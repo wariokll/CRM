@@ -1,12 +1,14 @@
 {
-  "name": "service-crm",
+  "name": "bazis-crm",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "powershell -ExecutionPolicy Bypass -File ./start-crm.ps1",
+    "stop": "powershell -ExecutionPolicy Bypass -File ./stop-crm.ps1"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",

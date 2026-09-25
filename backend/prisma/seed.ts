@@ -9,8 +9,8 @@ async function main() {
   const email = process.env.ADMIN_EMAIL ?? 'admin@servio.local'
   await prisma.user.upsert({
     where: { email },
-    update: { role: Role.ADMIN, status: UserStatus.ACTIVE },
-    create: { ipName: 'Servio', email, phone: '+7 000 000-00-00', passwordHash: await bcrypt.hash(password, 12), role: Role.ADMIN, status: UserStatus.ACTIVE },
+    update: { ipName: 'ЦТО БАЗИС', role: Role.ADMIN, status: UserStatus.ACTIVE },
+    create: { ipName: 'ЦТО БАЗИС', email, phone: '+7 000 000-00-00', passwordHash: await bcrypt.hash(password, 12), role: Role.ADMIN, status: UserStatus.ACTIVE },
   })
   await prisma.requestType.createMany({ data: [
     { name: 'Не работает касса', color: '#ee7d6a' },

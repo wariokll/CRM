@@ -51,6 +51,7 @@ model User {
   createdRequests   Request[]  @relation("created_requests")
   assignedRequests  Request[]  @relation("assigned_requests")
   updatedAccesses   StoreAccess[] @relation("access_updated_by")
+  notifications     Notification[]
   createdAt         DateTime   @default(now()) @map("created_at")
   updatedAt         DateTime   @updatedAt @map("updated_at")
   @@map("users")
@@ -63,6 +64,7 @@ model Store {
   address   String
   phone     String?
   status    StoreStatus @default(PENDING)
+  rejectionReason String? @db.Text @map("rejection_reason")
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   access    StoreAccess?
   requests  Request[]
@@ -138,4 +140,16 @@ model RequestAttachment {
   request      Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
   @@index([requestId])
   @@map("request_attachments")
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  title     String
+  message   String   @db.Text
+  isRead    Boolean  @default(false) @map("is_read")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  @@index([userId, isRead])
+  @@map("notifications")
 }

@@ -5,5 +5,12 @@ dist/
 backend/node_modules/
 backend/dist/
 backend/.runtime-tmp/
+backend/.mysql-data/
+backend/.mysql-data-*/
+backend/.mysql-recovery/
+backend/.logs/
+backend/.pids/
+backend/mysql.local.ini
+backend/.db-root-password
 backend/.env
 .env

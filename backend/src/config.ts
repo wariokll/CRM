@@ -10,6 +10,7 @@ export const config = {
   port: Number(process.env.PORT ?? 3001),
   clientOrigin: process.env.CLIENT_ORIGIN ?? 'http://localhost:5173',
   isProduction: process.env.NODE_ENV === 'production',
+  cookieSecure: process.env.COOKIE_SECURE === 'true',
   accessSecret: required('JWT_ACCESS_SECRET'),
   refreshSecret: required('JWT_REFRESH_SECRET'),
   encryptionKey: required('ENCRYPTION_KEY'),

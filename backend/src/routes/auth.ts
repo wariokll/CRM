@@ -14,7 +14,7 @@ const loginSchema = z.object({ email: z.string().email(), password: z.string().m
 const publicUser = { id: true, ipName: true, email: true, phone: true, role: true, status: true, rejectionReason: true, createdAt: true } as const
 
 function attachRefresh(res: Response, token: string) {
-  res.cookie('refreshToken', token, { httpOnly: true, sameSite: 'lax', secure: config.isProduction, maxAge: 30 * 24 * 60 * 60 * 1000, path: '/api/auth' })
+  res.cookie('refreshToken', token, { httpOnly: true, sameSite: 'lax', secure: config.cookieSecure, maxAge: 30 * 24 * 60 * 60 * 1000, path: '/api/auth' })
 }
 
 authRouter.post('/register', async (req, res) => {
