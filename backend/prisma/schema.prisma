@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CLIENT
+  ADMIN
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  BLOCKED
+}
+
+enum StoreStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+}
+
+enum Urgency {
+  URGENT
+  SCHEDULED
+}
+
+enum RequestStatus {
+  NEW
+  ACCEPTED
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+model User {
+  id                Int        @id @default(autoincrement())
+  ipName            String     @map("ip_name")
+  email             String     @unique
+  passwordHash      String     @map("password_hash")
+  phone             String
+  role              Role       @default(CLIENT)
+  status            UserStatus @default(PENDING)
+  rejectionReason   String?    @db.Text @map("rejection_reason")
+  stores            Store[]
+  createdRequests   Request[]  @relation("created_requests")
+  assignedRequests  Request[]  @relation("assigned_requests")
+  updatedAccesses   StoreAccess[] @relation("access_updated_by")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+  @@map("users")
+}
+
+model Store {
+  id        Int         @id @default(autoincrement())
+  userId    Int         @map("user_id")
+  name      String
+  address   String
+  phone     String?
+  status    StoreStatus @default(PENDING)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  access    StoreAccess?
+  requests  Request[]
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+  @@index([userId])
+  @@index([status])
+  @@map("stores")
+}
+
+model StoreAccess {
+  id                       Int       @id @default(autoincrement())
+  storeId                  Int       @unique @map("store_id")
+  anydeskId                String?   @map("anydesk_id")
+  anydeskPasswordEncrypted String?   @db.Text @map("anydesk_password_encrypted")
+  ofdUrl                   String?   @map("ofd_url")
+  ofdLogin                 String?   @map("ofd_login")
+  ofdPasswordEncrypted     String?   @db.Text @map("ofd_password_encrypted")
+  nalogUrl                 String?   @map("nalog_url")
+  nalogLogin               String?   @map("nalog_login")
+  nalogPasswordEncrypted   String?   @db.Text @map("nalog_password_encrypted")
+  updatedByUserId          Int?      @map("updated_by_user_id")
+  store                    Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  updatedBy                User?     @relation("access_updated_by", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  updatedAt                DateTime  @updatedAt @map("updated_at")
+  @@map("store_accesses")
+}
+
+model RequestType {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?   @db.Text
+  color       String?   @default("#ee7d6a")
+  isActive    Boolean   @default(true) @map("is_active")
+  requests    Request[]
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  @@map("request_types")
+}
+
+model Request {
+  id              Int           @id @default(autoincrement())
+  storeId         Int           @map("store_id")
+  createdByUserId Int           @map("created_by_user_id")
+  typeId          Int           @map("type_id")
+  urgency         Urgency
+  scheduledAt     DateTime?     @map("scheduled_at")
+  description     String        @db.Text
+  status          RequestStatus @default(NEW)
+  adminComment    String?       @db.Text @map("admin_comment")
+  assignedAdminId Int?          @map("assigned_admin_id")
+  store           Store         @relation(fields: [storeId], references: [id])
+  createdBy       User          @relation("created_requests", fields: [createdByUserId], references: [id])
+  type            RequestType   @relation(fields: [typeId], references: [id])
+  assignedAdmin   User?         @relation("assigned_requests", fields: [assignedAdminId], references: [id])
+  attachments     RequestAttachment[]
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  closedAt        DateTime?     @map("closed_at")
+  @@index([storeId])
+  @@index([status])
+  @@index([urgency])
+  @@index([scheduledAt])
+  @@map("requests")
+}
+
+model RequestAttachment {
+  id           Int      @id @default(autoincrement())
+  requestId    Int      @map("request_id")
+  filePath     String   @map("file_path")
+  originalName String   @map("original_name")
+  uploadedAt   DateTime @default(now()) @map("uploaded_at")
+  request      Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  @@index([requestId])
+  @@map("request_attachments")
+}

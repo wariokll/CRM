@@ -1,0 +1,18 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: servio-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: servio_crm
+      MYSQL_USER: crm_user
+      MYSQL_PASSWORD: change_me
+      MYSQL_ROOT_PASSWORD: change_root_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+volumes:
+  mysql_data:

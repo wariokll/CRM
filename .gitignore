@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.tools/
+.node-runtime/
+backend/node_modules/
+backend/dist/
+backend/.runtime-tmp/
+backend/.env
+.env
