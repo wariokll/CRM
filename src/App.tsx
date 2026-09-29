@@ -130,7 +130,7 @@ function Stores({ stores, admin, access, edit }: { stores: Store[]; admin: boole
   const [ownerFilter, setOwnerFilter] = useState('')
   const owners = useMemo(() => Array.from(new Map(stores.filter(store => store.user).map(store => [store.user!.id, store.user!])).values()).sort((a, b) => a.ipName.localeCompare(b.ipName, 'ru')), [stores])
   const visible = admin && ownerFilter ? stores.filter(store => store.user?.id === Number(ownerFilter)) : stores
-  const groups = admin ? Array.from(new Map(visible.map(store => [store.user?.id ?? 0, { owner: store.user, stores: [] as Store[] }])).values()) : [{ owner: undefined, stores: visible }]
+  const groups = admin ? Array.from(new Map(visible.map(store => [store.user?.id ?? 0, { owner: store.user, stores: [] as Store[] }])).values()) : [{ owner: undefined, stores: [] as Store[] }]
   for (const store of visible) {
     const group = groups.find(item => admin ? item.owner?.id === store.user?.id : true)
     if (group) group.stores.push(store)

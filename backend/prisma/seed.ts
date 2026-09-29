@@ -4,14 +4,41 @@ import { PrismaClient, Role, UserStatus } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function main() {
-  const password = process.env.ADMIN_PASSWORD
-  if (!password || password === 'change-this-before-first-seed') throw new Error('Set a strong ADMIN_PASSWORD before running the seed')
-  const email = process.env.ADMIN_EMAIL ?? 'admin@servio.local'
-  await prisma.user.upsert({
-    where: { email },
-    update: { ipName: 'ЦТО БАЗИС', role: Role.ADMIN, status: UserStatus.ACTIVE },
-    create: { ipName: 'ЦТО БАЗИС', email, phone: '+7 000 000-00-00', passwordHash: await bcrypt.hash(password, 12), role: Role.ADMIN, status: UserStatus.ACTIVE },
-  })
+  const adminEmail = (process.env.ADMIN_EMAIL ?? 'admin@bazis.ru').toLowerCase()
+  const adminPassword = process.env.ADMIN_PASSWORD ?? 'admin'
+  const clientEmail = (process.env.DEMO_USER_EMAIL ?? 'user@bazis.ru').toLowerCase()
+  const clientPassword = process.env.DEMO_USER_PASSWORD ?? 'user'
+  const [adminPasswordHash, clientPasswordHash] = await Promise.all([
+    bcrypt.hash(adminPassword, 12),
+    bcrypt.hash(clientPassword, 12),
+  ])
+
+  const currentAdmin = await prisma.user.findUnique({ where: { email: adminEmail } })
+    ?? await prisma.user.findUnique({ where: { email: 'admin@servio.local' } })
+  if (currentAdmin) {
+    await prisma.user.update({
+      where: { id: currentAdmin.id },
+      data: { email: adminEmail, passwordHash: adminPasswordHash, ipName: 'ЦТО БАЗИС', role: Role.ADMIN, status: UserStatus.ACTIVE },
+    })
+  } else {
+    await prisma.user.create({
+      data: { ipName: 'ЦТО БАЗИС', email: adminEmail, phone: '+7 000 000-00-00', passwordHash: adminPasswordHash, role: Role.ADMIN, status: UserStatus.ACTIVE },
+    })
+  }
+
+  const currentClient = await prisma.user.findUnique({ where: { email: clientEmail } })
+    ?? await prisma.user.findUnique({ where: { email: 'demo@servio.local' } })
+  if (currentClient) {
+    await prisma.user.update({
+      where: { id: currentClient.id },
+      data: { email: clientEmail, passwordHash: clientPasswordHash, ipName: 'ИП Демо', role: Role.CLIENT, status: UserStatus.ACTIVE },
+    })
+  } else {
+    await prisma.user.create({
+      data: { ipName: 'ИП Демо', email: clientEmail, phone: '+7 000 000-00-01', passwordHash: clientPasswordHash, role: Role.CLIENT, status: UserStatus.ACTIVE },
+    })
+  }
+
   await prisma.requestType.createMany({ data: [
     { name: 'Не работает касса', color: '#ee7d6a' },
     { name: 'Ошибка при закрытии смены', color: '#8979cf' },
