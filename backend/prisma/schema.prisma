@@ -130,11 +130,13 @@ model User {
   departmentMemberships  UserDepartment[]
   permissionOverrides    UserPermission[]
   requestComments        RequestComment[]
+  requestActivities      RequestActivity[]
   departmentTransfers    RequestDepartmentHistory[] @relation("request_transferred_by")
   updatedAccesses        StoreAccess[]              @relation("access_updated_by")
   notifications          Notification[]
   telegramMessages       TelegramMessage[]          @relation("telegram_sent_by")
   linkedTelegramChats    TelegramChat[]             @relation("telegram_linked_user")
+  telegramLinkCodes      TelegramLinkCode[]
   linkedContacts         Contact[]
   createdAt              DateTime                   @default(now()) @map("created_at")
   updatedAt              DateTime                   @updatedAt @map("updated_at")
@@ -328,6 +330,8 @@ model Request {
   comments            RequestComment[]
   departmentHistory   RequestDepartmentHistory[]
   attachments         RequestAttachment[]
+  activities          RequestActivity[]
+  reminders           RequestReminder[]
   telegramChats       TelegramChat[]
   createdAt           DateTime                   @default(now()) @map("created_at")
   updatedAt           DateTime                   @updatedAt @map("updated_at")
@@ -399,6 +403,46 @@ model RequestAttachment {
 
   @@index([requestId])
   @@map("request_attachments")
+}
+
+model RequestActivity {
+  id           Int      @id @default(autoincrement())
+  requestId    Int      @map("request_id")
+  authorUserId Int?     @map("author_user_id")
+  kind         String   @db.VarChar(40)
+  message      String   @db.VarChar(500)
+  request      Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  author       User?    @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([requestId, createdAt])
+  @@map("request_activities")
+}
+
+model RequestReminder {
+  id        Int      @id @default(autoincrement())
+  requestId Int      @map("request_id")
+  kind      String   @db.VarChar(32)
+  audience  String   @default("CLIENT") @db.VarChar(16)
+  sentAt    DateTime @default(now()) @map("sent_at")
+  request   Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@unique([requestId, kind, audience])
+  @@index([sentAt])
+  @@map("request_reminders")
+}
+
+model TelegramLinkCode {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  code      String   @unique @db.VarChar(80)
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, expiresAt])
+  @@map("telegram_link_codes")
 }
 
 model TelegramIntegration {

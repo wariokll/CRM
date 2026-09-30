@@ -1,8 +1,10 @@
 import { DepartmentMembershipRole, PermissionKey, Role, UserStatus } from '@prisma/client'
 import bcrypt from 'bcrypt'
+import { randomBytes } from 'node:crypto'
 import { Router } from 'express'
 import { z } from 'zod'
 import { prisma } from '../db.js'
+import { config } from '../config.js'
 import { authenticate } from '../middleware/auth.js'
 import { requirePermission } from '../utils/permissions.js'
 
@@ -20,6 +22,7 @@ const staffSelect = {
   createdAt: true,
   departmentMemberships: { include: { department: true } },
   permissionOverrides: true,
+  linkedTelegramChats: { where: { integration: { kind: 'BOT' } }, select: { id: true, title: true, username: true } },
 } as const
 
 staffRouter.get('/', async (_req, res) => {
@@ -87,4 +90,18 @@ staffRouter.patch('/:id/password', async (req, res) => {
   if (!target) return res.status(404).json({ message: 'Сотрудник не найден' })
   await prisma.user.update({ where: { id }, data: { passwordHash: await bcrypt.hash(password, 12) } })
   res.status(204).end()
+})
+
+staffRouter.post('/:id/telegram-link', async (req, res) => {
+  const id = Number(req.params.id)
+  const target = await prisma.user.findFirst({ where: { id, role: { not: Role.CLIENT }, status: UserStatus.ACTIVE }, select: { id: true, ipName: true } })
+  if (!target) return res.status(404).json({ message: 'Активный сотрудник не найден' })
+  const code = randomBytes(18).toString('base64url')
+  const expiresAt = new Date(Date.now() + 20 * 60_000)
+  await prisma.$transaction([
+    prisma.telegramLinkCode.deleteMany({ where: { userId: id, usedAt: null } }),
+    prisma.telegramLinkCode.create({ data: { userId: id, code, expiresAt } }),
+  ])
+  const deepLink = `https://t.me/${config.telegramBotUsername}?start=staff_${code}`
+  res.json({ employee: target.ipName, deepLink, expiresAt })
 })

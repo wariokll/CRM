@@ -73,8 +73,9 @@ storesRouter.get('/:id/access', async (req, res) => {
 })
 
 storesRouter.put('/:id/access', async (req, res) => {
-  const store = await visibleStore(Number(req.params.id), req.auth!.userId, PermissionKey.VIEW_STORE_SECRETS)
-  if (!store) return res.status(404).json({ message: 'Точка не найдена' })
+  const store = await prisma.store.findUnique({ where: { id: Number(req.params.id) } })
+  const access = await getUserAccess(req.auth!.userId)
+  if (!store || !access || access.status !== 'ACTIVE' || access.role === Role.CLIENT) return res.status(404).json({ message: 'Точка не найдена или доступна только сотрудникам' })
   const body = accessSchema.parse(req.body)
   const data = { anydeskId: body.anydeskId, ofdUrl: body.ofdUrl, ofdLogin: body.ofdLogin, nalogUrl: body.nalogUrl, nalogLogin: body.nalogLogin, ...(body.anydeskPassword !== undefined && { anydeskPasswordEncrypted: body.anydeskPassword ? encrypt(body.anydeskPassword, config.encryptionKey) : null }), ...(body.ofdPassword !== undefined && { ofdPasswordEncrypted: body.ofdPassword ? encrypt(body.ofdPassword, config.encryptionKey) : null }), ...(body.nalogPassword !== undefined && { nalogPasswordEncrypted: body.nalogPassword ? encrypt(body.nalogPassword, config.encryptionKey) : null }), updatedByUserId: req.auth!.userId }
   await prisma.storeAccess.upsert({ where: { storeId: store.id }, create: { storeId: store.id, ...data }, update: data })

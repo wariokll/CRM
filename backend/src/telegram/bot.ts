@@ -1,4 +1,4 @@
-import { Priority, RequestSource, Role, TelegramIntegrationKind, TelegramIntegrationStatus, Urgency, type Prisma } from '@prisma/client'
+import { Priority, RequestSource, Role, TelegramIntegrationKind, TelegramIntegrationStatus, Urgency, UserStatus, type Prisma } from '@prisma/client'
 import { config } from '../config.js'
 import { prisma } from '../db.js'
 
@@ -102,11 +102,30 @@ async function statusText(chatId: number) {
   return `Последние заявки:\n${requests.map(row => `#${row.id} · ${row.type.name} · ${labels[row.status]}`).join('\n')}`
 }
 
+async function linkEmployeeChat(chatId: number, code: string) {
+  const link = await prisma.telegramLinkCode.findUnique({ where: { code }, include: { user: { select: { id: true, ipName: true, role: true, status: true } } } })
+  if (!link || link.usedAt || link.expiresAt <= new Date() || link.user.status !== UserStatus.ACTIVE || link.user.role === Role.CLIENT) return null
+  await prisma.$transaction([
+    prisma.telegramChat.update({ where: { id: chatId }, data: { linkedUserId: link.userId, unreadCount: 0 } }),
+    prisma.telegramLinkCode.update({ where: { id: link.id }, data: { usedAt: new Date() } }),
+  ])
+  return link.user
+}
+
 async function handleMessage(integrationId: number, message: TelegramMessage) {
   const chat = await ensureChat(integrationId, message)
   await storeIncoming(chat.id, message)
   const text = message.text?.trim() ?? ''
   const lower = text.toLowerCase()
+  const startArgument = /^\/start(?:\s+(.+))?$/i.exec(text)?.[1]
+  if (startArgument?.startsWith('staff_')) {
+    const employee = await linkEmployeeChat(chat.id, startArgument.slice('staff_'.length))
+    return reply(chat.id, chat.externalChatId, employee ? `Telegram подключён к учётной записи «${employee.ipName}». Теперь вы будете получать рабочие уведомления по заявкам.` : 'Ссылка недействительна или устарела. Попросите руководителя сформировать новую ссылку.')
+  }
+  if (chat.linkedUserId) {
+    const employee = await prisma.user.findUnique({ where: { id: chat.linkedUserId }, select: { role: true, status: true } })
+    if (employee && employee.status === UserStatus.ACTIVE && employee.role !== Role.CLIENT) return reply(chat.id, chat.externalChatId, 'Рабочий Telegram подключён. Здесь будут приходить уведомления о назначенных заявках и напоминаниях.')
+  }
   if (lower === '/start' || lower === 'старт') return reply(chat.id, chat.externalChatId, 'Здравствуйте! Я бот ЦТО БАЗИС. Помогу создать заявку или показать её статус.', { keyboard: [['Создать заявку'], ['Мои заявки']], resize_keyboard: true })
   if (lower === 'создать заявку' || lower === '/new') return reply(chat.id, chat.externalChatId, 'Выберите шаблон заявки:', await requestKeyboard())
   if (lower === 'мои заявки' || lower === '/status') return reply(chat.id, chat.externalChatId, await statusText(chat.id))

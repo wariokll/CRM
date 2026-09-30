@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../db.js'
 import { authenticate } from '../middleware/auth.js'
 import { canChangeRequestStatus } from '../utils/request-status.js'
-import { notifyRequestClient } from '../utils/telegram-notifications.js'
+import { notifyRequestAssignees, notifyRequestClient } from '../utils/telegram-notifications.js'
 import { getUserAccess, hasPermission, requirePermission, type UserAccess } from '../utils/permissions.js'
 
 export const requestsRouter = Router()
@@ -32,7 +32,7 @@ const updateSchema = z.object({
 })
 
 const requestInclude = {
-  store: { include: { organization: true } },
+  store: { include: { organization: true, access: { select: { anydeskId: true, ofdUrl: true, ofdLogin: true, nalogUrl: true, nalogLogin: true, updatedAt: true } } } },
   organization: true,
   type: { include: { department: true } },
   department: true,
@@ -41,6 +41,7 @@ const requestInclude = {
   assignees: { include: { user: { select: { id: true, ipName: true, email: true, phone: true, role: true } } }, orderBy: { assignedAt: 'asc' as const } },
   comments: { include: { author: { select: { id: true, ipName: true, role: true } } }, orderBy: { createdAt: 'asc' as const } },
   departmentHistory: { include: { fromDepartment: true, toDepartment: true, transferredBy: { select: { id: true, ipName: true } } }, orderBy: { createdAt: 'asc' as const } },
+  activities: { include: { author: { select: { id: true, ipName: true, role: true } } }, orderBy: { createdAt: 'asc' as const } },
 } as const
 
 function visibilityWhere(access: UserAccess): Prisma.RequestWhereInput {
@@ -158,6 +159,7 @@ requestsRouter.post('/', async (req, res) => {
       templateData: body.templateData as Prisma.InputJsonValue | undefined,
     } })
     await transaction.requestDepartmentHistory.create({ data: { requestId: created.id, toDepartmentId: requestedDepartment, transferredByUserId: access.userId } })
+    await transaction.requestActivity.create({ data: { requestId: created.id, authorUserId: access.userId, kind: 'CREATED', message: 'Заявка создана' } })
     return transaction.request.findUniqueOrThrow({ where: { id: created.id }, include: requestInclude })
   })
   res.status(201).json(request)
@@ -167,7 +169,7 @@ requestsRouter.patch('/:id', async (req, res) => {
   const id = Number(req.params.id)
   const access = await getUserAccess(req.auth!.userId)
   if (!access || access.role === Role.CLIENT) return res.status(403).json({ message: 'Недостаточно прав' })
-  const row = await prisma.request.findFirst({ where: { id, AND: [visibilityWhere(access)] }, include: { assignees: true } })
+  const row = await prisma.request.findFirst({ where: { id, AND: [visibilityWhere(access)] }, include: { assignees: true, type: { select: { name: true } } } })
   if (!row) return res.status(404).json({ message: 'Заявка не найдена' })
   const update = updateSchema.parse(req.body)
   const managesCurrent = canManageCurrent(access, row.departmentId)
@@ -201,6 +203,12 @@ requestsRouter.patch('/:id', async (req, res) => {
       ...(update.adminComment !== undefined && { adminComment: update.adminComment }),
       ...((update.status === RequestStatus.DONE || update.status === RequestStatus.CANCELLED) && { closedAt: new Date() }),
     } })
+    const statusLabels: Record<RequestStatus, string> = { NEW: 'Новая', ACCEPTED: 'Принята', IN_PROGRESS: 'В работе', DONE: 'Выполнена', CANCELLED: 'Отменена' }
+    const priorityLabels: Record<Priority, string> = { LOW: 'низкий', NORMAL: 'обычный', HIGH: 'высокий', CRITICAL: 'критический' }
+    if (update.status && update.status !== row.status) await transaction.requestActivity.create({ data: { requestId: row.id, authorUserId: access.userId, kind: 'STATUS_CHANGED', message: `Статус изменён: «${statusLabels[row.status]}» → «${statusLabels[update.status]}»` } })
+    if (update.priority && update.priority !== row.priority) await transaction.requestActivity.create({ data: { requestId: row.id, authorUserId: access.userId, kind: 'PRIORITY_CHANGED', message: `Приоритет изменён: «${priorityLabels[row.priority]}» → «${priorityLabels[update.priority]}»` } })
+    if (update.departmentId && update.departmentId !== row.departmentId) await transaction.requestActivity.create({ data: { requestId: row.id, authorUserId: access.userId, kind: 'DEPARTMENT_CHANGED', message: 'Заявка передана в другой отдел' } })
+    if (update.assigneeIds) await transaction.requestActivity.create({ data: { requestId: row.id, authorUserId: access.userId, kind: 'ASSIGNEES_CHANGED', message: update.assigneeIds.length ? 'Исполнители обновлены' : 'Исполнители сняты с заявки' } })
     if (update.adminComment?.trim()) await transaction.requestComment.create({ data: { requestId: row.id, authorUserId: access.userId, visibility: CommentVisibility.CLIENT, body: update.adminComment.trim() } })
   })
   if (update.status && update.status !== row.status) {
@@ -208,6 +216,7 @@ requestsRouter.patch('/:id', async (req, res) => {
     void notifyRequestClient(row.id, `Заявка #${row.id}: статус изменён на «${labels[update.status]}».`)
   }
   if (update.adminComment?.trim()) void notifyRequestClient(row.id, `Новый комментарий по заявке #${row.id}:\n${update.adminComment.trim()}`)
+  if (update.assigneeIds?.length) void notifyRequestAssignees(row.id, `Вам назначена заявка «${row.type.name}». Откройте БАЗИС CRM для деталей.`)
   res.json(await prisma.request.findUniqueOrThrow({ where: { id: row.id }, include: requestInclude }))
 })
 
@@ -215,9 +224,11 @@ requestsRouter.post('/:id/assignees/self', async (req, res) => {
   const id = Number(req.params.id)
   const access = await getUserAccess(req.auth!.userId)
   if (!access || access.role === Role.CLIENT) return res.status(403).json({ message: 'Недостаточно прав' })
-  const row = await prisma.request.findUnique({ where: { id }, select: { departmentId: true } })
+  const row = await prisma.request.findUnique({ where: { id }, select: { departmentId: true, type: { select: { name: true } } } })
   if (!row || !access.departmentIds.includes(row.departmentId)) return res.status(404).json({ message: 'Заявка вашего отдела не найдена' })
   await prisma.requestAssignee.upsert({ where: { requestId_userId: { requestId: id, userId: access.userId } }, create: { requestId: id, userId: access.userId, assignedByUserId: access.userId }, update: {} })
+  await prisma.requestActivity.create({ data: { requestId: id, authorUserId: access.userId, kind: 'SELF_ASSIGNED', message: 'Мастер взял заявку в работу' } })
+  void notifyRequestAssignees(id, `Вы взяли в работу заявку «${row.type.name}».`, [access.userId])
   res.status(204).end()
 })
 
@@ -235,6 +246,7 @@ requestsRouter.post('/:id/comments', async (req, res) => {
   const body = z.object({ body: z.string().trim().min(1).max(5000), visibility: z.nativeEnum(CommentVisibility).default(CommentVisibility.CLIENT) }).parse(req.body)
   if (access.role === Role.CLIENT && body.visibility !== CommentVisibility.CLIENT) return res.status(403).json({ message: 'Недостаточно прав' })
   const comment = await prisma.requestComment.create({ data: { requestId: id, authorUserId: access.userId, visibility: body.visibility, body: body.body }, include: { author: { select: { id: true, ipName: true, role: true } } } })
+  await prisma.requestActivity.create({ data: { requestId: id, authorUserId: access.userId, kind: 'COMMENT_ADDED', message: body.visibility === CommentVisibility.INTERNAL ? 'Добавлен внутренний комментарий' : 'Добавлен комментарий для клиента' } })
   if (access.role !== Role.CLIENT && comment.visibility === CommentVisibility.CLIENT) void notifyRequestClient(id, `Новый комментарий по заявке #${id} от ${comment.author.ipName}:\n${comment.body}`)
   res.status(201).json(comment)
 })

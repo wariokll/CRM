@@ -104,6 +104,7 @@ export interface ServiceRequest {
   source: 'WEB' | 'TELEGRAM_ACCOUNT' | 'TELEGRAM_BOT'
   scheduledAt?: string | null
   description: string
+  templateData?: Record<string, unknown> | null
   status: RequestStatus
   adminComment?: string | null
   createdAt: string
@@ -116,10 +117,11 @@ export interface ServiceRequest {
   createdBy?: Pick<User, 'id' | 'ipName' | 'phone' | 'email'> | null
   assignees: Array<{ user: Pick<User, 'id' | 'ipName' | 'email' | 'phone' | 'role'>; assignedAt: string }>
   comments: Array<{ id: number; body: string; visibility: 'INTERNAL' | 'CLIENT'; createdAt: string; author: Pick<User, 'id' | 'ipName' | 'role'> }>
+  activities: Array<{ id: number; kind: string; message: string; createdAt: string; author?: Pick<User, 'id' | 'ipName' | 'role'> | null }>
   departmentHistory: Array<{ id: number; createdAt: string; fromDepartment?: Department | null; toDepartment: Department; transferredBy: Pick<User, 'id' | 'ipName'> }>
 }
 
-export interface StaffMember extends User { departmentMemberships: Array<{ departmentId: number; membershipRole: 'HEAD' | 'MASTER'; department: Department }>; permissionOverrides: Array<{ permission: PermissionKey; enabled: boolean }> }
+export interface StaffMember extends User { departmentMemberships: Array<{ departmentId: number; membershipRole: 'HEAD' | 'MASTER'; department: Department }>; permissionOverrides: Array<{ permission: PermissionKey; enabled: boolean }>; linkedTelegramChats?: Array<{ id: number; title: string; username?: string | null }> }
 export interface TelegramIntegration { id: number; kind: 'USER_ACCOUNT' | 'BOT'; status: 'DISABLED' | 'NEEDS_CONFIGURATION' | 'CONNECTING' | 'ACTIVE' | 'ERROR'; displayName?: string | null; lastError?: string | null }
 export interface TelegramChat { id: number; title: string; username?: string | null; unreadCount: number; lastMessageAt?: string | null; integration: TelegramIntegration; organization?: Organization | null; store?: Store | null; linkedUser?: Pick<User, 'id' | 'ipName' | 'email'> | null; messages: Array<{ body?: string | null; sentAt: string }> }
 
