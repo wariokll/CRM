@@ -9,6 +9,11 @@ describe('request status lifecycle', () => {
     expect(canChangeRequestStatus(RequestStatus.IN_PROGRESS, RequestStatus.DONE)).toBe(true)
   })
 
+  it('allows staff to complete an open request directly', () => {
+    expect(canChangeRequestStatus(RequestStatus.NEW, RequestStatus.DONE)).toBe(true)
+    expect(canChangeRequestStatus(RequestStatus.ACCEPTED, RequestStatus.DONE)).toBe(true)
+  })
+
   it('allows cancellation only before a terminal state', () => {
     expect(canChangeRequestStatus(RequestStatus.NEW, RequestStatus.CANCELLED)).toBe(true)
     expect(canChangeRequestStatus(RequestStatus.ACCEPTED, RequestStatus.CANCELLED)).toBe(true)

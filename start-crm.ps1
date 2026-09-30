@@ -23,5 +23,17 @@ if (-not (Get-NetTCPConnection -State Listen -LocalPort 3001 -ErrorAction Silent
   Set-Content -LiteralPath (Join-Path $pidDir 'backend.pid') -Value $process.Id -NoNewline
 }
 
+$botPid = Join-Path $pidDir 'telegram-bot.pid'
+$botTokenConfigured = (Get-Content -LiteralPath (Join-Path $backend '.env') -Raw -ErrorAction SilentlyContinue) -match '(?m)^TELEGRAM_BOT_TOKEN=.+$'
+if ($botTokenConfigured) {
+  $existingBotPid = if (Test-Path -LiteralPath $botPid) { [int](Get-Content -LiteralPath $botPid) } else { 0 }
+  if (-not $existingBotPid -or -not (Get-Process -Id $existingBotPid -ErrorAction SilentlyContinue)) {
+    $botOut = Join-Path $logDir 'telegram-bot-out.log'
+    $botErr = Join-Path $logDir 'telegram-bot-error.log'
+    $botProcess = Start-Process -FilePath 'node.exe' -ArgumentList 'dist/telegram/bot.js' -WorkingDirectory $backend -WindowStyle Hidden -RedirectStandardOutput $botOut -RedirectStandardError $botErr -PassThru
+    Set-Content -LiteralPath $botPid -Value $botProcess.Id -NoNewline
+  }
+}
+
 Start-Process 'http://localhost:3001'
 Write-Host 'БАЗИС CRM доступна по адресу http://localhost:3001' -ForegroundColor Green

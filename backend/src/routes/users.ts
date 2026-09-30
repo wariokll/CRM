@@ -1,12 +1,13 @@
-import { Role, StoreStatus, UserStatus } from '@prisma/client'
+import { OrganizationStatus, OrganizationType, PermissionKey, Role, StoreStatus, UserStatus } from '@prisma/client'
 import bcrypt from 'bcrypt'
 import { Router } from 'express'
 import { z } from 'zod'
 import { prisma } from '../db.js'
-import { allowRoles, authenticate } from '../middleware/auth.js'
+import { authenticate } from '../middleware/auth.js'
+import { requirePermission } from '../utils/permissions.js'
 
 export const usersRouter = Router()
-usersRouter.use(authenticate, allowRoles(Role.ADMIN))
+usersRouter.use(authenticate, requirePermission(PermissionKey.MANAGE_CLIENTS))
 
 const createSchema = z.object({
   ipName: z.string().min(2).max(200),
@@ -19,29 +20,33 @@ const createSchema = z.object({
 usersRouter.get('/', async (req, res) => {
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : ''
   const users = await prisma.user.findMany({
-    where: {
-      role: Role.CLIENT,
-      ...(search && { OR: [{ ipName: { contains: search } }, { email: { contains: search } }, { phone: { contains: search } }] }),
+    where: { role: Role.CLIENT, ...(search && { OR: [{ ipName: { contains: search } }, { email: { contains: search } }, { phone: { contains: search } }] }) },
+    select: {
+      id: true, ipName: true, email: true, phone: true, role: true, status: true, rejectionReason: true, createdAt: true,
+      organizations: { include: { organization: { include: { stores: { orderBy: { createdAt: 'asc' } } } } } },
+      _count: { select: { createdRequests: true } },
     },
-    select: { id: true, ipName: true, email: true, phone: true, status: true, rejectionReason: true, createdAt: true, stores: { orderBy: { createdAt: 'asc' } }, _count: { select: { createdRequests: true } } },
     orderBy: { createdAt: 'desc' },
   })
-  res.json(users)
+  res.json(users.map(user => ({ ...user, stores: user.organizations.flatMap(item => item.organization.stores) })))
 })
 
 usersRouter.post('/', async (req, res) => {
   const body = createSchema.parse(req.body)
-  const user = await prisma.user.create({
-    data: {
-      ipName: body.ipName,
-      email: body.email.toLowerCase(),
+  const user = await prisma.$transaction(async transaction => {
+    const created = await transaction.user.create({ data: { ipName: body.ipName, email: body.email.toLowerCase(), phone: body.phone, passwordHash: await bcrypt.hash(body.password, 12), role: Role.CLIENT, status: UserStatus.ACTIVE } })
+    await transaction.organization.create({ data: {
+      type: /^\s*ип\b/i.test(body.ipName) ? OrganizationType.IP : /^\s*ооо\b/i.test(body.ipName) ? OrganizationType.OOO : OrganizationType.OTHER,
+      legalName: body.ipName,
+      shortName: body.ipName,
       phone: body.phone,
-      passwordHash: await bcrypt.hash(body.password, 12),
-      role: Role.CLIENT,
-      status: UserStatus.ACTIVE,
-      stores: { create: { ...body.store, status: StoreStatus.ACTIVE } },
-    },
-    select: { id: true, ipName: true, email: true, phone: true, status: true, stores: true },
+      email: body.email.toLowerCase(),
+      status: OrganizationStatus.ACTIVE,
+      createdByUserId: created.id,
+      members: { create: { userId: created.id, isPrimary: true } },
+      stores: { create: { ...body.store, userId: created.id, status: StoreStatus.ACTIVE } },
+    } })
+    return created
   })
   res.status(201).json(user)
 })

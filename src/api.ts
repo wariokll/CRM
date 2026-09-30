@@ -7,6 +7,11 @@ export class ApiError extends Error {
   constructor(message: string, public status: number, public details?: unknown) { super(message) }
 }
 
+function errorMessage(data: { message?: string; issues?: unknown }): string {
+  if (Array.isArray(data.issues) && data.issues.every(item => typeof item === 'string')) return data.issues.join('\n')
+  return data.message ?? 'Не удалось выполнить запрос'
+}
+
 function setToken(token: string) {
   accessToken = token
   if (token) sessionStorage.setItem('servio_access_token', token)
@@ -35,8 +40,8 @@ export async function api<T>(path: string, options: RequestInit = {}, retry = tr
   const response = await fetch(`/api${path}`, { ...options, headers, credentials: 'include' })
   if (response.status === 401 && retry && await refresh()) return api<T>(path, options, false)
   if (!response.ok) {
-    const data = await response.json().catch(() => ({})) as { message?: string }
-    throw new ApiError(data.message ?? 'Не удалось выполнить запрос', response.status, data)
+    const data = await response.json().catch(() => ({})) as { message?: string; issues?: unknown }
+    throw new ApiError(errorMessage(data), response.status, data)
   }
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>

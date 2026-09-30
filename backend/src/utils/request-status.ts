@@ -1,8 +1,8 @@
 import { RequestStatus } from '@prisma/client'
 
 export const requestStatusTransitions: Record<RequestStatus, readonly RequestStatus[]> = {
-  NEW: [RequestStatus.ACCEPTED, RequestStatus.CANCELLED],
-  ACCEPTED: [RequestStatus.IN_PROGRESS, RequestStatus.CANCELLED],
+  NEW: [RequestStatus.ACCEPTED, RequestStatus.DONE, RequestStatus.CANCELLED],
+  ACCEPTED: [RequestStatus.IN_PROGRESS, RequestStatus.DONE, RequestStatus.CANCELLED],
   IN_PROGRESS: [RequestStatus.DONE, RequestStatus.CANCELLED],
   DONE: [],
   CANCELLED: [],

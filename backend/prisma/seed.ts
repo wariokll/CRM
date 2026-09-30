@@ -1,9 +1,12 @@
 import bcrypt from 'bcrypt'
-import { PrismaClient, Role, UserStatus } from '@prisma/client'
+import { OrganizationStatus, OrganizationType, PrismaClient, Role, StoreStatus, UserStatus } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
 async function main() {
+  const subscriber = await prisma.department.upsert({ where: { slug: 'subscriber' }, update: { name: 'Абонентский', isActive: true }, create: { slug: 'subscriber', name: 'Абонентский' } })
+  const service = await prisma.department.upsert({ where: { slug: 'service' }, update: { name: 'Сервисный', isActive: true }, create: { slug: 'service', name: 'Сервисный' } })
+  await prisma.department.upsert({ where: { slug: 'sales' }, update: { name: 'Торговый', isActive: true }, create: { slug: 'sales', name: 'Торговый' } })
   const adminEmail = (process.env.ADMIN_EMAIL ?? 'admin@bazis.ru').toLowerCase()
   const adminPassword = process.env.ADMIN_PASSWORD ?? 'admin'
   const clientEmail = (process.env.DEMO_USER_EMAIL ?? 'user@bazis.ru').toLowerCase()
@@ -18,11 +21,11 @@ async function main() {
   if (currentAdmin) {
     await prisma.user.update({
       where: { id: currentAdmin.id },
-      data: { email: adminEmail, passwordHash: adminPasswordHash, ipName: 'ЦТО БАЗИС', role: Role.ADMIN, status: UserStatus.ACTIVE },
+      data: { email: adminEmail, passwordHash: adminPasswordHash, ipName: 'ЦТО БАЗИС', role: Role.DIRECTOR, status: UserStatus.ACTIVE },
     })
   } else {
     await prisma.user.create({
-      data: { ipName: 'ЦТО БАЗИС', email: adminEmail, phone: '+7 000 000-00-00', passwordHash: adminPasswordHash, role: Role.ADMIN, status: UserStatus.ACTIVE },
+      data: { ipName: 'ЦТО БАЗИС', email: adminEmail, phone: '+7 000 000-00-00', passwordHash: adminPasswordHash, role: Role.DIRECTOR, status: UserStatus.ACTIVE },
     })
   }
 
@@ -39,12 +42,31 @@ async function main() {
     })
   }
 
+  const client = await prisma.user.findUniqueOrThrow({ where: { email: clientEmail } })
+  const existingOrganization = await prisma.organization.findFirst({ where: { members: { some: { userId: client.id } } } })
+  if (!existingOrganization) {
+    await prisma.organization.create({ data: {
+      type: OrganizationType.IP,
+      legalName: 'ИП Демо',
+      shortName: 'ИП Демо',
+      phone: client.phone,
+      email: client.email,
+      status: OrganizationStatus.ACTIVE,
+      createdByUserId: client.id,
+      members: { create: { userId: client.id, isPrimary: true } },
+      stores: { create: { name: 'Демо-точка', address: 'г. Москва, демонстрационный адрес', phone: client.phone, userId: client.id, status: StoreStatus.ACTIVE } },
+    } })
+  }
+
   await prisma.requestType.createMany({ data: [
-    { name: 'Не работает касса', color: '#ee7d6a' },
-    { name: 'Ошибка при закрытии смены', color: '#8979cf' },
-    { name: 'Подключение к ОФД', color: '#60a3da' },
-    { name: 'Плановое обслуживание', color: '#60bb94' },
+    { name: 'Не работает касса', color: '#ee7d6a', departmentId: service.id },
+    { name: 'Ошибка при закрытии смены', color: '#8979cf', departmentId: service.id },
+    { name: 'Подключение к ОФД', color: '#60a3da', departmentId: subscriber.id },
+    { name: 'Плановое обслуживание', color: '#60bb94', departmentId: service.id },
+    { name: 'Консультация', color: '#5b8def', departmentId: subscriber.id, requiresOrganization: false, requiresStore: false },
   ], skipDuplicates: true })
+
+  await prisma.telegramIntegration.createMany({ data: [{ kind: 'USER_ACCOUNT' }, { kind: 'BOT' }], skipDuplicates: true })
 }
 
 main().then(() => prisma.$disconnect()).catch(async (error) => { console.error(error); await prisma.$disconnect(); process.exit(1) })

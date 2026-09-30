@@ -1,4 +1,4 @@
-import { Role, UserStatus } from '@prisma/client'
+import { OrganizationStatus, OrganizationType, Role, StoreStatus, UserStatus } from '@prisma/client'
 import bcrypt from 'bcrypt'
 import { Router, type Response } from 'express'
 import rateLimit from 'express-rate-limit'
@@ -11,7 +11,19 @@ import { createAccessToken, createRefreshToken, verifyRefreshToken } from '../ut
 export const authRouter = Router()
 const registerSchema = z.object({ ipName: z.string().min(2), email: z.string().email(), password: z.string().min(8), phone: z.string().min(5), store: z.object({ name: z.string().min(2), address: z.string().min(5), phone: z.string().optional() }) })
 const loginSchema = z.object({ email: z.string().email(), password: z.string().min(1) })
-const publicUser = { id: true, ipName: true, email: true, phone: true, role: true, status: true, rejectionReason: true, createdAt: true } as const
+const publicUser = {
+  id: true,
+  ipName: true,
+  email: true,
+  phone: true,
+  role: true,
+  status: true,
+  rejectionReason: true,
+  createdAt: true,
+  permissionOverrides: { select: { permission: true, enabled: true } },
+  departmentMemberships: { include: { department: true } },
+  organizations: { include: { organization: true } },
+} as const
 
 function attachRefresh(res: Response, token: string) {
   res.cookie('refreshToken', token, { httpOnly: true, sameSite: 'lax', secure: config.cookieSecure, maxAge: 30 * 24 * 60 * 60 * 1000, path: '/api/auth' })
@@ -20,7 +32,22 @@ function attachRefresh(res: Response, token: string) {
 authRouter.post('/register', async (req, res) => {
   const body = registerSchema.parse(req.body)
   const passwordHash = await bcrypt.hash(body.password, 12)
-  const user = await prisma.user.create({ data: { ipName: body.ipName, email: body.email.toLowerCase(), passwordHash, phone: body.phone, status: UserStatus.PENDING, role: Role.CLIENT, stores: { create: { ...body.store } } }, select: publicUser })
+  const user = await prisma.$transaction(async transaction => {
+    const created = await transaction.user.create({ data: { ipName: body.ipName, email: body.email.toLowerCase(), passwordHash, phone: body.phone, status: UserStatus.PENDING, role: Role.CLIENT } })
+    const organization = await transaction.organization.create({ data: {
+      type: /^\s*ип\b/i.test(body.ipName) ? OrganizationType.IP : /^\s*ооо\b/i.test(body.ipName) ? OrganizationType.OOO : OrganizationType.OTHER,
+      legalName: body.ipName,
+      shortName: body.ipName,
+      phone: body.phone,
+      email: body.email.toLowerCase(),
+      status: OrganizationStatus.PENDING,
+      createdByUserId: created.id,
+      members: { create: { userId: created.id, isPrimary: true } },
+      stores: { create: { ...body.store, userId: created.id, status: StoreStatus.PENDING } },
+    } })
+    void organization
+    return transaction.user.findUniqueOrThrow({ where: { id: created.id }, select: publicUser })
+  })
   res.status(201).json({ user, message: 'Заявка на регистрацию отправлена на модерацию' })
 })
 
@@ -31,7 +58,8 @@ authRouter.post('/login', rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, stand
   if (user.status === UserStatus.BLOCKED) return res.status(403).json({ message: 'Аккаунт заблокирован' })
   const payload = { userId: user.id, role: user.role }
   attachRefresh(res, createRefreshToken(payload))
-  return res.json({ accessToken: createAccessToken(payload), user: { ...user, passwordHash: undefined } })
+  const publicProfile = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: publicUser })
+  return res.json({ accessToken: createAccessToken(payload), user: publicProfile })
 })
 
 authRouter.post('/refresh', async (req, res) => {

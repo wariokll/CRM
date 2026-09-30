@@ -9,7 +9,27 @@ datasource db {
 
 enum Role {
   CLIENT
-  ADMIN
+  DIRECTOR
+  DEPARTMENT_HEAD
+  MASTER
+}
+
+enum PermissionKey {
+  VIEW_ALL_REQUESTS
+  MANAGE_REQUESTS
+  CANCEL_REQUESTS
+  TRANSFER_REQUESTS
+  SET_PRIORITY
+  ASSIGN_MASTERS
+  MANAGE_CLIENTS
+  MANAGE_ORGANIZATIONS
+  MANAGE_STORES
+  VIEW_STORE_SECRETS
+  VIEW_TELEGRAM
+  SEND_TELEGRAM
+  MANAGE_TEMPLATES
+  VIEW_REPORTS
+  MANAGE_STAFF
 }
 
 enum UserStatus {
@@ -17,6 +37,23 @@ enum UserStatus {
   ACTIVE
   REJECTED
   BLOCKED
+}
+
+enum OrganizationType {
+  IP
+  OOO
+  OTHER
+}
+
+enum OrganizationStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+}
+
+enum DepartmentMembershipRole {
+  HEAD
+  MASTER
 }
 
 enum StoreStatus {
@@ -30,6 +67,19 @@ enum Urgency {
   SCHEDULED
 }
 
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum RequestSource {
+  WEB
+  TELEGRAM_ACCOUNT
+  TELEGRAM_BOT
+}
+
 enum RequestStatus {
   NEW
   ACCEPTED
@@ -38,97 +88,305 @@ enum RequestStatus {
   CANCELLED
 }
 
+enum CommentVisibility {
+  INTERNAL
+  CLIENT
+}
+
+enum TelegramIntegrationKind {
+  USER_ACCOUNT
+  BOT
+}
+
+enum TelegramIntegrationStatus {
+  DISABLED
+  NEEDS_CONFIGURATION
+  CONNECTING
+  ACTIVE
+  ERROR
+}
+
+enum MessageDirection {
+  INCOMING
+  OUTGOING
+}
+
 model User {
-  id                Int        @id @default(autoincrement())
-  ipName            String     @map("ip_name")
-  email             String     @unique
-  passwordHash      String     @map("password_hash")
-  phone             String
-  role              Role       @default(CLIENT)
-  status            UserStatus @default(PENDING)
-  rejectionReason   String?    @db.Text @map("rejection_reason")
-  stores            Store[]
-  createdRequests   Request[]  @relation("created_requests")
-  assignedRequests  Request[]  @relation("assigned_requests")
-  updatedAccesses   StoreAccess[] @relation("access_updated_by")
-  notifications     Notification[]
-  createdAt         DateTime   @default(now()) @map("created_at")
-  updatedAt         DateTime   @updatedAt @map("updated_at")
+  id                     Int                        @id @default(autoincrement())
+  ipName                 String                     @map("ip_name")
+  email                  String                     @unique
+  passwordHash           String                     @map("password_hash")
+  phone                  String
+  role                   Role                       @default(CLIENT)
+  status                 UserStatus                 @default(PENDING)
+  rejectionReason        String?                    @map("rejection_reason") @db.Text
+  organizations          OrganizationMember[]
+  createdOrganizations   Organization[]             @relation("organization_created_by")
+  legacyStores           Store[]                    @relation("legacy_store_owner")
+  createdRequests        Request[]                  @relation("created_requests")
+  legacyAssignedRequests Request[]                  @relation("legacy_assigned_requests")
+  requestAssignments     RequestAssignee[]          @relation("request_assignees")
+  assignmentsCreated     RequestAssignee[]          @relation("request_assigned_by")
+  departmentMemberships  UserDepartment[]
+  permissionOverrides    UserPermission[]
+  requestComments        RequestComment[]
+  departmentTransfers    RequestDepartmentHistory[] @relation("request_transferred_by")
+  updatedAccesses        StoreAccess[]              @relation("access_updated_by")
+  notifications          Notification[]
+  telegramMessages       TelegramMessage[]          @relation("telegram_sent_by")
+  linkedTelegramChats    TelegramChat[]             @relation("telegram_linked_user")
+  linkedContacts         Contact[]
+  createdAt              DateTime                   @default(now()) @map("created_at")
+  updatedAt              DateTime                   @updatedAt @map("updated_at")
+
   @@map("users")
 }
 
-model Store {
-  id        Int         @id @default(autoincrement())
-  userId    Int         @map("user_id")
-  name      String
-  address   String
-  phone     String?
-  status    StoreStatus @default(PENDING)
-  rejectionReason String? @db.Text @map("rejection_reason")
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  access    StoreAccess?
-  requests  Request[]
-  createdAt DateTime    @default(now()) @map("created_at")
-  updatedAt DateTime    @updatedAt @map("updated_at")
+model UserPermission {
+  userId     Int           @map("user_id")
+  permission PermissionKey
+  enabled    Boolean       @default(true)
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permission])
+  @@map("user_permissions")
+}
+
+model Department {
+  id            Int                        @id @default(autoincrement())
+  slug          String                     @unique
+  name          String                     @unique
+  isActive      Boolean                    @default(true) @map("is_active")
+  memberships   UserDepartment[]
+  requests      Request[]
+  requestTypes  RequestType[]
+  transfersFrom RequestDepartmentHistory[] @relation("department_history_from")
+  transfersTo   RequestDepartmentHistory[] @relation("department_history_to")
+  createdAt     DateTime                   @default(now()) @map("created_at")
+  updatedAt     DateTime                   @updatedAt @map("updated_at")
+
+  @@map("departments")
+}
+
+model UserDepartment {
+  userId         Int                      @map("user_id")
+  departmentId   Int                      @map("department_id")
+  membershipRole DepartmentMembershipRole @default(MASTER) @map("membership_role")
+  user           User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department     Department               @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@id([userId, departmentId])
+  @@index([departmentId, membershipRole])
+  @@map("user_departments")
+}
+
+model Organization {
+  id              Int                  @id @default(autoincrement())
+  type            OrganizationType     @default(OTHER)
+  legalName       String               @map("legal_name")
+  shortName       String?              @map("short_name")
+  inn             String?
+  kpp             String?
+  ogrn            String?
+  legalAddress    String?              @map("legal_address") @db.Text
+  contactName     String?              @map("contact_name")
+  phone           String?
+  email           String?
+  status          OrganizationStatus   @default(PENDING)
+  rejectionReason String?              @map("rejection_reason") @db.Text
+  createdByUserId Int?                 @map("created_by_user_id")
+  createdBy       User?                @relation("organization_created_by", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  members         OrganizationMember[]
+  stores          Store[]
+  requests        Request[]
+  telegramChats   TelegramChat[]
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([inn])
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  organizationId Int          @map("organization_id")
+  userId         Int          @map("user_id")
+  isPrimary      Boolean      @default(false) @map("is_primary")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, userId])
   @@index([userId])
+  @@map("organization_members")
+}
+
+model Store {
+  id              Int            @id @default(autoincrement())
+  userId          Int?           @map("user_id")
+  organizationId  Int            @map("organization_id")
+  name            String
+  address         String
+  phone           String?
+  status          StoreStatus    @default(PENDING)
+  rejectionReason String?        @map("rejection_reason") @db.Text
+  legacyOwner     User?          @relation("legacy_store_owner", fields: [userId], references: [id], onDelete: SetNull)
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  access          StoreAccess?
+  requests        Request[]
+  telegramChats   TelegramChat[]
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([organizationId])
   @@index([status])
   @@map("stores")
 }
 
 model StoreAccess {
-  id                       Int       @id @default(autoincrement())
-  storeId                  Int       @unique @map("store_id")
-  anydeskId                String?   @map("anydesk_id")
-  anydeskPasswordEncrypted String?   @db.Text @map("anydesk_password_encrypted")
-  ofdUrl                   String?   @map("ofd_url")
-  ofdLogin                 String?   @map("ofd_login")
-  ofdPasswordEncrypted     String?   @db.Text @map("ofd_password_encrypted")
-  nalogUrl                 String?   @map("nalog_url")
-  nalogLogin               String?   @map("nalog_login")
-  nalogPasswordEncrypted   String?   @db.Text @map("nalog_password_encrypted")
-  updatedByUserId          Int?      @map("updated_by_user_id")
-  store                    Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  updatedBy                User?     @relation("access_updated_by", fields: [updatedByUserId], references: [id], onDelete: SetNull)
-  updatedAt                DateTime  @updatedAt @map("updated_at")
+  id                       Int      @id @default(autoincrement())
+  storeId                  Int      @unique @map("store_id")
+  anydeskId                String?  @map("anydesk_id")
+  anydeskPasswordEncrypted String?  @map("anydesk_password_encrypted") @db.Text
+  ofdUrl                   String?  @map("ofd_url")
+  ofdLogin                 String?  @map("ofd_login")
+  ofdPasswordEncrypted     String?  @map("ofd_password_encrypted") @db.Text
+  nalogUrl                 String?  @map("nalog_url")
+  nalogLogin               String?  @map("nalog_login")
+  nalogPasswordEncrypted   String?  @map("nalog_password_encrypted") @db.Text
+  updatedByUserId          Int?     @map("updated_by_user_id")
+  store                    Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  updatedBy                User?    @relation("access_updated_by", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
   @@map("store_accesses")
 }
 
 model RequestType {
-  id          Int       @id @default(autoincrement())
-  name        String    @unique
-  description String?   @db.Text
-  color       String?   @default("#ee7d6a")
-  isActive    Boolean   @default(true) @map("is_active")
-  requests    Request[]
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id                   Int        @id @default(autoincrement())
+  name                 String     @unique
+  description          String?    @db.Text
+  color                String?    @default("#ee7d6a")
+  isActive             Boolean    @default(true) @map("is_active")
+  departmentId         Int        @map("department_id")
+  requiresOrganization Boolean    @default(true) @map("requires_organization")
+  requiresStore        Boolean    @default(true) @map("requires_store")
+  availableOnWeb       Boolean    @default(true) @map("available_on_web")
+  availableOnTelegram  Boolean    @default(true) @map("available_on_telegram")
+  defaultPriority      Priority   @default(NORMAL) @map("default_priority")
+  templateFields       Json?      @map("template_fields")
+  department           Department @relation(fields: [departmentId], references: [id])
+  requests             Request[]
+  createdAt            DateTime   @default(now()) @map("created_at")
+  updatedAt            DateTime   @updatedAt @map("updated_at")
+
+  @@index([departmentId])
   @@map("request_types")
 }
 
+model Contact {
+  id            Int            @id @default(autoincrement())
+  displayName   String         @map("display_name")
+  phone         String?
+  email         String?
+  linkedUserId  Int?           @map("linked_user_id")
+  linkedUser    User?          @relation(fields: [linkedUserId], references: [id], onDelete: SetNull)
+  requests      Request[]
+  telegramChats TelegramChat[]
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  @@index([linkedUserId])
+  @@map("contacts")
+}
+
 model Request {
-  id              Int           @id @default(autoincrement())
-  storeId         Int           @map("store_id")
-  createdByUserId Int           @map("created_by_user_id")
-  typeId          Int           @map("type_id")
-  urgency         Urgency
-  scheduledAt     DateTime?     @map("scheduled_at")
-  description     String        @db.Text
-  status          RequestStatus @default(NEW)
-  adminComment    String?       @db.Text @map("admin_comment")
-  assignedAdminId Int?          @map("assigned_admin_id")
-  store           Store         @relation(fields: [storeId], references: [id])
-  createdBy       User          @relation("created_requests", fields: [createdByUserId], references: [id])
-  type            RequestType   @relation(fields: [typeId], references: [id])
-  assignedAdmin   User?         @relation("assigned_requests", fields: [assignedAdminId], references: [id])
-  attachments     RequestAttachment[]
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
-  closedAt        DateTime?     @map("closed_at")
+  id                  Int                        @id @default(autoincrement())
+  storeId             Int?                       @map("store_id")
+  organizationId      Int?                       @map("organization_id")
+  createdByUserId     Int?                       @map("created_by_user_id")
+  contactId           Int?                       @map("contact_id")
+  typeId              Int                        @map("type_id")
+  departmentId        Int                        @map("department_id")
+  urgency             Urgency
+  priority            Priority                   @default(NORMAL)
+  source              RequestSource              @default(WEB)
+  scheduledAt         DateTime?                  @map("scheduled_at")
+  description         String                     @db.Text
+  templateData        Json?                      @map("template_data")
+  status              RequestStatus              @default(NEW)
+  adminComment        String?                    @map("admin_comment") @db.Text
+  assignedAdminId     Int?                       @map("assigned_admin_id")
+  store               Store?                     @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  organization        Organization?              @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  createdBy           User?                      @relation("created_requests", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  contact             Contact?                   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  type                RequestType                @relation(fields: [typeId], references: [id])
+  department          Department                 @relation(fields: [departmentId], references: [id])
+  legacyAssignedAdmin User?                      @relation("legacy_assigned_requests", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  assignees           RequestAssignee[]
+  comments            RequestComment[]
+  departmentHistory   RequestDepartmentHistory[]
+  attachments         RequestAttachment[]
+  telegramChats       TelegramChat[]
+  createdAt           DateTime                   @default(now()) @map("created_at")
+  updatedAt           DateTime                   @updatedAt @map("updated_at")
+  closedAt            DateTime?                  @map("closed_at")
+
   @@index([storeId])
+  @@index([organizationId])
+  @@index([departmentId])
   @@index([status])
+  @@index([priority])
   @@index([urgency])
   @@index([scheduledAt])
   @@map("requests")
+}
+
+model RequestAssignee {
+  requestId        Int      @map("request_id")
+  userId           Int      @map("user_id")
+  assignedByUserId Int?     @map("assigned_by_user_id")
+  assignedAt       DateTime @default(now()) @map("assigned_at")
+  request          Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user             User     @relation("request_assignees", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy       User?    @relation("request_assigned_by", fields: [assignedByUserId], references: [id], onDelete: SetNull)
+
+  @@id([requestId, userId])
+  @@index([userId])
+  @@map("request_assignees")
+}
+
+model RequestComment {
+  id           Int               @id @default(autoincrement())
+  requestId    Int               @map("request_id")
+  authorUserId Int               @map("author_user_id")
+  visibility   CommentVisibility @default(INTERNAL)
+  body         String            @db.Text
+  request      Request           @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  author       User              @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+  createdAt    DateTime          @default(now()) @map("created_at")
+
+  @@index([requestId, createdAt])
+  @@map("request_comments")
+}
+
+model RequestDepartmentHistory {
+  id                  Int         @id @default(autoincrement())
+  requestId           Int         @map("request_id")
+  fromDepartmentId    Int?        @map("from_department_id")
+  toDepartmentId      Int         @map("to_department_id")
+  transferredByUserId Int         @map("transferred_by_user_id")
+  request             Request     @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fromDepartment      Department? @relation("department_history_from", fields: [fromDepartmentId], references: [id], onDelete: SetNull)
+  toDepartment        Department  @relation("department_history_to", fields: [toDepartmentId], references: [id])
+  transferredBy       User        @relation("request_transferred_by", fields: [transferredByUserId], references: [id])
+  createdAt           DateTime    @default(now()) @map("created_at")
+
+  @@index([requestId])
+  @@index([fromDepartmentId])
+  @@index([toDepartmentId])
+  @@map("request_department_history")
 }
 
 model RequestAttachment {
@@ -138,8 +396,69 @@ model RequestAttachment {
   originalName String   @map("original_name")
   uploadedAt   DateTime @default(now()) @map("uploaded_at")
   request      Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
   @@index([requestId])
   @@map("request_attachments")
+}
+
+model TelegramIntegration {
+  id              Int                       @id @default(autoincrement())
+  kind            TelegramIntegrationKind   @unique
+  status          TelegramIntegrationStatus @default(NEEDS_CONFIGURATION)
+  displayName     String?                   @map("display_name")
+  lastError       String?                   @map("last_error") @db.Text
+  lastConnectedAt DateTime?                 @map("last_connected_at")
+  chats           TelegramChat[]
+  createdAt       DateTime                  @default(now()) @map("created_at")
+  updatedAt       DateTime                  @updatedAt @map("updated_at")
+
+  @@map("telegram_integrations")
+}
+
+model TelegramChat {
+  id             Int                 @id @default(autoincrement())
+  integrationId  Int                 @map("integration_id")
+  externalChatId String              @map("external_chat_id")
+  title          String
+  username       String?
+  unreadCount    Int                 @default(0) @map("unread_count")
+  linkedUserId   Int?                @map("linked_user_id")
+  organizationId Int?                @map("organization_id")
+  storeId        Int?                @map("store_id")
+  contactId      Int?                @map("contact_id")
+  requestId      Int?                @map("request_id")
+  integration    TelegramIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  linkedUser     User?               @relation("telegram_linked_user", fields: [linkedUserId], references: [id], onDelete: SetNull)
+  organization   Organization?       @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  store          Store?              @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  contact        Contact?            @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  request        Request?            @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  messages       TelegramMessage[]
+  lastMessageAt  DateTime?           @map("last_message_at")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  @@unique([integrationId, externalChatId])
+  @@index([lastMessageAt])
+  @@map("telegram_chats")
+}
+
+model TelegramMessage {
+  id                Int              @id @default(autoincrement())
+  chatId            Int              @map("chat_id")
+  externalMessageId String           @map("external_message_id")
+  direction         MessageDirection
+  body              String?          @db.Text
+  payload           Json?
+  sentByUserId      Int?             @map("sent_by_user_id")
+  chat              TelegramChat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sentBy            User?            @relation("telegram_sent_by", fields: [sentByUserId], references: [id], onDelete: SetNull)
+  sentAt            DateTime         @map("sent_at")
+  createdAt         DateTime         @default(now()) @map("created_at")
+
+  @@unique([chatId, externalMessageId])
+  @@index([chatId, sentAt])
+  @@map("telegram_messages")
 }
 
 model Notification {
@@ -150,6 +469,7 @@ model Notification {
   isRead    Boolean  @default(false) @map("is_read")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now()) @map("created_at")
+
   @@index([userId, isRead])
   @@map("notifications")
 }

@@ -14,4 +14,7 @@ export const config = {
   accessSecret: required('JWT_ACCESS_SECRET'),
   refreshSecret: required('JWT_REFRESH_SECRET'),
   encryptionKey: required('ENCRYPTION_KEY'),
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN,
+  telegramBotUsername: process.env.TELEGRAM_BOT_USERNAME ?? 'TMP_BAZIS_BOT',
+  telegramRegistrationUrl: process.env.TELEGRAM_REGISTRATION_URL,
 }
