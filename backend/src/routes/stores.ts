@@ -5,7 +5,7 @@ import { config } from '../config.js'
 import { prisma } from '../db.js'
 import { authenticate } from '../middleware/auth.js'
 import { decrypt, encrypt } from '../utils/crypto.js'
-import { getUserAccess, hasPermission, requirePermission } from '../utils/permissions.js'
+import { getUserAccess, hasPermission } from '../utils/permissions.js'
 
 export const storesRouter = Router()
 storesRouter.use(authenticate)
@@ -82,6 +82,19 @@ storesRouter.put('/:id/access', async (req, res) => {
   res.status(204).end()
 })
 
-storesRouter.post('/:id/approve', requirePermission(PermissionKey.MANAGE_STORES), async (req, res) => {
-  res.json(await prisma.store.update({ where: { id: Number(req.params.id) }, data: { status: StoreStatus.ACTIVE, rejectionReason: null } }))
+storesRouter.post('/:id/approve', async (req, res) => {
+  const access = await getUserAccess(req.auth!.userId)
+  if (!access || access.status !== 'ACTIVE' || access.role === Role.CLIENT) return res.status(403).json({ message: 'Принять точку может только активный сотрудник' })
+  const store = await prisma.store.findFirst({ where: { id: Number(req.params.id), status: StoreStatus.PENDING }, select: { id: true } })
+  if (!store) return res.status(404).json({ message: 'Точка на модерации не найдена' })
+  res.json(await prisma.store.update({ where: { id: store.id }, data: { status: StoreStatus.ACTIVE, rejectionReason: null } }))
+})
+
+storesRouter.post('/:id/reject', async (req, res) => {
+  const access = await getUserAccess(req.auth!.userId)
+  if (!access || access.status !== 'ACTIVE' || access.role === Role.CLIENT) return res.status(403).json({ message: 'Отклонить точку может только активный сотрудник' })
+  const body = z.object({ rejectionReason: z.string().trim().min(3).max(1000) }).parse(req.body)
+  const store = await prisma.store.findFirst({ where: { id: Number(req.params.id), status: StoreStatus.PENDING }, select: { id: true } })
+  if (!store) return res.status(404).json({ message: 'Точка на модерации не найдена' })
+  res.json(await prisma.store.update({ where: { id: store.id }, data: { status: StoreStatus.REJECTED, rejectionReason: body.rejectionReason } }))
 })

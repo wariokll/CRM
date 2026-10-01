@@ -79,3 +79,20 @@ organizationsRouter.put('/:id/members', async (req, res) => {
   })
   res.json(await prisma.organization.findUniqueOrThrow({ where: { id }, include }))
 })
+
+organizationsRouter.post('/:id/approve', async (req, res) => {
+  const access = await getUserAccess(req.auth!.userId)
+  if (!access || access.status !== 'ACTIVE' || access.role === Role.CLIENT) return res.status(403).json({ message: 'Принять организацию может только активный сотрудник' })
+  const organization = await prisma.organization.findFirst({ where: { id: Number(req.params.id), status: OrganizationStatus.PENDING }, select: { id: true } })
+  if (!organization) return res.status(404).json({ message: 'Организация на модерации не найдена' })
+  res.json(await prisma.organization.update({ where: { id: organization.id }, data: { status: OrganizationStatus.ACTIVE, rejectionReason: null }, include }))
+})
+
+organizationsRouter.post('/:id/reject', async (req, res) => {
+  const access = await getUserAccess(req.auth!.userId)
+  if (!access || access.status !== 'ACTIVE' || access.role === Role.CLIENT) return res.status(403).json({ message: 'Отклонить организацию может только активный сотрудник' })
+  const body = z.object({ rejectionReason: z.string().trim().min(3).max(1000) }).parse(req.body)
+  const organization = await prisma.organization.findFirst({ where: { id: Number(req.params.id), status: OrganizationStatus.PENDING }, select: { id: true } })
+  if (!organization) return res.status(404).json({ message: 'Организация на модерации не найдена' })
+  res.json(await prisma.organization.update({ where: { id: organization.id }, data: { status: OrganizationStatus.REJECTED, rejectionReason: body.rejectionReason }, include }))
+})
