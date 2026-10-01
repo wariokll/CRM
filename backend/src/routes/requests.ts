@@ -78,7 +78,10 @@ requestsRouter.get('/assignees', async (req, res) => {
   if (!access || access.role === Role.CLIENT) return res.status(403).json({ message: 'Недостаточно прав' })
   const departmentId = Number(req.query.departmentId) || undefined
   const users = await prisma.user.findMany({
-    where: { role: { in: [Role.MASTER, Role.DEPARTMENT_HEAD] }, status: 'ACTIVE', ...(departmentId && { departmentMemberships: { some: { departmentId } } }) },
+    where: { status: 'ACTIVE', OR: [
+      { role: Role.DIRECTOR },
+      { role: { in: [Role.MASTER, Role.DEPARTMENT_HEAD] }, ...(departmentId && { departmentMemberships: { some: { departmentId } } }) },
+    ] },
     select: { id: true, ipName: true, email: true, role: true, departmentMemberships: { include: { department: true } } },
     orderBy: { ipName: 'asc' },
   })
@@ -110,15 +113,37 @@ requestsRouter.get('/stats', requirePermission(PermissionKey.VIEW_REPORTS), asyn
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return res.status(400).json({ message: 'Некорректный период' })
   to.setHours(23, 59, 59, 999)
   const where: Prisma.RequestWhereInput = { AND: [visibilityWhere(access), { createdAt: { gte: from, lte: to } }] }
-  const [total, byStatus, byType, urgent, activeClients] = await Promise.all([
+  const [total, byStatus, byType, urgent, activeClients, reportRows] = await Promise.all([
     prisma.request.count({ where }),
     prisma.request.groupBy({ by: ['status'], where, _count: { _all: true } }),
     prisma.request.groupBy({ by: ['typeId'], where, _count: { _all: true } }),
     prisma.request.count({ where: { AND: [where, { urgency: Urgency.URGENT }] } }),
     prisma.user.count({ where: { role: Role.CLIENT, status: 'ACTIVE' } }),
+    prisma.request.findMany({ where, select: {
+      id: true, status: true, priority: true, createdAt: true, closedAt: true, scheduledAt: true, source: true,
+      organization: { select: { id: true, legalName: true } },
+      store: { select: { id: true, name: true } },
+      department: { select: { id: true, name: true } },
+      assignees: { select: { user: { select: { id: true, ipName: true } } } },
+    } }),
   ])
   const types = await prisma.requestType.findMany({ where: { id: { in: byType.map(item => item.typeId) } }, select: { id: true, name: true, color: true } })
-  res.json({ total, urgent, activeClients, byStatus, byType: byType.map(item => ({ ...item, type: types.find(type => type.id === item.typeId) })) })
+  const aggregate = <T extends { id: number; name: string }>(entries: Array<T | null | undefined>) => Object.values(entries.filter(Boolean).reduce<Record<number, { id: number; name: string; count: number }>>((result, entry) => {
+    const item = entry!
+    result[item.id] ??= { ...item, count: 0 }
+    result[item.id].count += 1
+    return result
+  }, {})).sort((left, right) => right.count - left.count || left.name.localeCompare(right.name, 'ru'))
+  const clients = aggregate(reportRows.map(row => row.organization ? { id: row.organization.id, name: row.organization.legalName } : null))
+  const stores = aggregate(reportRows.map(row => row.store ? { id: row.store.id, name: row.store.name } : null))
+  const employees = aggregate(reportRows.flatMap(row => row.assignees.map(assignee => ({ id: assignee.user.id, name: assignee.user.ipName }))))
+  const departments = aggregate(reportRows.map(row => ({ id: row.department.id, name: row.department.name })))
+  const completed = reportRows.filter(row => row.status === RequestStatus.DONE)
+  const averageResolutionHours = completed.length ? Math.round(completed.reduce((sum, row) => sum + ((row.closedAt?.getTime() ?? row.createdAt.getTime()) - row.createdAt.getTime()) / 3600000, 0) / completed.length * 10) / 10 : 0
+  const terminalStatuses: RequestStatus[] = [RequestStatus.DONE, RequestStatus.CANCELLED]
+  const overdue = reportRows.filter(row => row.scheduledAt && row.scheduledAt < new Date() && !terminalStatuses.includes(row.status)).length
+  const sources = Object.entries(reportRows.reduce<Record<string, number>>((result, row) => { result[row.source] = (result[row.source] ?? 0) + 1; return result }, {})).map(([source, count]) => ({ source, count }))
+  res.json({ total, urgent, activeClients, completed: completed.length, overdue, averageResolutionHours, byStatus, byType: byType.map(item => ({ ...item, type: types.find(type => type.id === item.typeId) })), clients, stores, employees, departments, sources, requests: reportRows.map(row => ({ id: row.id, status: row.status, priority: row.priority, createdAt: row.createdAt, closedAt: row.closedAt, scheduledAt: row.scheduledAt, source: row.source, organization: row.organization, store: row.store, department: row.department, assignees: row.assignees.map(item => item.user.ipName) })) })
 })
 
 requestsRouter.post('/', async (req, res) => {
@@ -131,6 +156,10 @@ requestsRouter.post('/', async (req, res) => {
   const organizationId = body.organizationId ?? store?.organizationId ?? null
   if (type.requiresStore && !store) return res.status(400).json({ message: 'Для этого типа заявки выберите торговую точку' })
   if (type.requiresOrganization && !organizationId) return res.status(400).json({ message: 'Для этого типа заявки выберите организацию' })
+  if (organizationId && !store) {
+    const organization = await prisma.organization.findFirst({ where: { id: organizationId, status: 'ACTIVE' }, select: { id: true } })
+    if (!organization) return res.status(400).json({ message: 'Выбранная организация не найдена или ещё не принята. Выберите активную организацию.' })
+  }
   if (store && organizationId && store.organizationId !== organizationId) return res.status(400).json({ message: 'Точка не относится к выбранной организации' })
   if (access.role === Role.CLIENT && organizationId) {
     const membership = await prisma.organizationMember.findUnique({ where: { organizationId_userId: { organizationId, userId: access.userId } } })
@@ -191,8 +220,11 @@ requestsRouter.patch('/:id', async (req, res) => {
     }
     if (update.assigneeIds) {
       const ids = [...new Set(update.assigneeIds)]
-      const eligible = await transaction.user.findMany({ where: { id: { in: ids }, status: 'ACTIVE', role: { in: [Role.MASTER, Role.DEPARTMENT_HEAD] }, departmentMemberships: { some: { departmentId: nextDepartmentId } } }, select: { id: true } })
-      if (eligible.length !== ids.length) throw new Error('Один из сотрудников не состоит в выбранном отделе')
+      const eligible = await transaction.user.findMany({ where: { id: { in: ids }, status: 'ACTIVE', OR: [
+        { role: Role.DIRECTOR },
+        { role: { in: [Role.MASTER, Role.DEPARTMENT_HEAD] }, departmentMemberships: { some: { departmentId: nextDepartmentId } } },
+      ] }, select: { id: true } })
+      if (eligible.length !== ids.length) throw new Error('Выбранный сотрудник не состоит в отделе заявки или недоступен')
       await transaction.requestAssignee.deleteMany({ where: { requestId: row.id } })
       if (ids.length) await transaction.requestAssignee.createMany({ data: ids.map(userId => ({ requestId: row.id, userId, assignedByUserId: access.userId })) })
     }
@@ -214,6 +246,7 @@ requestsRouter.patch('/:id', async (req, res) => {
   if (update.status && update.status !== row.status) {
     const labels: Record<RequestStatus, string> = { NEW: 'Новая', ACCEPTED: 'Принята', IN_PROGRESS: 'В работе', DONE: 'Выполнена', CANCELLED: 'Отменена' }
     void notifyRequestClient(row.id, `Заявка #${row.id}: статус изменён на «${labels[update.status]}».`)
+    void notifyRequestAssignees(row.id, `Заявка «${row.type.name}»: статус изменён на «${labels[update.status]}».`)
   }
   if (update.adminComment?.trim()) void notifyRequestClient(row.id, `Новый комментарий по заявке #${row.id}:\n${update.adminComment.trim()}`)
   if (update.assigneeIds?.length) void notifyRequestAssignees(row.id, `Вам назначена заявка «${row.type.name}». Откройте БАЗИС CRM для деталей.`)

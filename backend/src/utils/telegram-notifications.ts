@@ -31,13 +31,22 @@ async function sendToChat(chat: NotificationChat, text: string) {
   }
 }
 
-/** Sends a client notification only when this request is explicitly linked to a bot chat. */
+/** Sends client updates to the bot conversation that created the request and to its configured client links. */
 export async function notifyRequestClient(requestId: number, text: string) {
-  const chat = await prisma.telegramChat.findFirst({
-    where: { requestId, integration: { kind: TelegramIntegrationKind.BOT, status: TelegramIntegrationStatus.ACTIVE } },
+  const request = await prisma.request.findUnique({ where: { id: requestId }, select: { contactId: true, createdByUserId: true, organizationId: true, storeId: true } })
+  if (!request) return false
+  const chats = await prisma.telegramChat.findMany({
+    where: { integration: { kind: TelegramIntegrationKind.BOT, status: TelegramIntegrationStatus.ACTIVE }, OR: [
+      { requestId },
+      ...(request.contactId ? [{ contactId: request.contactId }] : []),
+      ...(request.createdByUserId ? [{ linkedUserId: request.createdByUserId }] : []),
+      ...(request.organizationId ? [{ organizationId: request.organizationId }, { organizationLinks: { some: { organizationId: request.organizationId } } }] : []),
+      ...(request.storeId ? [{ storeId: request.storeId }, { storeLinks: { some: { storeId: request.storeId } } }] : []),
+    ] },
     select: { id: true, externalChatId: true, integrationId: true },
   })
-  return chat ? sendToChat(chat, text) : false
+  const sent = await Promise.all(chats.map(chat => sendToChat(chat, text)))
+  return sent.some(Boolean)
 }
 
 /** Sends a work notification to one linked bot chat per assigned staff member. */

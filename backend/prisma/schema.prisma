@@ -199,6 +199,7 @@ model Organization {
   createdByUserId Int?                 @map("created_by_user_id")
   createdBy       User?                @relation("organization_created_by", fields: [createdByUserId], references: [id], onDelete: SetNull)
   members         OrganizationMember[]
+  contacts        OrganizationContact[]
   stores          Store[]
   requests        Request[]
   telegramChats   TelegramChat[]
@@ -209,6 +210,20 @@ model Organization {
   @@index([status])
   @@index([inn])
   @@map("organizations")
+}
+
+model OrganizationContact {
+  id             Int          @id @default(autoincrement())
+  organizationId Int          @map("organization_id")
+  fullName       String       @map("full_name")
+  phone          String?
+  note           String?      @db.Text
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@index([organizationId])
+  @@map("organization_contacts")
 }
 
 model OrganizationMember {

@@ -9,7 +9,8 @@ type TelegramCallback = { id: string; from: TelegramUser; message?: TelegramMess
 type TelegramUpdate = { update_id: number; message?: TelegramMessage; callback_query?: TelegramCallback }
 type BotResponse<T> = { ok: boolean; result?: T; description?: string }
 
-type Session = { typeId: number; organizationId?: number; storeId?: number; allowedStoreIds?: number[]; allowedOrganizationIds?: number[] }
+type TemplateField = { key: string; label: string; type: 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'DATE' | 'SELECT' | 'CHECKBOX' | 'FILE'; required?: boolean; options?: string[] }
+type Session = { typeId: number; organizationId?: number; storeId?: number; allowedStoreIds?: number[]; allowedOrganizationIds?: number[]; fields?: TemplateField[]; fieldIndex?: number; templateData?: Record<string, unknown> }
 const sessions = new Map<string, Session>()
 let stopped = false
 
@@ -102,11 +103,39 @@ async function createRequest(chatId: number, session: Session, description: stri
   const organizationId = session.organizationId ?? null, storeId = session.storeId ?? null
   if ((type.requiresOrganization && !organizationId) || (type.requiresStore && !storeId)) return null
   return prisma.$transaction(async transaction => {
-    const request = await transaction.request.create({ data: { storeId, organizationId, createdByUserId: chat.linkedUserId, contactId: chat.contactId, typeId: type.id, departmentId: type.departmentId, urgency: Urgency.URGENT, priority: type.defaultPriority ?? Priority.NORMAL, source: RequestSource.TELEGRAM_BOT, description } })
+    const request = await transaction.request.create({ data: { storeId, organizationId, createdByUserId: chat.linkedUserId, contactId: chat.contactId, typeId: type.id, departmentId: type.departmentId, urgency: Urgency.URGENT, priority: type.defaultPriority ?? Priority.NORMAL, source: RequestSource.TELEGRAM_BOT, description, templateData: session.templateData as Prisma.InputJsonValue | undefined } })
     await transaction.requestDepartmentHistory.create({ data: { requestId: request.id, toDepartmentId: type.departmentId, transferredByUserId: director.id } })
     await transaction.telegramChat.update({ where: { id: chat.id }, data: { requestId: request.id, unreadCount: 0 } })
     return request
   })
+}
+
+export function templateFields(value: unknown): TemplateField[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((field): field is TemplateField => Boolean(field && typeof field === 'object' && typeof (field as TemplateField).key === 'string' && typeof (field as TemplateField).label === 'string'))
+}
+
+function fieldPrompt(field: TemplateField) {
+  const required = field.required ? 'обязательно' : 'можно отправить «-», чтобы пропустить'
+  if (field.type === 'SELECT' && field.options?.length) return `${field.label} (${required}):\n${field.options.map((option, index) => `${index + 1}. ${option}`).join('\n')}\nОтправьте номер или значение.`
+  if (field.type === 'CHECKBOX') return `${field.label}: ответьте «да» или «нет»${field.required ? ' (обязательно)' : ''}.`
+  if (field.type === 'DATE') return `${field.label} (${required}): укажите дату в формате ДД.ММ.ГГГГ.`
+  if (field.type === 'NUMBER') return `${field.label} (${required}): укажите число.`
+  if (field.type === 'FILE') return `${field.label} (${required}): отправьте ссылку на файл или его описание одним сообщением.`
+  return `${field.label} (${required}):`
+}
+
+async function askNextField(chatId: number, externalChatId: string, session: Session) {
+  const field = session.fields?.[session.fieldIndex ?? 0]
+  return reply(chatId, externalChatId, field ? fieldPrompt(field) : 'Опишите проблему одним сообщением.')
+}
+
+export function parseFieldValue(field: TemplateField, input: string): { ok: true; value?: unknown } | { ok: false; message: string } {
+  if (!input || input === '-') return field.required ? { ok: false, message: `Поле «${field.label}» обязательно. ${fieldPrompt(field)}` } : { ok: true }
+  if (field.type === 'NUMBER' && !Number.isFinite(Number(input.replace(',', '.')))) return { ok: false, message: `Для поля «${field.label}» укажите число.` }
+  if (field.type === 'CHECKBOX') { if (['да', 'yes', '1', '+'].includes(input.toLowerCase())) return { ok: true, value: true }; if (['нет', 'no', '0', '-'].includes(input.toLowerCase())) return { ok: true, value: false }; return { ok: false, message: `Для поля «${field.label}» ответьте «да» или «нет».` } }
+  if (field.type === 'SELECT' && field.options?.length) { const option = field.options[Number(input) - 1] ?? field.options.find(option => option.toLowerCase() === input.toLowerCase()); return option ? { ok: true, value: option } : { ok: false, message: `Выберите один из предложенных вариантов для поля «${field.label}».` } }
+  return { ok: true, value: field.type === 'NUMBER' ? Number(input.replace(',', '.')) : input }
 }
 
 async function statusText(chatId: number) {
@@ -147,6 +176,15 @@ async function handleMessage(integrationId: number, message: TelegramMessage) {
   if (lower === 'мои заявки' || lower === '/status') return reply(chat.id, chat.externalChatId, await statusText(chat.id))
   const session = sessions.get(chat.externalChatId)
   if (session) {
+    const field = session.fields?.[session.fieldIndex ?? 0]
+    if (field) {
+      const parsed = parseFieldValue(field, text)
+      if (!parsed.ok) return reply(chat.id, chat.externalChatId, parsed.message)
+      const templateData = { ...(session.templateData ?? {}), ...(parsed.value !== undefined && { [field.key]: parsed.value }) }
+      const next = { ...session, templateData, fieldIndex: (session.fieldIndex ?? 0) + 1 }
+      sessions.set(chat.externalChatId, next)
+      return askNextField(chat.id, chat.externalChatId, next)
+    }
     sessions.delete(chat.externalChatId)
     const request = await createRequest(chat.id, session, text)
     if (request) return reply(chat.id, chat.externalChatId, 'Заявка принята. Мы сообщим о дальнейшем статусе.')
@@ -166,33 +204,37 @@ async function handleCallback(integrationId: number, callback: TelegramCallback)
     if (!session?.allowedStoreIds?.includes(storeId)) return reply(chat.id, chat.externalChatId, 'Выбор точки устарел. Начните создание заявки заново.')
     const store = await prisma.store.findFirst({ where: { id: storeId, status: 'ACTIVE' }, select: { id: true, organizationId: true, name: true } })
     if (!store) return reply(chat.id, chat.externalChatId, 'Эта точка больше недоступна. Начните создание заявки заново.')
-    sessions.set(chat.externalChatId, { typeId: session.typeId, organizationId: store.organizationId, storeId: store.id })
-    return reply(chat.id, chat.externalChatId, `Точка «${store.name}» выбрана. Опишите проблему одним сообщением.`)
+    const next = { ...session, organizationId: store.organizationId, storeId: store.id, allowedStoreIds: undefined }
+    sessions.set(chat.externalChatId, next)
+    return askNextField(chat.id, chat.externalChatId, next)
   }
   if (callback.data.startsWith('request-organization:')) {
     const session = sessions.get(chat.externalChatId), organizationId = Number(callback.data.slice('request-organization:'.length))
     if (!session?.allowedOrganizationIds?.includes(organizationId)) return reply(chat.id, chat.externalChatId, 'Выбор организации устарел. Начните создание заявки заново.')
     const organization = await prisma.organization.findFirst({ where: { id: organizationId, status: 'ACTIVE' }, select: { id: true, legalName: true } })
     if (!organization) return reply(chat.id, chat.externalChatId, 'Эта организация больше недоступна. Начните создание заявки заново.')
-    sessions.set(chat.externalChatId, { typeId: session.typeId, organizationId: organization.id })
-    return reply(chat.id, chat.externalChatId, `Организация «${organization.legalName}» выбрана. Опишите проблему одним сообщением.`)
+    const next = { ...session, organizationId: organization.id, allowedOrganizationIds: undefined }
+    sessions.set(chat.externalChatId, next)
+    return askNextField(chat.id, chat.externalChatId, next)
   }
   if (!callback.data.startsWith('request:')) return
   const typeId = Number(callback.data.slice('request:'.length))
-  const type = await prisma.requestType.findFirst({ where: { id: typeId, isActive: true, availableOnTelegram: true }, select: { id: true, name: true, requiresOrganization: true, requiresStore: true } })
+  const type = await prisma.requestType.findFirst({ where: { id: typeId, isActive: true, availableOnTelegram: true }, select: { id: true, name: true, requiresOrganization: true, requiresStore: true, templateFields: true } })
   if (!type) return reply(chat.id, chat.externalChatId, 'Этот шаблон больше недоступен. Выберите другой.')
   const target = await resolveTarget(chat.id, type)
   if (target.kind === 'missing') return reply(chat.id, chat.externalChatId, 'К этому Telegram-аккаунту не привязана активная организация или точка. Попросите сотрудника ЦТО настроить привязку в CRM.')
   if (target.kind === 'stores') {
-    sessions.set(chat.externalChatId, { typeId: type.id, allowedStoreIds: target.stores.map(store => store.id) })
+    sessions.set(chat.externalChatId, { typeId: type.id, fields: templateFields(type.templateFields), fieldIndex: 0, templateData: {}, allowedStoreIds: target.stores.map(store => store.id) })
     return reply(chat.id, chat.externalChatId, `Шаблон «${type.name}». Выберите торговую точку:`, { inline_keyboard: target.stores.map(store => [{ text: store.name + ' — ' + store.address, callback_data: `request-store:${store.id}` }]) })
   }
   if (target.kind === 'organizations') {
-    sessions.set(chat.externalChatId, { typeId: type.id, allowedOrganizationIds: target.organizations.map(organization => organization.id) })
+    sessions.set(chat.externalChatId, { typeId: type.id, fields: templateFields(type.templateFields), fieldIndex: 0, templateData: {}, allowedOrganizationIds: target.organizations.map(organization => organization.id) })
     return reply(chat.id, chat.externalChatId, `Шаблон «${type.name}». Выберите организацию:`, { inline_keyboard: target.organizations.map(organization => [{ text: organization.legalName, callback_data: `request-organization:${organization.id}` }]) })
   }
-  sessions.set(chat.externalChatId, { typeId: type.id, organizationId: target.organizationId, storeId: target.storeId })
-  await reply(chat.id, chat.externalChatId, `Шаблон «${type.name}». Опишите проблему одним сообщением.`)
+  const session = { typeId: type.id, organizationId: target.organizationId, storeId: target.storeId, fields: templateFields(type.templateFields), fieldIndex: 0, templateData: {} }
+  sessions.set(chat.externalChatId, session)
+  await reply(chat.id, chat.externalChatId, `Шаблон «${type.name}». ${session.fields?.length ? 'Ответьте на дополнительные вопросы.' : 'Опишите проблему одним сообщением.'}`)
+  if (session.fields?.length) await askNextField(chat.id, chat.externalChatId, session)
 }
 
 async function processUpdate(integrationId: number, update: TelegramUpdate) {
@@ -229,4 +271,4 @@ async function main() {
 
 process.on('SIGINT', () => { stopped = true })
 process.on('SIGTERM', () => { stopped = true })
-main().finally(() => prisma.$disconnect())
+if (!process.env.VITEST) main().finally(() => prisma.$disconnect())

@@ -10,6 +10,7 @@ organizationsRouter.use(authenticate)
 
 const optionalText = (max: number) => z.preprocess(value => typeof value === 'string' && !value.trim() ? null : value, z.string().trim().max(max).optional().nullable())
 const optionalEmail = z.preprocess(value => typeof value === 'string' && !value.trim() ? null : value, z.string().email().optional().nullable())
+const contactSchema = z.object({ fullName: z.string().trim().min(2).max(200), phone: optionalText(50), note: optionalText(2000) })
 
 const schema = z.object({
   type: z.nativeEnum(OrganizationType),
@@ -22,11 +23,13 @@ const schema = z.object({
   contactName: optionalText(200),
   phone: optionalText(50),
   email: optionalEmail,
+  contacts: z.array(contactSchema).max(30).default([]),
 })
 
 const include = {
   members: { include: { user: { select: { id: true, ipName: true, email: true, phone: true, status: true } } } },
   stores: { orderBy: { name: 'asc' as const } },
+  contacts: { orderBy: { id: 'asc' as const } },
   _count: { select: { requests: true } },
 } as const
 
@@ -49,11 +52,13 @@ organizationsRouter.post('/', async (req, res) => {
   const body = schema.parse(req.body)
   const requestedMembers = z.array(z.number().int().positive()).optional().parse(req.body.memberIds)
   const memberIds = ctx.manages && requestedMembers?.length ? [...new Set(requestedMembers)] : [req.auth!.userId]
+  const { contacts, ...organizationData } = body
   const organization = await prisma.organization.create({ data: {
-    ...body,
+    ...organizationData,
     status: ctx.manages ? OrganizationStatus.ACTIVE : OrganizationStatus.PENDING,
     createdByUserId: req.auth!.userId,
     members: { create: memberIds.map((userId, index) => ({ userId, isPrimary: index === 0 })) },
+    contacts: contacts.length ? { create: contacts } : undefined,
   }, include })
   res.status(201).json(organization)
 })
@@ -65,7 +70,8 @@ organizationsRouter.patch('/:id', async (req, res) => {
   const existing = await prisma.organization.findUnique({ where: { id }, select: { members: { where: { userId: req.auth!.userId }, select: { userId: true } } } })
   if (!existing || (!ctx.manages && !existing.members.length)) return res.status(404).json({ message: 'Организация не найдена' })
   const data = schema.partial().parse(req.body)
-  res.json(await prisma.organization.update({ where: { id }, data: { ...data, ...(!ctx.manages && { status: OrganizationStatus.PENDING }) }, include }))
+  const { contacts, ...organizationData } = data
+  res.json(await prisma.organization.update({ where: { id }, data: { ...organizationData, ...(contacts !== undefined && { contacts: { deleteMany: {}, create: contacts } }), ...(!ctx.manages && { status: OrganizationStatus.PENDING }) }, include }))
 })
 
 organizationsRouter.put('/:id/members', async (req, res) => {
@@ -85,7 +91,12 @@ organizationsRouter.post('/:id/approve', async (req, res) => {
   if (!access || access.status !== 'ACTIVE' || access.role === Role.CLIENT) return res.status(403).json({ message: 'Принять организацию может только активный сотрудник' })
   const organization = await prisma.organization.findFirst({ where: { id: Number(req.params.id), status: OrganizationStatus.PENDING }, select: { id: true } })
   if (!organization) return res.status(404).json({ message: 'Организация на модерации не найдена' })
-  res.json(await prisma.organization.update({ where: { id: organization.id }, data: { status: OrganizationStatus.ACTIVE, rejectionReason: null }, include }))
+  await prisma.$transaction(async transaction => {
+    await transaction.organization.update({ where: { id: organization.id }, data: { status: OrganizationStatus.ACTIVE, rejectionReason: null } })
+    await transaction.store.updateMany({ where: { organizationId: organization.id, status: 'PENDING' }, data: { status: 'ACTIVE', rejectionReason: null } })
+    await transaction.user.updateMany({ where: { status: 'PENDING', role: Role.CLIENT, organizations: { some: { organizationId: organization.id } } }, data: { status: 'ACTIVE', rejectionReason: null } })
+  })
+  res.json(await prisma.organization.findUniqueOrThrow({ where: { id: organization.id }, include }))
 })
 
 organizationsRouter.post('/:id/reject', async (req, res) => {

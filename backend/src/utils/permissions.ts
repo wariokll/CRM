@@ -23,6 +23,7 @@ const defaults: Record<Role, readonly PermissionKey[]> = {
     PermissionKey.VIEW_STORE_SECRETS,
     PermissionKey.VIEW_TELEGRAM,
     PermissionKey.SEND_TELEGRAM,
+    PermissionKey.VIEW_REPORTS,
   ],
   CLIENT: [],
 }
