@@ -9,7 +9,7 @@ type TelegramCallback = { id: string; from: TelegramUser; message?: TelegramMess
 type TelegramUpdate = { update_id: number; message?: TelegramMessage; callback_query?: TelegramCallback }
 type BotResponse<T> = { ok: boolean; result?: T; description?: string }
 
-type Session = { typeId: number }
+type Session = { typeId: number; organizationId?: number; storeId?: number; allowedStoreIds?: number[]; allowedOrganizationIds?: number[] }
 const sessions = new Map<string, Session>()
 let stopped = false
 
@@ -69,21 +69,37 @@ async function requestKeyboard() {
   return { inline_keyboard: types.map(type => [{ text: type.name, callback_data: `request:${type.id}` }]) }
 }
 
+async function resolveTarget(chatId: number, type: { requiresOrganization: boolean; requiresStore: boolean }) {
+  const chat = await prisma.telegramChat.findUnique({ where: { id: chatId }, include: { organizationLinks: { include: { organization: { select: { id: true, legalName: true, status: true } } } }, storeLinks: { include: { store: { select: { id: true, name: true, address: true, organizationId: true, status: true } } } } } })
+  if (!chat) return { kind: 'missing' as const }
+  const organizationMap = new Map(chat.organizationLinks.filter(link => link.organization.status === 'ACTIVE').map(link => [link.organization.id, link.organization]))
+  if (chat.organizationId) { const organization = await prisma.organization.findUnique({ where: { id: chat.organizationId }, select: { id: true, legalName: true, status: true } }); if (organization?.status === 'ACTIVE') organizationMap.set(organization.id, organization) }
+  if (!organizationMap.size && chat.linkedUserId) {
+    const organizations = await prisma.organization.findMany({ where: { status: 'ACTIVE', members: { some: { userId: chat.linkedUserId } } }, select: { id: true, legalName: true, status: true } })
+    organizations.forEach(organization => organizationMap.set(organization.id, organization))
+  }
+  const linkedStores = chat.storeLinks.map(link => link.store).filter(store => store.status === 'ACTIVE')
+  if (chat.storeId) { const store = await prisma.store.findUnique({ where: { id: chat.storeId }, select: { id: true, name: true, address: true, organizationId: true, status: true } }); if (store?.status === 'ACTIVE' && !linkedStores.some(item => item.id === store.id)) linkedStores.push(store) }
+  linkedStores.forEach(store => { if (!organizationMap.has(store.organizationId)) organizationMap.set(store.organizationId, { id: store.organizationId, legalName: 'Организация точки', status: 'ACTIVE' }) })
+  const organizations = [...organizationMap.values()]
+  if (!type.requiresOrganization && !type.requiresStore) return { kind: 'ready' as const }
+  if (type.requiresStore) {
+    const stores = linkedStores.length ? linkedStores : await prisma.store.findMany({ where: { organizationId: { in: organizations.map(organization => organization.id) }, status: 'ACTIVE' }, select: { id: true, name: true, address: true, organizationId: true, status: true }, orderBy: { name: 'asc' } })
+    if (!stores.length) return { kind: 'missing' as const }
+    if (stores.length === 1) return { kind: 'ready' as const, organizationId: stores[0].organizationId, storeId: stores[0].id }
+    return { kind: 'stores' as const, stores }
+  }
+  if (organizations.length === 1) return { kind: 'ready' as const, organizationId: organizations[0].id }
+  if (organizations.length > 1) return { kind: 'organizations' as const, organizations }
+  return { kind: 'missing' as const }
+}
+
 async function createRequest(chatId: number, session: Session, description: string) {
-  const chat = await prisma.telegramChat.findUnique({ where: { id: chatId }, include: { linkedUser: true, organization: true, store: true, contact: true } })
+  const chat = await prisma.telegramChat.findUnique({ where: { id: chatId }, include: { contact: true } })
   const type = await prisma.requestType.findUnique({ where: { id: session.typeId } })
   const director = await prisma.user.findFirst({ where: { role: Role.DIRECTOR, status: 'ACTIVE' }, select: { id: true } })
   if (!chat || !type || !director) throw new Error('Не удалось подготовить заявку')
-  let organizationId = chat.organizationId
-  if (!organizationId && chat.linkedUserId) {
-    const organization = await prisma.organization.findFirst({ where: { status: 'ACTIVE', members: { some: { userId: chat.linkedUserId } } }, orderBy: { createdAt: 'asc' }, select: { id: true } })
-    organizationId = organization?.id ?? null
-  }
-  let storeId = chat.storeId
-  if (!storeId && organizationId) {
-    const store = await prisma.store.findFirst({ where: { organizationId, status: 'ACTIVE' }, orderBy: { createdAt: 'asc' }, select: { id: true } })
-    storeId = store?.id ?? null
-  }
+  const organizationId = session.organizationId ?? null, storeId = session.storeId ?? null
   if ((type.requiresOrganization && !organizationId) || (type.requiresStore && !storeId)) return null
   return prisma.$transaction(async transaction => {
     const request = await transaction.request.create({ data: { storeId, organizationId, createdByUserId: chat.linkedUserId, contactId: chat.contactId, typeId: type.id, departmentId: type.departmentId, urgency: Urgency.URGENT, priority: type.defaultPriority ?? Priority.NORMAL, source: RequestSource.TELEGRAM_BOT, description } })
@@ -142,13 +158,40 @@ async function handleMessage(integrationId: number, message: TelegramMessage) {
 
 async function handleCallback(integrationId: number, callback: TelegramCallback) {
   const message = callback.message
-  if (!message || !callback.data?.startsWith('request:')) return
+  if (!message || !callback.data) return
   const chat = await ensureChat(integrationId, message)
-  const typeId = Number(callback.data.slice('request:'.length))
-  const type = await prisma.requestType.findFirst({ where: { id: typeId, isActive: true, availableOnTelegram: true }, select: { id: true, name: true } })
   await botApi<boolean>('answerCallbackQuery', { callback_query_id: callback.id })
+  if (callback.data.startsWith('request-store:')) {
+    const session = sessions.get(chat.externalChatId), storeId = Number(callback.data.slice('request-store:'.length))
+    if (!session?.allowedStoreIds?.includes(storeId)) return reply(chat.id, chat.externalChatId, 'Выбор точки устарел. Начните создание заявки заново.')
+    const store = await prisma.store.findFirst({ where: { id: storeId, status: 'ACTIVE' }, select: { id: true, organizationId: true, name: true } })
+    if (!store) return reply(chat.id, chat.externalChatId, 'Эта точка больше недоступна. Начните создание заявки заново.')
+    sessions.set(chat.externalChatId, { typeId: session.typeId, organizationId: store.organizationId, storeId: store.id })
+    return reply(chat.id, chat.externalChatId, `Точка «${store.name}» выбрана. Опишите проблему одним сообщением.`)
+  }
+  if (callback.data.startsWith('request-organization:')) {
+    const session = sessions.get(chat.externalChatId), organizationId = Number(callback.data.slice('request-organization:'.length))
+    if (!session?.allowedOrganizationIds?.includes(organizationId)) return reply(chat.id, chat.externalChatId, 'Выбор организации устарел. Начните создание заявки заново.')
+    const organization = await prisma.organization.findFirst({ where: { id: organizationId, status: 'ACTIVE' }, select: { id: true, legalName: true } })
+    if (!organization) return reply(chat.id, chat.externalChatId, 'Эта организация больше недоступна. Начните создание заявки заново.')
+    sessions.set(chat.externalChatId, { typeId: session.typeId, organizationId: organization.id })
+    return reply(chat.id, chat.externalChatId, `Организация «${organization.legalName}» выбрана. Опишите проблему одним сообщением.`)
+  }
+  if (!callback.data.startsWith('request:')) return
+  const typeId = Number(callback.data.slice('request:'.length))
+  const type = await prisma.requestType.findFirst({ where: { id: typeId, isActive: true, availableOnTelegram: true }, select: { id: true, name: true, requiresOrganization: true, requiresStore: true } })
   if (!type) return reply(chat.id, chat.externalChatId, 'Этот шаблон больше недоступен. Выберите другой.')
-  sessions.set(chat.externalChatId, { typeId: type.id })
+  const target = await resolveTarget(chat.id, type)
+  if (target.kind === 'missing') return reply(chat.id, chat.externalChatId, 'К этому Telegram-аккаунту не привязана активная организация или точка. Попросите сотрудника ЦТО настроить привязку в CRM.')
+  if (target.kind === 'stores') {
+    sessions.set(chat.externalChatId, { typeId: type.id, allowedStoreIds: target.stores.map(store => store.id) })
+    return reply(chat.id, chat.externalChatId, `Шаблон «${type.name}». Выберите торговую точку:`, { inline_keyboard: target.stores.map(store => [{ text: store.name + ' — ' + store.address, callback_data: `request-store:${store.id}` }]) })
+  }
+  if (target.kind === 'organizations') {
+    sessions.set(chat.externalChatId, { typeId: type.id, allowedOrganizationIds: target.organizations.map(organization => organization.id) })
+    return reply(chat.id, chat.externalChatId, `Шаблон «${type.name}». Выберите организацию:`, { inline_keyboard: target.organizations.map(organization => [{ text: organization.legalName, callback_data: `request-organization:${organization.id}` }]) })
+  }
+  sessions.set(chat.externalChatId, { typeId: type.id, organizationId: target.organizationId, storeId: target.storeId })
   await reply(chat.id, chat.externalChatId, `Шаблон «${type.name}». Опишите проблему одним сообщением.`)
 }
 

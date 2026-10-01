@@ -202,6 +202,7 @@ model Organization {
   stores          Store[]
   requests        Request[]
   telegramChats   TelegramChat[]
+  telegramLinks   TelegramChatOrganization[]
   createdAt       DateTime             @default(now()) @map("created_at")
   updatedAt       DateTime             @updatedAt @map("updated_at")
 
@@ -236,6 +237,7 @@ model Store {
   access          StoreAccess?
   requests        Request[]
   telegramChats   TelegramChat[]
+  telegramLinks   TelegramChatStore[]
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
 
@@ -478,6 +480,8 @@ model TelegramChat {
   contact        Contact?            @relation(fields: [contactId], references: [id], onDelete: SetNull)
   request        Request?            @relation(fields: [requestId], references: [id], onDelete: SetNull)
   messages       TelegramMessage[]
+  organizationLinks TelegramChatOrganization[]
+  storeLinks        TelegramChatStore[]
   lastMessageAt  DateTime?           @map("last_message_at")
   createdAt      DateTime            @default(now()) @map("created_at")
   updatedAt      DateTime            @updatedAt @map("updated_at")
@@ -485,6 +489,30 @@ model TelegramChat {
   @@unique([integrationId, externalChatId])
   @@index([lastMessageAt])
   @@map("telegram_chats")
+}
+
+model TelegramChatOrganization {
+  telegramChatId Int          @map("telegram_chat_id")
+  organizationId Int          @map("organization_id")
+  telegramChat   TelegramChat @relation(fields: [telegramChatId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@id([telegramChatId, organizationId])
+  @@index([organizationId])
+  @@map("telegram_chat_organizations")
+}
+
+model TelegramChatStore {
+  telegramChatId Int          @map("telegram_chat_id")
+  storeId        Int          @map("store_id")
+  telegramChat   TelegramChat @relation(fields: [telegramChatId], references: [id], onDelete: Cascade)
+  store          Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@id([telegramChatId, storeId])
+  @@index([storeId])
+  @@map("telegram_chat_stores")
 }
 
 model TelegramMessage {

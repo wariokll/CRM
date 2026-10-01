@@ -123,7 +123,7 @@ export interface ServiceRequest {
 
 export interface StaffMember extends User { departmentMemberships: Array<{ departmentId: number; membershipRole: 'HEAD' | 'MASTER'; department: Department }>; permissionOverrides: Array<{ permission: PermissionKey; enabled: boolean }>; linkedTelegramChats?: Array<{ id: number; title: string; username?: string | null }> }
 export interface TelegramIntegration { id: number; kind: 'USER_ACCOUNT' | 'BOT'; status: 'DISABLED' | 'NEEDS_CONFIGURATION' | 'CONNECTING' | 'ACTIVE' | 'ERROR'; displayName?: string | null; lastError?: string | null }
-export interface TelegramChat { id: number; title: string; username?: string | null; unreadCount: number; lastMessageAt?: string | null; integration: TelegramIntegration; organization?: Organization | null; store?: Store | null; linkedUser?: Pick<User, 'id' | 'ipName' | 'email'> | null; messages: Array<{ body?: string | null; sentAt: string }> }
+export interface TelegramChat { id: number; title: string; username?: string | null; unreadCount: number; lastMessageAt?: string | null; integration: TelegramIntegration; organization?: Organization | null; store?: Store | null; organizationLinks: Array<{ organization: Pick<Organization, 'id' | 'legalName'> }>; storeLinks: Array<{ store: Pick<Store, 'id' | 'name' | 'address' | 'organizationId'> }>; linkedUser?: Pick<User, 'id' | 'ipName' | 'email'> | null; messages: Array<{ body?: string | null; sentAt: string }> }
 
 export interface Stats {
   total: number
