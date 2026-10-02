@@ -1,0 +1,7 @@
+dist
+node_modules
+backend/dist
+backend/node_modules
+backend/.mysql-data
+package-lock.json
+*.tsbuildinfo

@@ -1,267 +1,3770 @@
-import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
-import { Activity, AlertTriangle, Building2, CalendarDays, Check, ClipboardList, Columns3, FileText, LayoutDashboard, ListTodo, LogOut, Menu, MessageCircle, Pencil, Plus, RefreshCw, Search, Settings2, ShieldCheck, Store as StoreIcon, Users, UserRoundCog, X } from 'lucide-react'
-import { api, ApiError, login, logout, restoreSession } from './api'
-import bazisLogo from './assets/bazis-logo.svg'
-import { ReportsPage } from './features/reports/ReportsPage'
-import { BoardsPage } from './features/boards/BoardsPage'
-import './recurrence.css'
-import type { Component, Department, Organization, PermissionKey, Priority, RequestStatus, RequestType, ServiceRequest, StaffMember, Store, StoreAccess, TelegramChat, TelegramIntegration, User, UserStatus } from './types'
+import {
+  type FormEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import {
+  Activity,
+  AlertTriangle,
+  Building2,
+  CalendarDays,
+  Check,
+  ClipboardList,
+  Columns3,
+  FileText,
+  LayoutDashboard,
+  ListTodo,
+  LogOut,
+  Menu,
+  MessageCircle,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings2,
+  ShieldCheck,
+  Store as StoreIcon,
+  Users,
+  UserRoundCog,
+  X,
+} from "lucide-react";
+import { api, ApiError, login, logout, restoreSession } from "./api";
+import bazisLogo from "./assets/bazis-logo.svg";
+import { ReportsPage } from "./features/reports/ReportsPage";
+import { BoardsPage } from "./features/boards/BoardsPage";
+import "./recurrence.css";
+import type {
+  Component,
+  Department,
+  Organization,
+  PermissionKey,
+  Priority,
+  RequestStatus,
+  RequestType,
+  ServiceRequest,
+  StaffMember,
+  Store,
+  StoreAccess,
+  TelegramChat,
+  TelegramIntegration,
+  User,
+  UserStatus,
+} from "./types";
 
-const statusLabel: Record<RequestStatus, string> = { NEW: 'Новая', ACCEPTED: 'Принята', IN_PROGRESS: 'В работе', DONE: 'Выполнена', CANCELLED: 'Отменена' }
-const priorityLabel: Record<Priority, string> = { LOW: 'Низкий', NORMAL: 'Обычный', HIGH: 'Высокий', CRITICAL: 'Критический' }
-const roleLabel = { CLIENT: 'Клиент', DIRECTOR: 'Руководитель', DEPARTMENT_HEAD: 'Начальник отдела', MASTER: 'Мастер' } as const
-const transitions: Record<RequestStatus, RequestStatus[]> = { NEW: ['ACCEPTED', 'DONE', 'CANCELLED'], ACCEPTED: ['IN_PROGRESS', 'DONE', 'CANCELLED'], IN_PROGRESS: ['DONE', 'CANCELLED'], DONE: [], CANCELLED: [] }
-const permissionLabels: Record<PermissionKey, string> = { VIEW_ALL_REQUESTS: 'Просмотр всех заявок', MANAGE_REQUESTS: 'Управление заявками', CANCEL_REQUESTS: 'Отмена заявок', TRANSFER_REQUESTS: 'Перенос между отделами', SET_PRIORITY: 'Управление приоритетом', ASSIGN_MASTERS: 'Назначение мастеров', MANAGE_CLIENTS: 'Управление клиентами', MANAGE_ORGANIZATIONS: 'Управление организациями', MANAGE_STORES: 'Управление точками', VIEW_STORE_SECRETS: 'Реквизиты и пароли точек', VIEW_TELEGRAM: 'Работа с Telegram', SEND_TELEGRAM: 'Отправка сообщений', MANAGE_TEMPLATES: 'Управление шаблонами', VIEW_REPORTS: 'Просмотр отчётов', MANAGE_STAFF: 'Управление сотрудниками и правами' }
-const permissionGroups: Array<{ title: string; description: string; permissions: PermissionKey[] }> = [
-  { title: 'Заявки', description: 'Работа с обращениями, приоритетами и исполнителями.', permissions: ['VIEW_ALL_REQUESTS', 'MANAGE_REQUESTS', 'CANCEL_REQUESTS', 'TRANSFER_REQUESTS', 'SET_PRIORITY', 'ASSIGN_MASTERS'] },
-  { title: 'Клиенты и объекты', description: 'Клиенты, организации, торговые точки и доступы к ним.', permissions: ['MANAGE_CLIENTS', 'MANAGE_ORGANIZATIONS', 'MANAGE_STORES', 'VIEW_STORE_SECRETS'] },
-  { title: 'Telegram и отчёты', description: 'Рабочие чаты, отправка сообщений и аналитика.', permissions: ['VIEW_TELEGRAM', 'SEND_TELEGRAM', 'VIEW_REPORTS'] },
-  { title: 'Администрирование', description: 'Настройка шаблонов и сотрудников CRM.', permissions: ['MANAGE_TEMPLATES', 'MANAGE_STAFF'] },
-]
-const defaultPermissions: Record<User['role'], PermissionKey[]> = {
+const statusLabel: Record<RequestStatus, string> = {
+  NEW: "Новая",
+  ACCEPTED: "Принята",
+  IN_PROGRESS: "В работе",
+  DONE: "Выполнена",
+  CANCELLED: "Отменена",
+};
+const priorityLabel: Record<Priority, string> = {
+  LOW: "Низкий",
+  NORMAL: "Обычный",
+  HIGH: "Высокий",
+  CRITICAL: "Критический",
+};
+const roleLabel = {
+  CLIENT: "Клиент",
+  DIRECTOR: "Руководитель",
+  DEPARTMENT_HEAD: "Начальник отдела",
+  MASTER: "Мастер",
+} as const;
+const transitions: Record<RequestStatus, RequestStatus[]> = {
+  NEW: ["ACCEPTED", "DONE", "CANCELLED"],
+  ACCEPTED: ["IN_PROGRESS", "DONE", "CANCELLED"],
+  IN_PROGRESS: ["DONE", "CANCELLED"],
+  DONE: [],
+  CANCELLED: [],
+};
+const permissionLabels: Record<PermissionKey, string> = {
+  VIEW_ALL_REQUESTS: "Просмотр всех заявок",
+  MANAGE_REQUESTS: "Управление заявками",
+  CANCEL_REQUESTS: "Отмена заявок",
+  TRANSFER_REQUESTS: "Перенос между отделами",
+  SET_PRIORITY: "Управление приоритетом",
+  ASSIGN_MASTERS: "Назначение мастеров",
+  MANAGE_CLIENTS: "Управление клиентами",
+  MANAGE_ORGANIZATIONS: "Управление организациями",
+  MANAGE_STORES: "Управление точками",
+  VIEW_STORE_SECRETS: "Реквизиты и пароли точек",
+  VIEW_TELEGRAM: "Работа с Telegram",
+  SEND_TELEGRAM: "Отправка сообщений",
+  MANAGE_TEMPLATES: "Управление шаблонами",
+  VIEW_REPORTS: "Просмотр отчётов",
+  MANAGE_STAFF: "Управление сотрудниками и правами",
+};
+const permissionGroups: Array<{
+  title: string;
+  description: string;
+  permissions: PermissionKey[];
+}> = [
+  {
+    title: "Заявки",
+    description: "Работа с обращениями, приоритетами и исполнителями.",
+    permissions: [
+      "VIEW_ALL_REQUESTS",
+      "MANAGE_REQUESTS",
+      "CANCEL_REQUESTS",
+      "TRANSFER_REQUESTS",
+      "SET_PRIORITY",
+      "ASSIGN_MASTERS",
+    ],
+  },
+  {
+    title: "Клиенты и объекты",
+    description: "Клиенты, организации, торговые точки и доступы к ним.",
+    permissions: [
+      "MANAGE_CLIENTS",
+      "MANAGE_ORGANIZATIONS",
+      "MANAGE_STORES",
+      "VIEW_STORE_SECRETS",
+    ],
+  },
+  {
+    title: "Telegram и отчёты",
+    description: "Рабочие чаты, отправка сообщений и аналитика.",
+    permissions: ["VIEW_TELEGRAM", "SEND_TELEGRAM", "VIEW_REPORTS"],
+  },
+  {
+    title: "Администрирование",
+    description: "Настройка шаблонов и сотрудников CRM.",
+    permissions: ["MANAGE_TEMPLATES", "MANAGE_STAFF"],
+  },
+];
+const defaultPermissions: Record<User["role"], PermissionKey[]> = {
   DIRECTOR: Object.keys(permissionLabels) as PermissionKey[],
-  DEPARTMENT_HEAD: ['MANAGE_REQUESTS', 'CANCEL_REQUESTS', 'TRANSFER_REQUESTS', 'SET_PRIORITY', 'ASSIGN_MASTERS', 'VIEW_STORE_SECRETS', 'VIEW_TELEGRAM', 'SEND_TELEGRAM', 'MANAGE_TEMPLATES', 'VIEW_REPORTS'],
-  MASTER: ['MANAGE_REQUESTS', 'VIEW_STORE_SECRETS', 'VIEW_TELEGRAM', 'SEND_TELEGRAM', 'VIEW_REPORTS'], CLIENT: [],
-}
-const formatDate = (value?: string | null) => value ? new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '—'
-const errorText = (value: unknown) => value instanceof ApiError || value instanceof Error ? value.message : 'Не удалось выполнить действие'
-const isOverdue = (item: ServiceRequest) => Boolean(item.scheduledAt && new Date(item.scheduledAt) < new Date() && !['DONE', 'CANCELLED'].includes(item.status))
+  DEPARTMENT_HEAD: [
+    "MANAGE_REQUESTS",
+    "CANCEL_REQUESTS",
+    "TRANSFER_REQUESTS",
+    "SET_PRIORITY",
+    "ASSIGN_MASTERS",
+    "VIEW_STORE_SECRETS",
+    "VIEW_TELEGRAM",
+    "SEND_TELEGRAM",
+    "MANAGE_TEMPLATES",
+    "VIEW_REPORTS",
+  ],
+  MASTER: [
+    "MANAGE_REQUESTS",
+    "VIEW_STORE_SECRETS",
+    "VIEW_TELEGRAM",
+    "SEND_TELEGRAM",
+    "VIEW_REPORTS",
+  ],
+  CLIENT: [],
+};
+const formatDate = (value?: string | null) =>
+  value
+    ? new Intl.DateTimeFormat("ru-RU", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(new Date(value))
+    : "—";
+const errorText = (value: unknown) =>
+  value instanceof ApiError || value instanceof Error
+    ? value.message
+    : "Не удалось выполнить действие";
+const isOverdue = (item: ServiceRequest) =>
+  Boolean(
+    item.scheduledAt &&
+    new Date(item.scheduledAt) < new Date() &&
+    !["DONE", "CANCELLED"].includes(item.status),
+  );
 
-function can(user: User, key: PermissionKey) { const overrides = new Map(user.permissionOverrides?.map(item => [item.permission, item.enabled])); return overrides.get(key) ?? defaultPermissions[user.role].includes(key) }
-function Button({ kind = 'primary', children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { kind?: 'primary' | 'secondary' | 'danger' | 'ghost' }) { return <button className={`button ${kind}`} {...props}>{children}</button> }
-function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="field"><span>{label}</span>{children}</label> }
-function Empty({ title, text }: { title: string; text: string }) { return <div className="empty"><ClipboardList /><b>{title}</b><span>{text}</span></div> }
-function Brand() { return <div className="brand"><img src={bazisLogo} alt="БАЗИС CRM" /></div> }
-function Modal({ title, close, children, wide = false }: { title: string; close: () => void; children: ReactNode; wide?: boolean }) { return <div className="modal-backdrop" onMouseDown={close}><section className={`modal ${wide ? 'wide' : ''}`} onMouseDown={event => event.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">БАЗИС CRM</span><h2>{title}</h2></div><button className="icon-button" onClick={close}><X /></button></div>{children}</section></div> }
+function can(user: User, key: PermissionKey) {
+  const overrides = new Map(
+    user.permissionOverrides?.map((item) => [item.permission, item.enabled]),
+  );
+  return overrides.get(key) ?? defaultPermissions[user.role].includes(key);
+}
+function Button({
+  kind = "primary",
+  children,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  kind?: "primary" | "secondary" | "danger" | "ghost";
+}) {
+  return (
+    <button className={`button ${kind}`} {...props}>
+      {children}
+    </button>
+  );
+}
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+function Empty({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="empty">
+      <ClipboardList />
+      <b>{title}</b>
+      <span>{text}</span>
+    </div>
+  );
+}
+function Brand() {
+  return (
+    <div className="brand">
+      <img src={bazisLogo} alt="БАЗИС CRM" />
+    </div>
+  );
+}
+function Modal({
+  title,
+  close,
+  children,
+  wide = false,
+}: {
+  title: string;
+  close: () => void;
+  children: ReactNode;
+  wide?: boolean;
+}) {
+  return (
+    <div className="modal-backdrop" onMouseDown={close}>
+      <section
+        className={`modal ${wide ? "wide" : ""}`}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="modal-head">
+          <div>
+            <span className="eyebrow">БАЗИС CRM</span>
+            <h2>{title}</h2>
+          </div>
+          <button className="icon-button" onClick={close}>
+            <X />
+          </button>
+        </div>
+        {children}
+      </section>
+    </div>
+  );
+}
 
 function Auth({ onAuth }: { onAuth: (user: User) => void }) {
-  const [mode, setMode] = useState<'login' | 'register'>('login'), [busy, setBusy] = useState(false), [error, setError] = useState('')
-  const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setBusy(true); setError(''); const v = Object.fromEntries(new FormData(event.currentTarget)) as Record<string, string>; try { if (mode === 'register') await api('/auth/register', { method: 'POST', body: JSON.stringify({ ipName: v.ipName, email: v.email, password: v.password, phone: v.phone, store: { name: v.storeName, address: v.address, phone: v.storePhone || undefined } }) }, false); onAuth(await login(v.email, v.password)) } catch (reason) { setError(errorText(reason)) } finally { setBusy(false) } }
-  return <main className="auth-page"><section className="auth-brand"><Brand /><div><span className="eyebrow light">ЦЕНТР ТЕХНИЧЕСКОГО ОБСЛУЖИВАНИЯ</span><h1>Заявки, организации и команда — в одном пространстве.</h1><p>БАЗИС CRM объединяет клиентские обращения, отделы, торговые точки и защищённые доступы.</p></div><div className="auth-proof"><span><Check /> Статусы и история</span><span><Check /> Права сотрудников</span><span><Check /> Telegram готов к подключению</span></div></section><section className="auth-form-wrap"><form className="auth-form" onSubmit={submit}><h2>{mode === 'login' ? 'Вход в БАЗИС CRM' : 'Регистрация клиента'}</h2><p>{mode === 'login' ? 'Введите данные учётной записи' : 'Организация и первая точка будут отправлены на модерацию.'}</p>{mode === 'register' && <><Field label="Название организации"><input name="ipName" required minLength={2} placeholder="ИП Иванов / ООО Ромашка" /></Field><div className="form-grid"><Field label="Телефон"><input name="phone" required minLength={5} /></Field><Field label="Первая точка"><input name="storeName" required minLength={2} /></Field></div><Field label="Адрес точки"><input name="address" required minLength={5} /></Field><Field label="Телефон точки"><input name="storePhone" /></Field></>}<Field label="Email"><input name="email" type="email" required /></Field><Field label="Пароль"><input name="password" type="password" required minLength={mode === 'register' ? 8 : 1} /></Field>{error && <div className="form-error"><AlertTriangle />{error}</div>}<Button disabled={busy}>{busy && <RefreshCw className="spin" />}{mode === 'login' ? 'Войти' : 'Отправить на модерацию'}</Button><button type="button" className="auth-switch" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}>{mode === 'login' ? 'Нет аккаунта? Зарегистрироваться' : 'Уже есть аккаунт? Войти'}</button></form></section></main>
+  const [mode, setMode] = useState<"login" | "register">("login"),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    const v = Object.fromEntries(new FormData(event.currentTarget)) as Record<
+      string,
+      string
+    >;
+    try {
+      if (mode === "register")
+        await api(
+          "/auth/register",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              ipName: v.ipName,
+              email: v.email,
+              password: v.password,
+              phone: v.phone,
+              store: {
+                name: v.storeName,
+                address: v.address,
+                phone: v.storePhone || undefined,
+              },
+            }),
+          },
+          false,
+        );
+      onAuth(await login(v.email, v.password));
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <main className="auth-page">
+      <section className="auth-brand">
+        <Brand />
+        <div>
+          <span className="eyebrow light">ЦЕНТР ТЕХНИЧЕСКОГО ОБСЛУЖИВАНИЯ</span>
+          <h1>Заявки, организации и команда — в одном пространстве.</h1>
+          <p>
+            БАЗИС CRM объединяет клиентские обращения, отделы, торговые точки и
+            защищённые доступы.
+          </p>
+        </div>
+        <div className="auth-proof">
+          <span>
+            <Check /> Статусы и история
+          </span>
+          <span>
+            <Check /> Права сотрудников
+          </span>
+          <span>
+            <Check /> Telegram готов к подключению
+          </span>
+        </div>
+      </section>
+      <section className="auth-form-wrap">
+        <form className="auth-form" onSubmit={submit}>
+          <h2>
+            {mode === "login" ? "Вход в БАЗИС CRM" : "Регистрация клиента"}
+          </h2>
+          <p>
+            {mode === "login"
+              ? "Введите данные учётной записи"
+              : "Организация и первая точка будут отправлены на модерацию."}
+          </p>
+          {mode === "register" && (
+            <>
+              <Field label="Название организации">
+                <input
+                  name="ipName"
+                  required
+                  minLength={2}
+                  placeholder="ИП Иванов / ООО Ромашка"
+                />
+              </Field>
+              <div className="form-grid">
+                <Field label="Телефон">
+                  <input name="phone" required minLength={5} />
+                </Field>
+                <Field label="Первая точка">
+                  <input name="storeName" required minLength={2} />
+                </Field>
+              </div>
+              <Field label="Адрес точки">
+                <input name="address" required minLength={5} />
+              </Field>
+              <Field label="Телефон точки">
+                <input name="storePhone" />
+              </Field>
+            </>
+          )}
+          <Field label="Email">
+            <input name="email" type="email" required />
+          </Field>
+          <Field label="Пароль">
+            <input
+              name="password"
+              type="password"
+              required
+              minLength={mode === "register" ? 8 : 1}
+            />
+          </Field>
+          {error && (
+            <div className="form-error">
+              <AlertTriangle />
+              {error}
+            </div>
+          )}
+          <Button disabled={busy}>
+            {busy && <RefreshCw className="spin" />}
+            {mode === "login" ? "Войти" : "Отправить на модерацию"}
+          </Button>
+          <button
+            type="button"
+            className="auth-switch"
+            onClick={() => {
+              setMode(mode === "login" ? "register" : "login");
+              setError("");
+            }}
+          >
+            {mode === "login"
+              ? "Нет аккаунта? Зарегистрироваться"
+              : "Уже есть аккаунт? Войти"}
+          </button>
+        </form>
+      </section>
+    </main>
+  );
 }
 
-function RequestCard({ item, open }: { item: ServiceRequest; open: () => void }) { return <button className="request-card" onClick={open}><div className="request-card-top"><span className="type-chip"><i style={{ background: item.type.color || '#ee7865' }} />{item.type.name}</span><span>#{item.id}</span></div><h3>{item.description}</h3><div className="request-meta"><span><Building2 />{item.organization?.legalName ?? item.createdBy?.ipName ?? 'Консультация'}</span><span><StoreIcon />{item.store?.name ?? 'Без точки'}</span></div><div className="request-meta"><span>{item.department.name}</span><span>{item.assignees.length ? item.assignees.map(a => a.user.ipName).join(', ') : 'Свободна'}</span></div><div className="request-card-bottom"><span className={`urgency ${item.priority.toLowerCase()}`}>{priorityLabel[item.priority]}</span>{isOverdue(item) && <span className="overdue">Просрочена</span>}<span className={`status ${item.status.toLowerCase()}`}>{statusLabel[item.status]}</span></div></button> }
+function RequestCard({
+  item,
+  open,
+}: {
+  item: ServiceRequest;
+  open: () => void;
+}) {
+  return (
+    <button className="request-card" onClick={open}>
+      <div className="request-card-top">
+        <span className="type-chip">
+          <i style={{ background: item.type.color || "#ee7865" }} />
+          {item.type.name}
+        </span>
+        <span>#{item.id}</span>
+      </div>
+      <h3>{item.description}</h3>
+      <div className="request-meta">
+        <span>
+          <Building2 />
+          {item.organization?.legalName ??
+            item.createdBy?.ipName ??
+            "Консультация"}
+        </span>
+        <span>
+          <StoreIcon />
+          {item.store?.name ?? "Без точки"}
+        </span>
+      </div>
+      <div className="request-meta">
+        <span>{item.department.name}</span>
+        <span>
+          {item.assignees.length
+            ? item.assignees.map((a) => a.user.ipName).join(", ")
+            : "Свободна"}
+        </span>
+      </div>
+      <div className="request-card-bottom">
+        <span className={`urgency ${item.priority.toLowerCase()}`}>
+          {priorityLabel[item.priority]}
+        </span>
+        {isOverdue(item) && <span className="overdue">Просрочена</span>}
+        <span className={`status ${item.status.toLowerCase()}`}>
+          {statusLabel[item.status]}
+        </span>
+      </div>
+    </button>
+  );
+}
 
 function TemplateData({ item }: { item: ServiceRequest }) {
-  const data = item.templateData ?? {}
-  const knownFields = item.type.templateFields ?? []
-  const used = new Set<string>()
-  const rows = knownFields.flatMap<{ key: string; label: string; value: unknown }>(field => {
-    used.add(field.key)
-    const value = data[field.key]
-    if (value === undefined || value === null || value === '') return []
-    return [{ key: field.key, label: field.label, value }]
-  }).concat(Object.entries(data).filter(([key, value]) => !used.has(key) && value !== undefined && value !== null && value !== '').map(([key, value]) => ({ key, label: key, value })))
-  const present = (value: unknown) => value === true ? 'Да' : value === false ? 'Нет' : Array.isArray(value) ? value.join(', ') : typeof value === 'object' ? JSON.stringify(value) : String(value)
-  if (!rows.length) return null
-  return <section className="template-data"><h3>Дополнительные данные</h3><div>{rows.map(row => <p key={row.key}><small>{row.label}</small><b>{present(row.value)}</b></p>)}</div></section>
-}
-
-function StoreAccessLinks({ access, compact = false }: { access?: Store['access'] | StoreAccess | null; compact?: boolean }) {
-  const anydeskRaw = access?.anydeskId?.trim(), anydeskAddress = anydeskRaw && (/^[\d\s-]+$/.test(anydeskRaw) ? anydeskRaw.replace(/\D/g, '') : anydeskRaw.replace(/\s+/g, ''))
-  if (!anydeskAddress && !access?.ofdUrl && !access?.nalogUrl) return null
-  return <div className={'store-actions' + (compact ? ' compact-store-actions' : '')}>{anydeskAddress && <a className="button secondary anydesk-button" href={'anydesk:' + anydeskAddress} onClick={event => { event.stopPropagation(); void navigator.clipboard?.writeText(anydeskAddress).catch(() => undefined) }}>Подключиться через AnyDesk</a>}{access?.ofdUrl && <a className="button secondary" href={access?.ofdUrl} target="_blank" rel="noreferrer" onClick={event => event.stopPropagation()}>Открыть ОФД</a>}{access?.nalogUrl && <a className="button secondary" href={access?.nalogUrl} target="_blank" rel="noreferrer" onClick={event => event.stopPropagation()}>Открыть налоговую</a>}</div>
-}
-
-function RequestModal({ item, user, departments, close, reload }: { item: ServiceRequest; user: User; departments: Department[]; close: () => void; reload: () => void }) {
-  const [status, setStatus] = useState(item.status), [priority, setPriority] = useState(item.priority), [departmentId, setDepartmentId] = useState(item.departmentId), [comment, setComment] = useState(''), [internal, setInternal] = useState(false), [assignees, setAssignees] = useState<StaffMember[]>([]), [selected, setSelected] = useState(item.assignees.map(a => a.user.id)), [error, setError] = useState('')
-  const staff = user.role !== 'CLIENT'
-  const canManage = staff && can(user, 'MANAGE_REQUESTS')
-  useEffect(() => { if (staff && can(user, 'ASSIGN_MASTERS')) api<StaffMember[]>(`/requests/assignees?departmentId=${departmentId}`).then(setAssignees).catch(() => setAssignees([])) }, [departmentId, staff, user])
-  const save = async (nextStatus = status) => { try { await api(`/requests/${item.id}`, { method: 'PATCH', body: JSON.stringify({ status: nextStatus, ...(can(user, 'SET_PRIORITY') && { priority }), ...(can(user, 'TRANSFER_REQUESTS') && { departmentId }), ...(can(user, 'ASSIGN_MASTERS') && { assigneeIds: selected }) }) }); reload(); close() } catch (reason) { setError(errorText(reason)) } }
-  const addComment = async () => { if (!comment.trim()) return; try { await api(`/requests/${item.id}/comments`, { method: 'POST', body: JSON.stringify({ body: comment, visibility: internal ? 'INTERNAL' : 'CLIENT' }) }); setComment(''); reload() } catch (reason) { setError(errorText(reason)) } }
-  const take = async () => { try { await api(`/requests/${item.id}/assignees/self`, { method: 'POST' }); reload() } catch (reason) { setError(errorText(reason)) } }
-  const finish = async () => save('DONE')
-  const stopRecurrence = async () => { if (!item.recurrenceSchedule || !window.confirm('Остановить создание будущих повторяющихся заявок? Уже созданные заявки останутся в системе.')) return; try { await api(`/recurring-requests/${item.recurrenceSchedule.id}/stop`, { method: 'POST' }); reload(); close() } catch (reason) { setError(errorText(reason)) } }
-  return <Modal title={`Заявка #${item.id}`} close={close} wide><div className="detail-grid"><div><small>Клиент / организация</small><b>{item.organization?.legalName ?? item.createdBy?.ipName ?? 'Новый контакт'}</b></div><div><small>Точка</small><b>{item.store?.name ?? 'Не выбрана'}</b><span>{item.store?.address}</span></div><div><small>Отдел</small><b>{item.department.name}</b></div><div><small>Тип и источник</small><b>{item.type.name}</b><span>{item.source === 'WEB' ? 'Сайт' : item.source === 'TELEGRAM_BOT' ? 'Telegram-бот' : 'Telegram'}</span></div><div><small>Создана</small><b>{formatDate(item.createdAt)}</b></div><div><small>Исполнители</small><b>{item.assignees.length ? item.assignees.map(a => a.user.ipName).join(', ') : 'Не назначены'}</b></div></div><div className="description-box"><small>Описание</small><p>{item.description}</p></div>{item.store?.access && <section className="request-store-links"><small>Быстрые доступы точки</small><StoreAccessLinks access={item.store.access} /></section>}<TemplateData item={item} />{item.activities?.length > 0 && <section className="activity-list"><h3>История изменений</h3>{item.activities.map(activity => <div className="activity-row" key={activity.id}><span>{formatDate(activity.createdAt)}</span><div><b>{activity.message}</b><small>{activity.author?.ipName ?? 'Система'}</small></div></div>)}</section>}{item.comments.length > 0 && <section className="comment-list">{item.comments.map(c => <div className={c.visibility === 'INTERNAL' ? 'internal-comment' : 'admin-comment'} key={c.id}><b>{c.author.ipName} · {c.visibility === 'INTERNAL' ? 'внутренний' : 'клиентский'}</b><p>{c.body}</p></div>)}</section>}{staff && <><div className="form-grid"><Field label="Статус"><select disabled={!canManage} value={status} onChange={e => setStatus(e.target.value as RequestStatus)}>{[item.status, ...transitions[item.status]].map(value => <option key={value} value={value}>{statusLabel[value]}</option>)}</select></Field>{can(user, 'SET_PRIORITY') && <Field label="Приоритет"><select value={priority} onChange={e => setPriority(e.target.value as Priority)}>{Object.entries(priorityLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>}{can(user, 'TRANSFER_REQUESTS') && <Field label="Передать в отдел"><select value={departmentId} onChange={e => setDepartmentId(Number(e.target.value))}>{departments.filter(d => d.isActive).map(d => <option value={d.id} key={d.id}>{d.name}</option>)}</select></Field>}</div>{can(user, 'ASSIGN_MASTERS') && <Field label="Исполнители (можно выбрать нескольких)"><select multiple value={selected.map(String)} onChange={e => setSelected(Array.from(e.currentTarget.selectedOptions, option => Number(option.value)))}>{assignees.map(person => <option value={person.id} key={person.id}>{person.ipName} · {roleLabel[person.role]}</option>)}</select></Field>}<div className="form-grid"><Field label="Комментарий"><textarea rows={3} value={comment} onChange={e => setComment(e.target.value)} placeholder="Напишите клиенту или оставьте внутреннюю заметку" /></Field><Field label="Видимость"><select value={internal ? 'INTERNAL' : 'CLIENT'} onChange={e => setInternal(e.target.value === 'INTERNAL')}><option value="CLIENT">Виден клиенту</option><option value="INTERNAL">Только сотрудникам</option></select></Field></div>{error && <div className="form-error">{error}</div>}<div className="modal-actions">{user.role === 'MASTER' && !item.assignees.some(a => a.user.id === user.id) && <Button kind="secondary" onClick={take}>Взять в работу</Button>}<Button kind="secondary" onClick={addComment}>Добавить комментарий</Button>{canManage && item.status !== 'DONE' && item.status !== 'CANCELLED' && <Button kind="secondary" onClick={finish}>Завершить заявку</Button>}{canManage && <Button onClick={() => void save()}>Сохранить изменения</Button>}</div></>}</Modal>
-}
-
-function RequestComponents({ components, selected, onChange }: { components: Component[]; selected: Array<{ componentId: number; quantity: number }>; onChange: (next: Array<{ componentId: number; quantity: number }>) => void }) {
-  const available = components.filter(component => component.isActive)
-  const add = () => { const first = available.find(component => !selected.some(item => item.componentId === component.id)); if (first) onChange([...selected, { componentId: first.id, quantity: 1 }]) }
-  return <section className="template-components"><div><h3>Компоненты для этой заявки</h3><p>Выберите фактически нужные компоненты и их количество.</p></div>{selected.map((item, index) => <div className="component-requirement" key={`${item.componentId}-${index}`}><select value={item.componentId} onChange={event => onChange(selected.map((row, rowIndex) => rowIndex === index ? { ...row, componentId: Number(event.target.value) } : row))}>{available.map(component => <option value={component.id} key={component.id}>{component.name}</option>)}</select><input aria-label="Количество" type="number" min="1" value={item.quantity} onChange={event => onChange(selected.map((row, rowIndex) => rowIndex === index ? { ...row, quantity: Math.max(1, Number(event.target.value) || 1) } : row))} /><Button kind="ghost" type="button" onClick={() => onChange(selected.filter((_, rowIndex) => rowIndex !== index))}>Удалить</Button></div>)}<Button kind="secondary" type="button" onClick={add} disabled={!available.some(component => !selected.some(item => item.componentId === component.id))}>Добавить компонент</Button>{!available.length && <small>Справочник компонентов пуст. Добавьте позиции на странице «Шаблоны заявок».</small>}</section>
-}
-
-function CreateRequest({ organizations, stores, types, user, close, reload, initialUrgency = 'URGENT', initialScheduledAt }: { organizations: Organization[]; stores: Store[]; types: RequestType[]; user: User; close: () => void; reload: () => void; initialUrgency?: 'URGENT' | 'SCHEDULED'; initialScheduledAt?: Date | null }) {
-  const activeOrganizations = organizations.filter(organization => organization.status === 'ACTIVE')
-  const [typeId, setTypeId] = useState(types.find(t => t.isActive)?.id ?? 0), [organizationId, setOrganizationId] = useState(activeOrganizations[0]?.id ?? 0), [urgency, setUrgency] = useState<'URGENT' | 'SCHEDULED'>(initialUrgency), [assigneeId, setAssigneeId] = useState(''), [assignees, setAssignees] = useState<StaffMember[]>([]), [components, setComponents] = useState<Component[]>([]), [selectedComponents, setSelectedComponents] = useState<Array<{ componentId: number; quantity: number }>>([]), [recurrenceIntervalDays, setRecurrenceIntervalDays] = useState(''), [error, setError] = useState('')
-  const selectedType = types.find(t => t.id === typeId)
-  const type = selectedType?.requiresComponents ? { ...selectedType, templateFields: [...(selectedType.templateFields ?? []), { key: '__components', label: '', type: 'TEXT' as const, required: false }] } : selectedType
-  const visibleStores = stores.filter(store => store.organizationId === organizationId && store.status === 'ACTIVE')
-  const canSelectAssignee = user.role !== 'CLIENT'
-  useEffect(() => { if (!activeOrganizations.some(organization => organization.id === organizationId)) setOrganizationId(activeOrganizations[0]?.id ?? 0) }, [organizationId, activeOrganizations])
-  useEffect(() => {
-    if (!canSelectAssignee || user.role === 'MASTER') return
-    api<StaffMember[]>('/requests/assignees').then(setAssignees).catch(() => setAssignees([]))
-  }, [canSelectAssignee, user.role])
-  useEffect(() => { api<Component[]>('/components').then(setComponents).catch(() => setComponents([])) }, [])
-  const scheduledValue = initialScheduledAt ? new Date(initialScheduledAt.getTime() - initialScheduledAt.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : undefined
-  const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget)) as Record<string, string>; const templateData: Record<string, unknown> = {}; type?.templateFields?.forEach(field => { if (field.type === 'CHECKBOX') templateData[field.key] = values[field.key] === 'on'; else if (values[field.key]) templateData[field.key] = values[field.key] }); try { await api('/requests', { method: 'POST', body: JSON.stringify({ typeId, organizationId: type?.requiresOrganization ? organizationId : undefined, storeId: type?.requiresStore ? Number(values.storeId) : undefined, urgency, scheduledAt: urgency === 'SCHEDULED' ? values.scheduledAt : undefined, recurrenceIntervalDays: urgency === 'SCHEDULED' && recurrenceIntervalDays ? Number(recurrenceIntervalDays) : undefined, assigneeId: assigneeId ? Number(assigneeId) : undefined, components: selectedComponents, description: values.description, templateData }) }); reload(); close() } catch (reason) { setError(errorText(reason)) } }
-  const dynamic = (field: NonNullable<RequestType['templateFields']>[number]) => field.key === '__components' ? <RequestComponents key={field.key} components={components} selected={selectedComponents} onChange={setSelectedComponents} /> : <Field label={`${field.label}${field.required ? ' *' : ''}`} key={field.key}>{field.type === 'TEXTAREA' ? <textarea name={field.key} required={field.required} /> : field.type === 'SELECT' ? <select name={field.key} required={field.required}><option value="">Выберите</option>{field.options?.map(o => <option key={o}>{o}</option>)}</select> : field.type === 'CHECKBOX' ? <input name={field.key} type="checkbox" /> : <input name={field.key} type={field.type === 'DATE' ? 'date' : field.type === 'NUMBER' ? 'number' : field.type === 'FILE' ? 'file' : 'text'} required={field.required} />}</Field>
-  return <Modal title="Новая заявка" close={close}><form onSubmit={submit}><Field label="Шаблон"><select value={typeId} onChange={e => setTypeId(Number(e.target.value))}>{types.filter(t => t.isActive).map(t => <option value={t.id} key={t.id}>{t.name} · {t.department.name}</option>)}</select></Field>{type?.requiresOrganization && <Field label="Организация"><select value={organizationId} onChange={e => setOrganizationId(Number(e.target.value))} required disabled={!activeOrganizations.length}><option value="">{activeOrganizations.length ? 'Выберите организацию' : 'Нет доступных активных организаций'}</option>{activeOrganizations.map(o => <option value={o.id} key={o.id}>{o.legalName}</option>)}</select></Field>}{type?.requiresStore && <Field label="Торговая точка"><select name="storeId" required><option value="">Выберите точку</option>{visibleStores.map(s => <option value={s.id} key={s.id}>{s.name} — {s.address}</option>)}</select></Field>}{canSelectAssignee && <Field label="Исполнитель (необязательно)"><select value={assigneeId} onChange={event => setAssigneeId(event.target.value)}><option value="">Не назначать при создании</option>{user.role === 'MASTER' ? <option value={user.id}>{user.ipName} · я</option> : assignees.map(person => <option value={person.id} key={person.id}>{person.ipName} · {roleLabel[person.role]}</option>)}</select></Field>}<div className="segmented"><button type="button" className={urgency === 'URGENT' ? 'active' : ''} onClick={() => setUrgency('URGENT')}>Срочная</button><button type="button" className={urgency === 'SCHEDULED' ? 'active' : ''} onClick={() => setUrgency('SCHEDULED')}>Плановая</button></div>{urgency === 'SCHEDULED' && <><Field label="Дата и время"><input name="scheduledAt" type="datetime-local" min={new Date(Date.now() + 300000).toISOString().slice(0, 16)} defaultValue={scheduledValue} required /></Field>{canSelectAssignee && <Field label="Повторять (необязательно)"><div className="input-with-suffix"><input type="number" min="1" max="3650" value={recurrenceIntervalDays} onChange={event => setRecurrenceIntervalDays(event.target.value)} placeholder="Например, 365" /><span>дней</span></div><small>Будущие заявки создаются автоматически. Выходные и федеральные праздники переносятся на предыдущий рабочий день.</small></Field>}</>}{type?.templateFields?.map(dynamic)}<Field label="Описание"><textarea name="description" rows={4} minLength={5} required /></Field>{error && <div className="form-error">{error}</div>}<div className="modal-actions"><Button kind="secondary" type="button" onClick={close}>Отмена</Button><Button disabled={type?.requiresOrganization && !activeOrganizations.length}>Создать заявку</Button></div></form></Modal>
-}
-
-function RequestsList({ requests, user, departments, types, open }: { requests: ServiceRequest[]; user: User; departments: Department[]; types: RequestType[]; open: (item: ServiceRequest) => void }) {
-  const [showClosed, setShowClosed] = useState(false), [search, setSearch] = useState(''), [status, setStatus] = useState<RequestStatus | ''>(''), [priority, setPriority] = useState<Priority | ''>(''), [departmentId, setDepartmentId] = useState(''), [typeId, setTypeId] = useState(''), [assigneeId, setAssigneeId] = useState(''), [schedule, setSchedule] = useState<'ALL' | 'TODAY' | 'WEEK' | 'OVERDUE'>('ALL'), [myToday, setMyToday] = useState(false)
-  const assignees = useMemo(() => Array.from(new Map(requests.flatMap(item => item.assignees.map(assignee => [assignee.user.id, assignee.user] as const))).values()).sort((left, right) => left.ipName.localeCompare(right.ipName, 'ru')), [requests])
-  const rows = useMemo(() => {
-    const today = new Date(); today.setHours(0, 0, 0, 0)
-    const weekEnd = new Date(today); weekEnd.setDate(today.getDate() + 7)
-    const matchesSchedule = (value?: string | null) => {
-      if (schedule === 'ALL') return true
-      if (!value) return false
-      const date = new Date(value); date.setHours(0, 0, 0, 0)
-      if (schedule === 'TODAY') return date.getTime() === today.getTime()
-      if (schedule === 'OVERDUE') return new Date(value) < new Date()
-      return date >= today && date < weekEnd
-    }
-    return requests.filter(item => {
-      const haystack = `${item.description} ${item.organization?.legalName ?? ''} ${item.store?.name ?? ''} ${item.type.name}`.toLowerCase()
-      return (showClosed ? item.status === 'DONE' : !['DONE', 'CANCELLED'].includes(item.status)) && (!search || haystack.includes(search.toLowerCase())) && (!status || item.status === status) && (!priority || item.priority === priority) && (!departmentId || item.departmentId === Number(departmentId)) && (!typeId || item.typeId === Number(typeId)) && (!assigneeId || item.assignees.some(assignee => assignee.user.id === Number(assigneeId))) && matchesSchedule(item.scheduledAt) && (!myToday || (item.scheduledAt && new Date(item.scheduledAt).toDateString() === today.toDateString() && item.assignees.some(assignee => assignee.user.id === user.id)))
+  const data = item.templateData ?? {};
+  const knownFields = item.type.templateFields ?? [];
+  const used = new Set<string>();
+  const rows = knownFields
+    .flatMap<{ key: string; label: string; value: unknown }>((field) => {
+      used.add(field.key);
+      const value = data[field.key];
+      if (value === undefined || value === null || value === "") return [];
+      return [{ key: field.key, label: field.label, value }];
     })
-  }, [requests, showClosed, search, status, priority, departmentId, typeId, assigneeId, schedule, myToday, user.id])
-  const clear = () => { setSearch(''); setStatus(''); setPriority(''); setDepartmentId(''); setTypeId(''); setAssigneeId(''); setSchedule('ALL'); setMyToday(false) }
-  return <section className="panel table-panel"><div className="toolbar request-filters"><div className="search-box"><Search /><input value={search} placeholder="Поиск по заявкам" onChange={event => setSearch(event.target.value)} /></div><select value={status} onChange={event => setStatus(event.target.value as RequestStatus | '')}><option value="">Все активные статусы</option>{Object.entries(statusLabel).filter(([value]) => value !== 'DONE' && value !== 'CANCELLED').map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select value={priority} onChange={event => setPriority(event.target.value as Priority | '')}><option value="">Все приоритеты</option>{Object.entries(priorityLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select value={departmentId} onChange={event => setDepartmentId(event.target.value)}><option value="">Все отделы</option>{departments.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><select value={typeId} onChange={event => setTypeId(event.target.value)}><option value="">Все шаблоны</option>{types.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><select value={assigneeId} onChange={event => setAssigneeId(event.target.value)}><option value="">Все исполнители</option>{assignees.map(item => <option key={item.id} value={item.id}>{item.ipName}</option>)}</select><select value={schedule} onChange={event => setSchedule(event.target.value as 'ALL' | 'TODAY' | 'WEEK' | 'OVERDUE')}><option value="ALL">Любая дата</option><option value="TODAY">Запланировано сегодня</option><option value="WEEK">Запланировано на 7 дней</option><option value="OVERDUE">Просроченные</option></select><Button kind={myToday ? 'primary' : 'secondary'} onClick={() => setMyToday(value => !value)}>Мои на сегодня</Button><Button kind="ghost" onClick={clear}>Сбросить</Button><Button kind="secondary" onClick={() => setShowClosed(value => !value)}>{showClosed ? 'Показать активные' : 'Показать выполненные'}</Button></div><div className="request-filter-summary">Найдено: {rows.length}</div><div className="request-grid">{rows.map(item => <RequestCard item={item} open={() => open(item)} key={item.id} />)}{!rows.length && <Empty title="Заявок не найдено" text="Измените условия фильтра или сбросьте их." />}</div></section>
+    .concat(
+      Object.entries(data)
+        .filter(
+          ([key, value]) =>
+            !used.has(key) &&
+            value !== undefined &&
+            value !== null &&
+            value !== "",
+        )
+        .map(([key, value]) => ({ key, label: key, value })),
+    );
+  const present = (value: unknown) =>
+    value === true
+      ? "Да"
+      : value === false
+        ? "Нет"
+        : Array.isArray(value)
+          ? value.join(", ")
+          : typeof value === "object"
+            ? JSON.stringify(value)
+            : String(value);
+  if (!rows.length) return null;
+  return (
+    <section className="template-data">
+      <h3>Дополнительные данные</h3>
+      <div>
+        {rows.map((row) => (
+          <p key={row.key}>
+            <small>{row.label}</small>
+            <b>{present(row.value)}</b>
+          </p>
+        ))}
+      </div>
+    </section>
+  );
 }
 
-function Calendar({ requests, open, add }: { requests: ServiceRequest[]; open: (item: ServiceRequest) => void; add: (date: Date) => void }) {
-  const [cursor, setCursor] = useState(() => new Date())
-  const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
-  const firstWeekday = (monthStart.getDay() + 6) % 7
-  const days = Array.from({ length: 42 }, (_, index) => new Date(cursor.getFullYear(), cursor.getMonth(), index - firstWeekday + 1))
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const monthTitle = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' }).format(cursor)
-  const scheduleFor = (day: Date) => { const value = new Date(day); value.setHours(10, 0, 0, 0); const minimum = new Date(Date.now() + 600000); return value < minimum ? minimum : value }
-  const sameDay = (left: Date, right: Date) => left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth() && left.getDate() === right.getDate()
-  const time = (value: string) => new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(new Date(value))
-  return <section className="panel calendar-page"><div className="calendar-toolbar"><div><button aria-label="Предыдущий месяц" onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}>‹</button><h2>{monthTitle}</h2><button aria-label="Следующий месяц" onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}>›</button></div><Button onClick={() => add(scheduleFor(new Date()))}><Plus /> Новая плановая</Button></div><div className="calendar-weekdays">{['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(day => <span key={day}>{day}</span>)}</div><div className="calendar-grid">{days.map(day => { const past = day < today; const items = requests.filter(item => item.urgency === 'SCHEDULED' && item.scheduledAt && new Date(item.scheduledAt) >= new Date() && !['DONE', 'CANCELLED'].includes(item.status) && sameDay(new Date(item.scheduledAt), day)); return <div key={day.toISOString()} className={`calendar-cell ${day.getMonth() !== cursor.getMonth() ? 'muted-day' : ''} ${sameDay(day, today) ? 'today' : ''} ${past ? '' : 'clickable'}`} onClick={() => !past && add(scheduleFor(day))}><span>{day.getDate()}</span>{items.map(item => <button key={item.id} title={`Открыть заявку #${item.id}`} style={{ borderColor: item.type.color || '#ee7865' }} onClick={event => { event.stopPropagation(); open(item) }}><b>{time(item.scheduledAt!)} · {item.type.name}</b><small>{item.store?.name ?? item.organization?.legalName ?? item.description}</small></button>)}</div> })}</div><p className="calendar-hint">В календаре показываются только будущие активные плановые заявки.</p></section>
+function StoreAccessLinks({
+  access,
+  compact = false,
+}: {
+  access?: Store["access"] | StoreAccess | null;
+  compact?: boolean;
+}) {
+  const anydeskRaw = access?.anydeskId?.trim(),
+    anydeskAddress =
+      anydeskRaw &&
+      (/^[\d\s-]+$/.test(anydeskRaw)
+        ? anydeskRaw.replace(/\D/g, "")
+        : anydeskRaw.replace(/\s+/g, ""));
+  if (!anydeskAddress && !access?.ofdUrl && !access?.nalogUrl) return null;
+  return (
+    <div
+      className={"store-actions" + (compact ? " compact-store-actions" : "")}
+    >
+      {anydeskAddress && (
+        <a
+          className="button secondary anydesk-button"
+          href={"anydesk:" + anydeskAddress}
+          onClick={(event) => {
+            event.stopPropagation();
+            void navigator.clipboard
+              ?.writeText(anydeskAddress)
+              .catch(() => undefined);
+          }}
+        >
+          Подключиться через AnyDesk
+        </a>
+      )}
+      {access?.ofdUrl && (
+        <a
+          className="button secondary"
+          href={access?.ofdUrl}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(event) => event.stopPropagation()}
+        >
+          Открыть ОФД
+        </a>
+      )}
+      {access?.nalogUrl && (
+        <a
+          className="button secondary"
+          href={access?.nalogUrl}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(event) => event.stopPropagation()}
+        >
+          Открыть налоговую
+        </a>
+      )}
+    </div>
+  );
 }
 
-
-function StoreDetails({ store, user, close }: { store: Store; user: User; close: () => void }) {
-  const canViewSecrets = can(user, 'VIEW_STORE_SECRETS'), canEditAccess = user.role !== 'CLIENT'
-  const [access, setAccess] = useState<StoreAccess | null>(null), [loading, setLoading] = useState(canViewSecrets), [saving, setSaving] = useState(false), [saved, setSaved] = useState(false), [error, setError] = useState('')
-  useEffect(() => { if (!canViewSecrets) return; api<StoreAccess | null>('/stores/' + store.id + '/access').then(setAccess).catch(reason => setError(errorText(reason))).finally(() => setLoading(false)) }, [store.id, canViewSecrets])
-  const details = access ?? store.access
-  const saveAccess = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setSaving(true); setError(''); setSaved(false); const values = Object.fromEntries(Array.from(new FormData(event.currentTarget).entries()).filter(([, value]) => typeof value === 'string' && value.trim())) as Record<string, string>; try { await api('/stores/' + store.id + '/access', { method: 'PUT', body: JSON.stringify(values) }); setAccess(previous => ({ ...(previous ?? {}), ...values } as StoreAccess)); setSaved(true) } catch (reason) { setError(errorText(reason)) } finally { setSaving(false) } }
-  return <Modal title={store.name} close={close} wide><div className="detail-grid"><div><small>Организация</small><b>{store.organization?.legalName ?? 'Не указана'}</b></div><div><small>Статус</small><b>{store.status === 'ACTIVE' ? 'Активна' : store.status === 'PENDING' ? 'На модерации' : 'Отклонена'}</b></div><div><small>Заявок</small><b>{store._count?.requests ?? 0}</b></div><div><small>Адрес</small><b>{store.address}</b></div><div><small>Телефон</small><b>{store.phone || 'Не указан'}</b></div><div><small>Контакт</small><b>{store.user?.ipName ?? store.organization?.contactName ?? 'Не указан'}</b></div></div><section className="store-access"><h3>Рабочие доступы</h3>{loading ? <p>Загрузка доступов…</p> : <><div className="detail-grid"><div><small>AnyDesk</small><b>{details?.anydeskId || 'Не указан'}</b></div><div><small>ОФД</small><b>{details?.ofdUrl || 'Не указан'}</b><span>{details?.ofdLogin || ''}</span></div><div><small>Налоговая</small><b>{details?.nalogUrl || 'Не указан'}</b><span>{details?.nalogLogin || ''}</span></div></div><StoreAccessLinks access={details} /></>}{canEditAccess && <form className="access-form" onSubmit={saveAccess}><h3>Заполнить или обновить доступы</h3><p>Пустое поле не изменяет сохранённое значение. Пароли видят только сотрудники с отдельным разрешением.</p><div className="form-grid"><Field label="AnyDesk ID"><input name="anydeskId" defaultValue={details?.anydeskId ?? ''} /></Field><Field label="Пароль AnyDesk"><input name="anydeskPassword" type="password" placeholder={canViewSecrets && access?.anydeskPassword ? 'Сохранён — введите для замены' : 'Введите пароль'} /></Field></div><div className="form-grid"><Field label="Сайт ОФД"><input name="ofdUrl" type="url" placeholder="https://…" defaultValue={details?.ofdUrl ?? ''} /></Field><Field label="Логин ОФД"><input name="ofdLogin" defaultValue={details?.ofdLogin ?? ''} /></Field></div><Field label="Пароль ОФД"><input name="ofdPassword" type="password" placeholder={canViewSecrets && access?.ofdPassword ? 'Сохранён — введите для замены' : 'Введите пароль'} /></Field><div className="form-grid"><Field label="Сайт налоговой"><input name="nalogUrl" type="url" placeholder="https://…" defaultValue={details?.nalogUrl ?? ''} /></Field><Field label="Логин налоговой"><input name="nalogLogin" defaultValue={details?.nalogLogin ?? ''} /></Field></div><Field label="Пароль налоговой"><input name="nalogPassword" type="password" placeholder={canViewSecrets && access?.nalogPassword ? 'Сохранён — введите для замены' : 'Введите пароль'} /></Field>{error && <div className="form-error">{error}</div>}{saved && <div className="inline-message">Доступы сохранены.</div>}<div className="modal-actions"><Button type="submit" disabled={saving}>{saving ? 'Сохранение…' : 'Сохранить доступы'}</Button></div></form>}</section></Modal>
-}
-
-function Organizations({ organizations, user, reload, openStores }: { organizations: Organization[]; user: User; reload: () => void; openStores: (organizationId: number) => void }) {
-  const [adding, setAdding] = useState(false), [error, setError] = useState(''), [contacts, setContacts] = useState([{ fullName: '', phone: '', note: '' }])
-  const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget)); try { await api('/organizations', { method: 'POST', body: JSON.stringify({ ...values, contacts: contacts.filter(contact => contact.fullName.trim()) }) }); setAdding(false); setContacts([{ fullName: '', phone: '', note: '' }]); reload() } catch (reason) { setError(errorText(reason)) } }
-  const approve = async (id: number) => { try { setError(''); await api('/organizations/' + id + '/approve', { method: 'POST' }); reload() } catch (reason) { setError(errorText(reason)) } }
-  const reject = async (id: number) => { const rejectionReason = window.prompt('Укажите причину отказа (её увидит клиент):'); if (!rejectionReason?.trim()) return; try { setError(''); await api('/organizations/' + id + '/reject', { method: 'POST', body: JSON.stringify({ rejectionReason }) }); reload() } catch (reason) { setError(errorText(reason)) } }
-  const canApprove = user.role !== 'CLIENT'
-  return <><div className="section-actions"><span>{organizations.length} организаций</span><Button onClick={() => setAdding(true)}><Plus /> Добавить организацию</Button></div>{error && <div className="page-error">{error}</div>}<div className="store-grid">{[...organizations].sort((left, right) => Number(right.status === 'PENDING') - Number(left.status === 'PENDING')).map(organization => <article className={'store-card clickable-card' + (organization.status === 'PENDING' ? ' pending-card' : '')} onClick={() => openStores(organization.id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openStores(organization.id) } }} role="button" tabIndex={0} key={organization.id}><div className="store-card-head"><span className="store-icon"><Building2 /></span><span className={'store-status ' + organization.status.toLowerCase()}>{organization.status === 'ACTIVE' ? 'Активна' : organization.status === 'PENDING' ? 'На модерации' : 'Отклонена'}</span></div><h3>{organization.legalName}</h3><p>{organization.type === 'IP' ? 'ИП' : organization.type === 'OOO' ? 'ООО' : 'Организация'} {organization.inn && '· ИНН ' + organization.inn}</p><p>{organization.contacts?.length ? organization.contacts.map(contact => `${contact.fullName}${contact.phone ? ' · ' + contact.phone : ''}`).join('; ') : organization.contactName || organization.phone || organization.email || 'Контакты не указаны'}</p><div className="store-metrics"><span><b>{organization.stores?.length ?? 0}</b> точек</span><span><b>{organization._count?.requests ?? 0}</b> заявок</span></div>{canApprove && organization.status === 'PENDING' && <div className="moderation-actions"><Button kind="secondary" onClick={event => { event.stopPropagation(); void approve(organization.id) }}><Check /> Принять {organization.type === 'IP' ? 'ИП' : 'организацию'}</Button><Button kind="secondary" onClick={event => { event.stopPropagation(); void reject(organization.id) }}>Отклонить</Button></div>}<small className="card-hint">Открыть торговые точки →</small></article>)}</div>{!organizations.length && <Empty title="Организаций нет" text="Добавьте первую организацию, чтобы связать с ней точки и заявки." />}{adding && <Modal title="Новая организация" close={() => setAdding(false)}><form onSubmit={submit}><Field label="Тип"><select name="type"><option value="IP">ИП</option><option value="OOO">ООО</option><option value="OTHER">Другое</option></select></Field><Field label="Полное название"><input name="legalName" minLength={2} required /></Field><Field label="Сокращённое название"><input name="shortName" /></Field><div className="form-grid"><Field label="ИНН"><input name="inn" /></Field><Field label="КПП"><input name="kpp" /></Field></div><Field label="ОГРН / ОГРНИП"><input name="ogrn" /></Field><Field label="Юридический адрес"><textarea name="legalAddress" /></Field><Field label="Основной телефон организации"><input name="phone" /></Field><Field label="Email"><input name="email" type="email" /></Field><section className="contact-editor"><h3>Контактные лица</h3>{contacts.map((contact, index) => <div className="contact-row" key={index}><input value={contact.fullName} onChange={event => setContacts(items => items.map((item, position) => position === index ? { ...item, fullName: event.target.value } : item))} placeholder="ФИО" /><input value={contact.phone} onChange={event => setContacts(items => items.map((item, position) => position === index ? { ...item, phone: event.target.value } : item))} placeholder="Телефон" /><input value={contact.note} onChange={event => setContacts(items => items.map((item, position) => position === index ? { ...item, note: event.target.value } : item))} placeholder="Примечание" />{contacts.length > 1 && <Button kind="ghost" type="button" onClick={() => setContacts(items => items.filter((_, position) => position !== index))}>Удалить</Button>}</div>)}<Button kind="secondary" type="button" onClick={() => setContacts(items => [...items, { fullName: '', phone: '', note: '' }])}>+ Ещё контакт</Button></section><div className="modal-actions"><Button type="button" kind="secondary" onClick={() => setAdding(false)}>Отмена</Button><Button>Сохранить</Button></div></form></Modal>}</>
-}
-
-function Stores({ stores, organizations, user, reload, organizationFilter, clearFilter }: { stores: Store[]; organizations: Organization[]; user: User; reload: () => void; organizationFilter: number | null; clearFilter: () => void }) {
-  const [adding, setAdding] = useState(false), [selected, setSelected] = useState<Store | null>(null), [error, setError] = useState(''), [selectedOrganizationId, setSelectedOrganizationId] = useState<number | null>(organizationFilter)
-  const visibleOrganizations = selectedOrganizationId ? organizations.filter(organization => organization.id === selectedOrganizationId) : organizations
-  const groups = visibleOrganizations.map(organization => ({ organization, stores: stores.filter(store => store.organizationId === organization.id).sort((left, right) => Number(right.status === 'PENDING') - Number(left.status === 'PENDING')) })).filter(group => group.stores.length || Boolean(selectedOrganizationId)).sort((left, right) => Number(right.organization.status === 'PENDING' || right.stores.some(store => store.status === 'PENDING')) - Number(left.organization.status === 'PENDING' || left.stores.some(store => store.status === 'PENDING')))
-  const visibleCount = groups.reduce((total, group) => total + group.stores.length, 0)
-  const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget)); await api('/stores', { method: 'POST', body: JSON.stringify({ ...values, organizationId: Number(values.organizationId) }) }); setAdding(false); reload() }
-  const approve = async (id: number) => { try { setError(''); await api('/stores/' + id + '/approve', { method: 'POST' }); reload() } catch (reason) { setError(errorText(reason)) } }
-  const reject = async (id: number) => { const rejectionReason = window.prompt('Укажите причину отказа (её увидит клиент):'); if (!rejectionReason?.trim()) return; try { setError(''); await api('/stores/' + id + '/reject', { method: 'POST', body: JSON.stringify({ rejectionReason }) }); reload() } catch (reason) { setError(errorText(reason)) } }
-  return <>{error && <div className="page-error">{error}</div>}<div className="section-actions"><span>{visibleCount} торговых точек{selectedOrganizationId && ' · ' + (visibleOrganizations[0]?.legalName ?? '')}</span><div className="inline-actions"><select className="store-organization-filter" value={selectedOrganizationId ?? ''} aria-label="Фильтр по организации" onChange={event => { const value = Number(event.target.value) || null; setSelectedOrganizationId(value); if (!value) clearFilter() }}><option value="">Все организации</option>{organizations.map(organization => <option value={organization.id} key={organization.id}>{organization.legalName}</option>)}</select>{selectedOrganizationId && <Button kind="secondary" onClick={() => { setSelectedOrganizationId(null); clearFilter() }}>Все организации</Button>}<Button onClick={() => setAdding(true)}><Plus /> Добавить точку</Button></div></div>{groups.map(group => <section className="store-group" key={group.organization.id}><div className="store-group-head"><span className="store-icon"><Building2 /></span><div><h2>{group.organization.legalName}</h2><p>{group.stores.length} точек · ИНН {group.organization.inn || 'не указан'}</p></div></div><div className="store-grid">{group.stores.map(store => <article className={'store-card clickable-card' + (store.status === 'PENDING' ? ' pending-card' : '')} onClick={() => setSelected(store)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelected(store) } }} role="button" tabIndex={0} key={store.id}><div className="store-card-head"><span className="store-icon"><StoreIcon /></span><span className={'store-status ' + store.status.toLowerCase()}>{store.status === 'ACTIVE' ? 'Активна' : store.status === 'PENDING' ? 'На модерации' : 'Отклонена'}</span></div><h3>{store.name}</h3><p>{store.address}</p><p>{store.phone || 'Телефон не указан'}</p><div className="store-metrics"><span><b>{store._count?.requests ?? 0}</b> заявок</span></div><StoreAccessLinks access={store.access} compact />{store.status === 'PENDING' && <div className="moderation-actions"><Button kind="secondary" onClick={event => { event.stopPropagation(); void approve(store.id) }}><Check /> Принять точку</Button><Button kind="secondary" onClick={event => { event.stopPropagation(); void reject(store.id) }}>Отклонить</Button></div>}<small className="card-hint">Открыть подробности →</small></article>)}</div></section>)}{!groups.length && <Empty title="Торговых точек нет" text="Добавьте первую точку для этой организации." />}{adding && <Modal title="Новая торговая точка" close={() => setAdding(false)}><form onSubmit={submit}><Field label="Организация"><select name="organizationId" required defaultValue={selectedOrganizationId ?? undefined}>{organizations.filter(organization => organization.status === 'ACTIVE').map(organization => <option value={organization.id} key={organization.id}>{organization.legalName}</option>)}</select></Field><Field label="Название"><input name="name" required minLength={2} /></Field><Field label="Адрес"><input name="address" required minLength={5} /></Field><Field label="Телефон"><input name="phone" /></Field><div className="modal-actions"><Button type="button" kind="secondary" onClick={() => setAdding(false)}>Отмена</Button><Button>Сохранить</Button></div></form></Modal>}{selected && <StoreDetails store={selected} user={user} close={() => setSelected(null)} />}</>
-}
-
-function Templates({ types, departments, reload }: { types: RequestType[]; departments: Department[]; reload: () => void }) {
-  const [editing, setEditing] = useState<RequestType | 'new' | null>(null)
-  const [components, setComponents] = useState<Component[]>([])
-  const [requirements, setRequirements] = useState<Array<{ componentId: number; quantity: number }>>([])
-  const [error, setError] = useState('')
-  const loadComponents = useCallback(() => api<Component[]>('/components').then(setComponents).catch(() => setComponents([])), [])
-  useEffect(() => { void loadComponents() }, [loadComponents])
-  const open = (template: RequestType | 'new') => {
-    setEditing(template)
-    setRequirements(template === 'new' ? [] : template.componentRequirements.map(item => ({ componentId: item.componentId, quantity: item.quantity })))
-    setError('')
-  }
-  const addComponent = () => {
-    const first = components.find(component => component.isActive && !requirements.some(item => item.componentId === component.id))
-    if (first) setRequirements(items => [...items, { componentId: first.id, quantity: 1 }])
-  }
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); setError('')
-    const values = Object.fromEntries(new FormData(event.currentTarget)) as Record<string, string>
+function RequestModal({
+  item,
+  user,
+  departments,
+  close,
+  reload,
+}: {
+  item: ServiceRequest;
+  user: User;
+  departments: Department[];
+  close: () => void;
+  reload: () => void;
+}) {
+  const [status, setStatus] = useState(item.status),
+    [priority, setPriority] = useState(item.priority),
+    [departmentId, setDepartmentId] = useState(item.departmentId),
+    [comment, setComment] = useState(""),
+    [internal, setInternal] = useState(false),
+    [assignees, setAssignees] = useState<StaffMember[]>([]),
+    [selected, setSelected] = useState(item.assignees.map((a) => a.user.id)),
+    [error, setError] = useState("");
+  const staff = user.role !== "CLIENT";
+  const canManage = staff && can(user, "MANAGE_REQUESTS");
+  useEffect(() => {
+    if (staff && can(user, "ASSIGN_MASTERS"))
+      api<StaffMember[]>(`/requests/assignees?departmentId=${departmentId}`)
+        .then(setAssignees)
+        .catch(() => setAssignees([]));
+  }, [departmentId, staff, user]);
+  const save = async (nextStatus = status) => {
     try {
-      const templateFields = values.templateFields ? JSON.parse(values.templateFields) : []
-      await api(editing === 'new' ? '/request-types' : `/request-types/${(editing as RequestType).id}`, {
-        method: editing === 'new' ? 'POST' : 'PATCH',
-        body: JSON.stringify({ ...values, departmentId: Number(values.departmentId), isActive: values.isActive === 'on', requiresOrganization: values.requiresOrganization === 'on', requiresStore: values.requiresStore === 'on', requiresComponents: values.requiresComponents === 'on', availableOnWeb: values.availableOnWeb === 'on', availableOnTelegram: values.availableOnTelegram === 'on', templateFields }),
-      })
-      setEditing(null); reload()
-    } catch (reason) { setError(reason instanceof SyntaxError ? 'Дополнительные поля указаны в неверном формате JSON' : errorText(reason)) }
-  }
-  const addCatalogComponent = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const form = event.currentTarget
-    const name = String(new FormData(form).get('componentName') ?? '').trim()
-    if (!name) return
-    try {
-      const component = await api<Component>('/components', { method: 'POST', body: JSON.stringify({ name }) })
-      form.reset()
-      setComponents(items => [...items, component].sort((left, right) => left.name.localeCompare(right.name, 'ru')))
+      await api(`/requests/${item.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          status: nextStatus,
+          ...(can(user, "SET_PRIORITY") && { priority }),
+          ...(can(user, "TRANSFER_REQUESTS") && { departmentId }),
+          ...(can(user, "ASSIGN_MASTERS") && { assigneeIds: selected }),
+        }),
+      });
+      reload();
+      close();
+    } catch (reason) {
+      setError(errorText(reason));
     }
-    catch (reason) { setError(errorText(reason)) }
-  }
-  return <>
-    <section className="panel component-catalog"><div className="panel-head"><div><h2>Справочник компонентов</h2><p>Общий список для всех шаблонов заявок.</p></div></div><div className="component-catalog-body"><form onSubmit={addCatalogComponent} className="component-add"><input name="componentName" placeholder="Например, Фискальный накопитель ФН-1.2" required /><Button>Добавить компонент</Button></form><div className="component-tags">{components.filter(component => component.isActive).map(component => <span key={component.id}>{component.name}</span>)}{!components.some(component => component.isActive) && <small>Справочник пока пуст. Добавьте первый компонент выше.</small>}</div></div></section>
-    <div className="section-actions"><span>{types.filter(type => type.isActive).length} активных шаблонов</span><Button onClick={() => open('new')}><Plus /> Новый шаблон</Button></div>
-    <div className="type-grid">{types.map(type => <article className="type-card" key={type.id}><i style={{ background: type.color || '#ee7d6a' }} /><div><h3>{type.name}</h3><p>{type.description || 'Без описания'}<br />{type.department.name} · {priorityLabel[type.defaultPriority]}</p><span>{type.isActive ? 'Активен' : 'Отключён'} · полей: {type.templateFields?.length ?? 0} · компонентов: {type.componentRequirements.length}</span></div><Button kind="ghost" onClick={() => open(type)}><Pencil /></Button></article>)}</div>
-    {editing && <Modal title={editing === 'new' ? 'Новый шаблон' : 'Настройка шаблона'} close={() => setEditing(null)} wide><form onSubmit={submit}><div className="form-grid"><Field label="Название"><input name="name" required defaultValue={editing === 'new' ? '' : editing.name} /></Field><Field label="Отдел"><select name="departmentId" defaultValue={editing === 'new' ? departments[0]?.id : editing.departmentId}>{departments.map(department => <option value={department.id} key={department.id}>{department.name}</option>)}</select></Field></div><Field label="Описание"><textarea name="description" defaultValue={editing === 'new' ? '' : editing.description ?? ''} /></Field><div className="form-grid"><Field label="Цвет"><input name="color" type="color" defaultValue={editing === 'new' ? '#ee7d6a' : editing.color ?? '#ee7d6a'} /></Field><Field label="Начальный приоритет"><select name="defaultPriority" defaultValue={editing === 'new' ? 'NORMAL' : editing.defaultPriority}>{Object.entries(priorityLabel).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></Field></div><div className="checkbox-row"><label><input name="isActive" type="checkbox" defaultChecked={editing === 'new' || editing.isActive} /> Активен</label><label><input name="requiresOrganization" type="checkbox" defaultChecked={editing === 'new' || editing.requiresOrganization} /> Требовать организацию</label><label><input name="requiresStore" type="checkbox" defaultChecked={editing === 'new' || editing.requiresStore} /> Требовать точку</label><label><input name="requiresComponents" type="checkbox" defaultChecked={editing !== 'new' && editing.requiresComponents} /> Требовать компоненты</label><label><input name="availableOnWeb" type="checkbox" defaultChecked={editing === 'new' || editing.availableOnWeb} /> Сайт</label><label><input name="availableOnTelegram" type="checkbox" defaultChecked={editing === 'new' || editing.availableOnTelegram} /> Telegram</label></div><Field label="Дополнительные поля (JSON)"><textarea name="templateFields" rows={7} defaultValue={editing === 'new' ? '[]' : JSON.stringify(editing.templateFields ?? [], null, 2)} /><small>Пример: [{'{"key":"serial","label":"Серийный номер","type":"TEXT","required":true}'}]</small></Field>{error && <div className="form-error">{error}</div>}<div className="modal-actions"><Button kind="secondary" type="button" onClick={() => setEditing(null)}>Отмена</Button><Button>Сохранить</Button></div></form></Modal>}
-  </>
-}
-
-function Staff({ staff, departments, reload }: { staff: StaffMember[]; departments: Department[]; reload: () => void }) {
-  const [editing, setEditing] = useState<StaffMember | 'new' | null>(null), [error, setError] = useState(''), [telegramLink, setTelegramLink] = useState<{ deepLink: string; expiresAt: string } | null>(null)
-  const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setError(''); const form = new FormData(event.currentTarget); const role = String(form.get('role')) as StaffMember['role']; const ids = form.getAll('departments').map(Number); const permissions = (Object.keys(permissionLabels) as PermissionKey[]).map(permission => ({ permission, enabled: form.get(`permission-${permission}`) === 'on' })); try { if (editing === 'new') await api('/staff', { method: 'POST', body: JSON.stringify({ name: form.get('name'), email: form.get('email'), phone: form.get('phone'), password: form.get('password'), role, departmentIds: ids }) }); else await api(`/staff/${editing!.id}/access`, { method: 'PUT', body: JSON.stringify({ role, departments: ids.map(departmentId => ({ departmentId, membershipRole: role === 'DEPARTMENT_HEAD' ? 'HEAD' : 'MASTER' })), permissions }) }); setEditing(null); reload() } catch (reason) { setError(errorText(reason)) } }
-  const createTelegramLink = async (id: number) => { try { setError(''); setTelegramLink(await api<{ deepLink: string; expiresAt: string }>(`/staff/${id}/telegram-link`, { method: 'POST' })) } catch (reason) { setError(errorText(reason)) } }
-  const enabled = (key: PermissionKey) => { if (!editing || editing === 'new') return false; return editing.permissionOverrides.find(item => item.permission === key)?.enabled ?? defaultPermissions[editing.role].includes(key) }
-  return <><div className="section-actions"><span>{staff.length} сотрудников</span><Button onClick={() => setEditing('new')}><Plus /> Добавить сотрудника</Button></div><section className="panel data-table"><div className="table-row table-head"><span>Сотрудник</span><span>Роль</span><span>Отделы</span><span>Статус</span><span /></div>{staff.map(person => <div className="table-row" key={person.id}><span><b>{person.ipName}</b><small>{person.email} · {person.phone}</small></span><span>{roleLabel[person.role]}</span><span>{person.departmentMemberships.map(d => d.department.name).join(', ') || '—'}</span><span>{person.status === 'ACTIVE' ? 'Активен' : 'Заблокирован'}</span><span><Button kind="ghost" onClick={() => setEditing(person)}><UserRoundCog /></Button></span></div>)}</section>{editing && <Modal title={editing === 'new' ? 'Новый сотрудник' : `Права: ${editing.ipName}`} close={() => setEditing(null)} wide><form onSubmit={submit}>{editing === 'new' && <><div className="form-grid"><Field label="Имя"><input name="name" required /></Field><Field label="Телефон"><input name="phone" required /></Field></div><div className="form-grid"><Field label="Email"><input name="email" type="email" required /></Field><Field label="Временный пароль"><input name="password" minLength={8} required /></Field></div></>}<Field label="Роль"><select name="role" defaultValue={editing === 'new' ? 'MASTER' : editing.role}>{(['DIRECTOR', 'DEPARTMENT_HEAD', 'MASTER'] as const).map(role => <option value={role} key={role}>{roleLabel[role]}</option>)}</select></Field><section className="staff-access-editor"><section className="access-group departments-group"><div className="access-group-head"><div><h3>Отделы</h3><p>Определяют рабочую очередь сотрудника.</p></div></div><div className="access-list">{departments.map(department => <label className="access-row" key={department.id}><input name="departments" type="checkbox" value={department.id} defaultChecked={editing !== 'new' && editing.departmentMemberships.some(item => item.departmentId === department.id)} /><span><b>{department.name}</b><small>{department.isActive ? 'Активный отдел' : 'Отдел отключён'}</small></span></label>)}</div></section><section className="access-groups"><div className="access-group-head"><div><h3>Индивидуальные разрешения</h3><p>Переключатели дополняют или ограничивают права выбранной роли.</p></div></div>{permissionGroups.map(group => <section className="access-group" key={group.title}><div className="access-group-head"><div><h4>{group.title}</h4><p>{group.description}</p></div></div><div className="access-list">{group.permissions.map(key => <label className="access-row" key={key}><input name={`permission-${key}`} type="checkbox" defaultChecked={enabled(key)} /><span><b>{permissionLabels[key]}</b><small>{defaultPermissions[editing === 'new' ? 'MASTER' : editing.role].includes(key) ? 'Входит в права роли' : 'Дополнительное разрешение'}</small></span></label>)}</div></section>)}</section></section>{editing !== 'new' && <section className="telegram-link"><div><b>Рабочий Telegram</b><p>{editing.linkedTelegramChats?.length ? <>Подключён: @{editing.linkedTelegramChats[0].username ?? editing.linkedTelegramChats[0].title}</> : 'Не подключён'}</p></div><Button type="button" kind="secondary" onClick={() => void createTelegramLink(editing.id)}>{editing.linkedTelegramChats?.length ? 'Новая ссылка' : 'Подключить Telegram'}</Button>{telegramLink && <a className="link-button" href={telegramLink.deepLink} target="_blank" rel="noreferrer">Открыть ссылку (20 мин.)</a>}</section>}{error && <div className="form-error">{error}</div>}<div className="modal-actions"><Button type="button" kind="secondary" onClick={() => setEditing(null)}>Отмена</Button><Button>Сохранить</Button></div></form></Modal>}</>
-}
-
-function Telegram({ integrations, chats, organizations, stores, reload }: { integrations: TelegramIntegration[]; chats: TelegramChat[]; organizations: Organization[]; stores: Store[]; reload: () => void }) {
-  const [editing, setEditing] = useState<number | null>(null), [saving, setSaving] = useState(false), [error, setError] = useState('')
-  const saveLinks = async (event: FormEvent<HTMLFormElement>, chatId: number) => {
-    event.preventDefault(); setSaving(true); setError('')
-    const form = new FormData(event.currentTarget)
+  };
+  const addComment = async () => {
+    if (!comment.trim()) return;
     try {
-      await api('/telegram/chats/' + chatId + '/links', { method: 'PUT', body: JSON.stringify({ organizationIds: form.getAll('organizationIds').map(Number), storeIds: form.getAll('storeIds').map(Number) }) })
-      setEditing(null); await reload()
-    } catch (reason) { setError(errorText(reason)) } finally { setSaving(false) }
-  }
-  return <><div className="stats-grid">{integrations.map(item => <div className="stat-card violet" key={item.id}><span><MessageCircle /></span><div><small>{item.kind === 'BOT' ? 'Telegram-бот' : 'Корпоративный аккаунт'}</small><strong style={{ fontSize: 15 }}>{item.status === 'ACTIVE' ? 'Подключён' : 'Нужна настройка'}</strong></div></div>)}</div><section className="panel table-panel"><div className="panel-head"><div><h2>Telegram-аккаунты и привязки</h2><p>Один аккаунт можно связать с несколькими организациями и точками. Для привязки пользователь должен сначала написать боту.</p></div></div>{error && <div className="form-error">{error}</div>}{chats.length ? chats.map(chat => { const organizationIds = chat.organizationLinks.map(link => link.organization.id), storeIds = chat.storeLinks.map(link => link.store.id); return <article className="telegram-row" key={chat.id}><div><b>{chat.title}</b><span>{chat.username ? '@' + chat.username : 'Без username'}</span><small>{chat.messages[0]?.body ?? 'Нет сообщений'} · {formatDate(chat.lastMessageAt)}</small><p className="telegram-links-summary">Организации: {chat.organizationLinks.length ? chat.organizationLinks.map(link => link.organization.legalName).join(', ') : 'не привязаны'}<br />Точки: {chat.storeLinks.length ? chat.storeLinks.map(link => link.store.name).join(', ') : 'не привязаны'}</p></div><Button kind="secondary" onClick={() => { setEditing(editing === chat.id ? null : chat.id); setError('') }}>{editing === chat.id ? 'Скрыть' : 'Настроить привязки'}</Button>{editing === chat.id && <form className="telegram-links-form" onSubmit={event => void saveLinks(event, chat.id)}><Field label="Организации"><select name="organizationIds" multiple defaultValue={organizationIds.map(String)}>{organizations.filter(item => item.status === 'ACTIVE').map(item => <option value={item.id} key={item.id}>{item.legalName}</option>)}</select><small>Ctrl / Cmd + клик — выбрать несколько.</small></Field><Field label="Торговые точки"><select name="storeIds" multiple defaultValue={storeIds.map(String)}>{stores.filter(item => item.status === 'ACTIVE').map(item => <option value={item.id} key={item.id}>{item.organization?.legalName ? item.organization.legalName + ' · ' : ''}{item.name} — {item.address}</option>)}</select><small>Привязка точки имеет приоритет при создании заявки ботом.</small></Field><div className="modal-actions"><Button type="submit" disabled={saving}>{saving ? 'Сохранение…' : 'Сохранить привязки'}</Button></div></form>}</article> }) : <Empty title="Telegram ещё не подключён" text="Попросите пользователя написать боту: после первого сообщения аккаунт появится в этом списке." />}</section></>
+      await api(`/requests/${item.id}/comments`, {
+        method: "POST",
+        body: JSON.stringify({
+          body: comment,
+          visibility: internal ? "INTERNAL" : "CLIENT",
+        }),
+      });
+      setComment("");
+      reload();
+    } catch (reason) {
+      setError(errorText(reason));
+    }
+  };
+  const take = async () => {
+    try {
+      await api(`/requests/${item.id}/assignees/self`, { method: "POST" });
+      reload();
+    } catch (reason) {
+      setError(errorText(reason));
+    }
+  };
+  const finish = async () => save("DONE");
+  const stopRecurrence = async () => {
+    if (
+      !item.recurrenceSchedule ||
+      !window.confirm(
+        "Остановить создание будущих повторяющихся заявок? Уже созданные заявки останутся в системе.",
+      )
+    )
+      return;
+    try {
+      await api(`/recurring-requests/${item.recurrenceSchedule.id}/stop`, {
+        method: "POST",
+      });
+      reload();
+      close();
+    } catch (reason) {
+      setError(errorText(reason));
+    }
+  };
+  return (
+    <Modal title={`Заявка #${item.id}`} close={close} wide>
+      <div className="detail-grid">
+        <div>
+          <small>Клиент / организация</small>
+          <b>
+            {item.organization?.legalName ??
+              item.createdBy?.ipName ??
+              "Новый контакт"}
+          </b>
+        </div>
+        <div>
+          <small>Точка</small>
+          <b>{item.store?.name ?? "Не выбрана"}</b>
+          <span>{item.store?.address}</span>
+        </div>
+        <div>
+          <small>Отдел</small>
+          <b>{item.department.name}</b>
+        </div>
+        <div>
+          <small>Тип и источник</small>
+          <b>{item.type.name}</b>
+          <span>
+            {item.source === "WEB"
+              ? "Сайт"
+              : item.source === "TELEGRAM_BOT"
+                ? "Telegram-бот"
+                : "Telegram"}
+          </span>
+        </div>
+        <div>
+          <small>Создана</small>
+          <b>{formatDate(item.createdAt)}</b>
+        </div>
+        <div>
+          <small>Исполнители</small>
+          <b>
+            {item.assignees.length
+              ? item.assignees.map((a) => a.user.ipName).join(", ")
+              : "Не назначены"}
+          </b>
+        </div>
+      </div>
+      <div className="description-box">
+        <small>Описание</small>
+        <p>{item.description}</p>
+      </div>
+      {item.store?.access && (
+        <section className="request-store-links">
+          <small>Быстрые доступы точки</small>
+          <StoreAccessLinks access={item.store.access} />
+        </section>
+      )}
+      <TemplateData item={item} />
+      {item.activities?.length > 0 && (
+        <section className="activity-list">
+          <h3>История изменений</h3>
+          {item.activities.map((activity) => (
+            <div className="activity-row" key={activity.id}>
+              <span>{formatDate(activity.createdAt)}</span>
+              <div>
+                <b>{activity.message}</b>
+                <small>{activity.author?.ipName ?? "Система"}</small>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+      {item.comments.length > 0 && (
+        <section className="comment-list">
+          {item.comments.map((c) => (
+            <div
+              className={
+                c.visibility === "INTERNAL"
+                  ? "internal-comment"
+                  : "admin-comment"
+              }
+              key={c.id}
+            >
+              <b>
+                {c.author.ipName} ·{" "}
+                {c.visibility === "INTERNAL" ? "внутренний" : "клиентский"}
+              </b>
+              <p>{c.body}</p>
+            </div>
+          ))}
+        </section>
+      )}
+      {staff && (
+        <>
+          <div className="form-grid">
+            <Field label="Статус">
+              <select
+                disabled={!canManage}
+                value={status}
+                onChange={(e) => setStatus(e.target.value as RequestStatus)}
+              >
+                {[item.status, ...transitions[item.status]].map((value) => (
+                  <option key={value} value={value}>
+                    {statusLabel[value]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {can(user, "SET_PRIORITY") && (
+              <Field label="Приоритет">
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as Priority)}
+                >
+                  {Object.entries(priorityLabel).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
+            {can(user, "TRANSFER_REQUESTS") && (
+              <Field label="Передать в отдел">
+                <select
+                  value={departmentId}
+                  onChange={(e) => setDepartmentId(Number(e.target.value))}
+                >
+                  {departments
+                    .filter((d) => d.isActive)
+                    .map((d) => (
+                      <option value={d.id} key={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+            )}
+          </div>
+          {can(user, "ASSIGN_MASTERS") && (
+            <Field label="Исполнители (можно выбрать нескольких)">
+              <select
+                multiple
+                value={selected.map(String)}
+                onChange={(e) =>
+                  setSelected(
+                    Array.from(e.currentTarget.selectedOptions, (option) =>
+                      Number(option.value),
+                    ),
+                  )
+                }
+              >
+                {assignees.map((person) => (
+                  <option value={person.id} key={person.id}>
+                    {person.ipName} · {roleLabel[person.role]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          <div className="form-grid">
+            <Field label="Комментарий">
+              <textarea
+                rows={3}
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Напишите клиенту или оставьте внутреннюю заметку"
+              />
+            </Field>
+            <Field label="Видимость">
+              <select
+                value={internal ? "INTERNAL" : "CLIENT"}
+                onChange={(e) => setInternal(e.target.value === "INTERNAL")}
+              >
+                <option value="CLIENT">Виден клиенту</option>
+                <option value="INTERNAL">Только сотрудникам</option>
+              </select>
+            </Field>
+          </div>
+          {error && <div className="form-error">{error}</div>}
+          <div className="modal-actions">
+            {user.role === "MASTER" &&
+              !item.assignees.some((a) => a.user.id === user.id) && (
+                <Button kind="secondary" onClick={take}>
+                  Взять в работу
+                </Button>
+              )}
+            <Button kind="secondary" onClick={addComment}>
+              Добавить комментарий
+            </Button>
+            {canManage &&
+              item.status !== "DONE" &&
+              item.status !== "CANCELLED" && (
+                <Button kind="secondary" onClick={finish}>
+                  Завершить заявку
+                </Button>
+              )}
+            {canManage && (
+              <Button onClick={() => void save()}>Сохранить изменения</Button>
+            )}
+          </div>
+        </>
+      )}
+    </Modal>
+  );
+}
+
+function RequestComponents({
+  components,
+  selected,
+  onChange,
+}: {
+  components: Component[];
+  selected: Array<{ componentId: number; quantity: number }>;
+  onChange: (next: Array<{ componentId: number; quantity: number }>) => void;
+}) {
+  const available = components.filter((component) => component.isActive);
+  const add = () => {
+    const first = available.find(
+      (component) =>
+        !selected.some((item) => item.componentId === component.id),
+    );
+    if (first) onChange([...selected, { componentId: first.id, quantity: 1 }]);
+  };
+  return (
+    <section className="template-components">
+      <div>
+        <h3>Компоненты для этой заявки</h3>
+        <p>Выберите фактически нужные компоненты и их количество.</p>
+      </div>
+      {selected.map((item, index) => (
+        <div
+          className="component-requirement"
+          key={`${item.componentId}-${index}`}
+        >
+          <select
+            value={item.componentId}
+            onChange={(event) =>
+              onChange(
+                selected.map((row, rowIndex) =>
+                  rowIndex === index
+                    ? { ...row, componentId: Number(event.target.value) }
+                    : row,
+                ),
+              )
+            }
+          >
+            {available.map((component) => (
+              <option value={component.id} key={component.id}>
+                {component.name}
+              </option>
+            ))}
+          </select>
+          <input
+            aria-label="Количество"
+            type="number"
+            min="1"
+            value={item.quantity}
+            onChange={(event) =>
+              onChange(
+                selected.map((row, rowIndex) =>
+                  rowIndex === index
+                    ? {
+                        ...row,
+                        quantity: Math.max(1, Number(event.target.value) || 1),
+                      }
+                    : row,
+                ),
+              )
+            }
+          />
+          <Button
+            kind="ghost"
+            type="button"
+            onClick={() =>
+              onChange(selected.filter((_, rowIndex) => rowIndex !== index))
+            }
+          >
+            Удалить
+          </Button>
+        </div>
+      ))}
+      <Button
+        kind="secondary"
+        type="button"
+        onClick={add}
+        disabled={
+          !available.some(
+            (component) =>
+              !selected.some((item) => item.componentId === component.id),
+          )
+        }
+      >
+        Добавить компонент
+      </Button>
+      {!available.length && (
+        <small>
+          Справочник компонентов пуст. Добавьте позиции на странице «Шаблоны
+          заявок».
+        </small>
+      )}
+    </section>
+  );
+}
+
+function CreateRequest({
+  organizations,
+  stores,
+  types,
+  user,
+  close,
+  reload,
+  initialUrgency = "URGENT",
+  initialScheduledAt,
+}: {
+  organizations: Organization[];
+  stores: Store[];
+  types: RequestType[];
+  user: User;
+  close: () => void;
+  reload: () => void;
+  initialUrgency?: "URGENT" | "SCHEDULED";
+  initialScheduledAt?: Date | null;
+}) {
+  const activeOrganizations = organizations.filter(
+    (organization) => organization.status === "ACTIVE",
+  );
+  const [typeId, setTypeId] = useState(types.find((t) => t.isActive)?.id ?? 0),
+    [organizationId, setOrganizationId] = useState(
+      activeOrganizations[0]?.id ?? 0,
+    ),
+    [urgency, setUrgency] = useState<"URGENT" | "SCHEDULED">(initialUrgency),
+    [assigneeId, setAssigneeId] = useState(""),
+    [assignees, setAssignees] = useState<StaffMember[]>([]),
+    [components, setComponents] = useState<Component[]>([]),
+    [selectedComponents, setSelectedComponents] = useState<
+      Array<{ componentId: number; quantity: number }>
+    >([]),
+    [recurrenceIntervalDays, setRecurrenceIntervalDays] = useState(""),
+    [error, setError] = useState("");
+  const selectedType = types.find((t) => t.id === typeId);
+  const type = selectedType?.requiresComponents
+    ? {
+        ...selectedType,
+        templateFields: [
+          ...(selectedType.templateFields ?? []),
+          {
+            key: "__components",
+            label: "",
+            type: "TEXT" as const,
+            required: false,
+          },
+        ],
+      }
+    : selectedType;
+  const visibleStores = stores.filter(
+    (store) =>
+      store.organizationId === organizationId && store.status === "ACTIVE",
+  );
+  const canSelectAssignee = user.role !== "CLIENT";
+  useEffect(() => {
+    if (
+      !activeOrganizations.some(
+        (organization) => organization.id === organizationId,
+      )
+    )
+      setOrganizationId(activeOrganizations[0]?.id ?? 0);
+  }, [organizationId, activeOrganizations]);
+  useEffect(() => {
+    if (!canSelectAssignee || user.role === "MASTER") return;
+    api<StaffMember[]>("/requests/assignees")
+      .then(setAssignees)
+      .catch(() => setAssignees([]));
+  }, [canSelectAssignee, user.role]);
+  useEffect(() => {
+    api<Component[]>("/components")
+      .then(setComponents)
+      .catch(() => setComponents([]));
+  }, []);
+  const scheduledValue = initialScheduledAt
+    ? new Date(
+        initialScheduledAt.getTime() -
+          initialScheduledAt.getTimezoneOffset() * 60000,
+      )
+        .toISOString()
+        .slice(0, 16)
+    : undefined;
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const values = Object.fromEntries(
+      new FormData(event.currentTarget),
+    ) as Record<string, string>;
+    const templateData: Record<string, unknown> = {};
+    type?.templateFields?.forEach((field) => {
+      if (field.type === "CHECKBOX")
+        templateData[field.key] = values[field.key] === "on";
+      else if (values[field.key]) templateData[field.key] = values[field.key];
+    });
+    try {
+      await api("/requests", {
+        method: "POST",
+        body: JSON.stringify({
+          typeId,
+          organizationId: type?.requiresOrganization
+            ? organizationId
+            : undefined,
+          storeId: type?.requiresStore ? Number(values.storeId) : undefined,
+          urgency,
+          scheduledAt: urgency === "SCHEDULED" ? values.scheduledAt : undefined,
+          recurrenceIntervalDays:
+            urgency === "SCHEDULED" && recurrenceIntervalDays
+              ? Number(recurrenceIntervalDays)
+              : undefined,
+          assigneeId: assigneeId ? Number(assigneeId) : undefined,
+          components: selectedComponents,
+          description: values.description,
+          templateData,
+        }),
+      });
+      reload();
+      close();
+    } catch (reason) {
+      setError(errorText(reason));
+    }
+  };
+  const dynamic = (
+    field: NonNullable<RequestType["templateFields"]>[number],
+  ) =>
+    field.key === "__components" ? (
+      <RequestComponents
+        key={field.key}
+        components={components}
+        selected={selectedComponents}
+        onChange={setSelectedComponents}
+      />
+    ) : (
+      <Field
+        label={`${field.label}${field.required ? " *" : ""}`}
+        key={field.key}
+      >
+        {field.type === "TEXTAREA" ? (
+          <textarea name={field.key} required={field.required} />
+        ) : field.type === "SELECT" ? (
+          <select name={field.key} required={field.required}>
+            <option value="">Выберите</option>
+            {field.options?.map((o) => (
+              <option key={o}>{o}</option>
+            ))}
+          </select>
+        ) : field.type === "CHECKBOX" ? (
+          <input name={field.key} type="checkbox" />
+        ) : (
+          <input
+            name={field.key}
+            type={
+              field.type === "DATE"
+                ? "date"
+                : field.type === "NUMBER"
+                  ? "number"
+                  : field.type === "FILE"
+                    ? "file"
+                    : "text"
+            }
+            required={field.required}
+          />
+        )}
+      </Field>
+    );
+  return (
+    <Modal title="Новая заявка" close={close}>
+      <form onSubmit={submit}>
+        <Field label="Шаблон">
+          <select
+            value={typeId}
+            onChange={(e) => setTypeId(Number(e.target.value))}
+          >
+            {types
+              .filter((t) => t.isActive)
+              .map((t) => (
+                <option value={t.id} key={t.id}>
+                  {t.name} · {t.department.name}
+                </option>
+              ))}
+          </select>
+        </Field>
+        {type?.requiresOrganization && (
+          <Field label="Организация">
+            <select
+              value={organizationId}
+              onChange={(e) => setOrganizationId(Number(e.target.value))}
+              required
+              disabled={!activeOrganizations.length}
+            >
+              <option value="">
+                {activeOrganizations.length
+                  ? "Выберите организацию"
+                  : "Нет доступных активных организаций"}
+              </option>
+              {activeOrganizations.map((o) => (
+                <option value={o.id} key={o.id}>
+                  {o.legalName}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        {type?.requiresStore && (
+          <Field label="Торговая точка">
+            <select name="storeId" required>
+              <option value="">Выберите точку</option>
+              {visibleStores.map((s) => (
+                <option value={s.id} key={s.id}>
+                  {s.name} — {s.address}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        {canSelectAssignee && (
+          <Field label="Исполнитель (необязательно)">
+            <select
+              value={assigneeId}
+              onChange={(event) => setAssigneeId(event.target.value)}
+            >
+              <option value="">Не назначать при создании</option>
+              {user.role === "MASTER" ? (
+                <option value={user.id}>{user.ipName} · я</option>
+              ) : (
+                assignees.map((person) => (
+                  <option value={person.id} key={person.id}>
+                    {person.ipName} · {roleLabel[person.role]}
+                  </option>
+                ))
+              )}
+            </select>
+          </Field>
+        )}
+        <div className="segmented">
+          <button
+            type="button"
+            className={urgency === "URGENT" ? "active" : ""}
+            onClick={() => setUrgency("URGENT")}
+          >
+            Срочная
+          </button>
+          <button
+            type="button"
+            className={urgency === "SCHEDULED" ? "active" : ""}
+            onClick={() => setUrgency("SCHEDULED")}
+          >
+            Плановая
+          </button>
+        </div>
+        {urgency === "SCHEDULED" && (
+          <>
+            <Field label="Дата и время">
+              <input
+                name="scheduledAt"
+                type="datetime-local"
+                min={new Date(Date.now() + 300000).toISOString().slice(0, 16)}
+                defaultValue={scheduledValue}
+                required
+              />
+            </Field>
+            {canSelectAssignee && (
+              <Field label="Повторять (необязательно)">
+                <div className="input-with-suffix">
+                  <input
+                    type="number"
+                    min="1"
+                    max="3650"
+                    value={recurrenceIntervalDays}
+                    onChange={(event) =>
+                      setRecurrenceIntervalDays(event.target.value)
+                    }
+                    placeholder="Например, 365"
+                  />
+                  <span>дней</span>
+                </div>
+                <small>
+                  Будущие заявки создаются автоматически. Выходные и федеральные
+                  праздники переносятся на предыдущий рабочий день.
+                </small>
+              </Field>
+            )}
+          </>
+        )}
+        {type?.templateFields?.map(dynamic)}
+        <Field label="Описание">
+          <textarea name="description" rows={4} minLength={5} required />
+        </Field>
+        {error && <div className="form-error">{error}</div>}
+        <div className="modal-actions">
+          <Button kind="secondary" type="button" onClick={close}>
+            Отмена
+          </Button>
+          <Button
+            disabled={type?.requiresOrganization && !activeOrganizations.length}
+          >
+            Создать заявку
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function RequestsList({
+  requests,
+  user,
+  departments,
+  types,
+  open,
+}: {
+  requests: ServiceRequest[];
+  user: User;
+  departments: Department[];
+  types: RequestType[];
+  open: (item: ServiceRequest) => void;
+}) {
+  const [showClosed, setShowClosed] = useState(false),
+    [search, setSearch] = useState(""),
+    [status, setStatus] = useState<RequestStatus | "">(""),
+    [priority, setPriority] = useState<Priority | "">(""),
+    [departmentId, setDepartmentId] = useState(""),
+    [typeId, setTypeId] = useState(""),
+    [assigneeId, setAssigneeId] = useState(""),
+    [schedule, setSchedule] = useState<"ALL" | "TODAY" | "WEEK" | "OVERDUE">(
+      "ALL",
+    ),
+    [myToday, setMyToday] = useState(false);
+  const assignees = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          requests.flatMap((item) =>
+            item.assignees.map(
+              (assignee) => [assignee.user.id, assignee.user] as const,
+            ),
+          ),
+        ).values(),
+      ).sort((left, right) => left.ipName.localeCompare(right.ipName, "ru")),
+    [requests],
+  );
+  const rows = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weekEnd = new Date(today);
+    weekEnd.setDate(today.getDate() + 7);
+    const matchesSchedule = (value?: string | null) => {
+      if (schedule === "ALL") return true;
+      if (!value) return false;
+      const date = new Date(value);
+      date.setHours(0, 0, 0, 0);
+      if (schedule === "TODAY") return date.getTime() === today.getTime();
+      if (schedule === "OVERDUE") return new Date(value) < new Date();
+      return date >= today && date < weekEnd;
+    };
+    return requests.filter((item) => {
+      const haystack =
+        `${item.description} ${item.organization?.legalName ?? ""} ${item.store?.name ?? ""} ${item.type.name}`.toLowerCase();
+      return (
+        (showClosed
+          ? item.status === "DONE"
+          : !["DONE", "CANCELLED"].includes(item.status)) &&
+        (!search || haystack.includes(search.toLowerCase())) &&
+        (!status || item.status === status) &&
+        (!priority || item.priority === priority) &&
+        (!departmentId || item.departmentId === Number(departmentId)) &&
+        (!typeId || item.typeId === Number(typeId)) &&
+        (!assigneeId ||
+          item.assignees.some(
+            (assignee) => assignee.user.id === Number(assigneeId),
+          )) &&
+        matchesSchedule(item.scheduledAt) &&
+        (!myToday ||
+          (item.scheduledAt &&
+            new Date(item.scheduledAt).toDateString() ===
+              today.toDateString() &&
+            item.assignees.some((assignee) => assignee.user.id === user.id)))
+      );
+    });
+  }, [
+    requests,
+    showClosed,
+    search,
+    status,
+    priority,
+    departmentId,
+    typeId,
+    assigneeId,
+    schedule,
+    myToday,
+    user.id,
+  ]);
+  const clear = () => {
+    setSearch("");
+    setStatus("");
+    setPriority("");
+    setDepartmentId("");
+    setTypeId("");
+    setAssigneeId("");
+    setSchedule("ALL");
+    setMyToday(false);
+  };
+  return (
+    <section className="panel table-panel">
+      <div className="toolbar request-filters">
+        <div className="search-box">
+          <Search />
+          <input
+            value={search}
+            placeholder="Поиск по заявкам"
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </div>
+        <select
+          value={status}
+          onChange={(event) =>
+            setStatus(event.target.value as RequestStatus | "")
+          }
+        >
+          <option value="">Все активные статусы</option>
+          {Object.entries(statusLabel)
+            .filter(([value]) => value !== "DONE" && value !== "CANCELLED")
+            .map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+        </select>
+        <select
+          value={priority}
+          onChange={(event) => setPriority(event.target.value as Priority | "")}
+        >
+          <option value="">Все приоритеты</option>
+          {Object.entries(priorityLabel).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={departmentId}
+          onChange={(event) => setDepartmentId(event.target.value)}
+        >
+          <option value="">Все отделы</option>
+          {departments.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={typeId}
+          onChange={(event) => setTypeId(event.target.value)}
+        >
+          <option value="">Все шаблоны</option>
+          {types.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={assigneeId}
+          onChange={(event) => setAssigneeId(event.target.value)}
+        >
+          <option value="">Все исполнители</option>
+          {assignees.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.ipName}
+            </option>
+          ))}
+        </select>
+        <select
+          value={schedule}
+          onChange={(event) =>
+            setSchedule(
+              event.target.value as "ALL" | "TODAY" | "WEEK" | "OVERDUE",
+            )
+          }
+        >
+          <option value="ALL">Любая дата</option>
+          <option value="TODAY">Запланировано сегодня</option>
+          <option value="WEEK">Запланировано на 7 дней</option>
+          <option value="OVERDUE">Просроченные</option>
+        </select>
+        <Button
+          kind={myToday ? "primary" : "secondary"}
+          onClick={() => setMyToday((value) => !value)}
+        >
+          Мои на сегодня
+        </Button>
+        <Button kind="ghost" onClick={clear}>
+          Сбросить
+        </Button>
+        <Button
+          kind="secondary"
+          onClick={() => setShowClosed((value) => !value)}
+        >
+          {showClosed ? "Показать активные" : "Показать выполненные"}
+        </Button>
+      </div>
+      <div className="request-filter-summary">Найдено: {rows.length}</div>
+      <div className="request-grid">
+        {rows.map((item) => (
+          <RequestCard item={item} open={() => open(item)} key={item.id} />
+        ))}
+        {!rows.length && (
+          <Empty
+            title="Заявок не найдено"
+            text="Измените условия фильтра или сбросьте их."
+          />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function Calendar({
+  requests,
+  open,
+  add,
+}: {
+  requests: ServiceRequest[];
+  open: (item: ServiceRequest) => void;
+  add: (date: Date) => void;
+}) {
+  const [cursor, setCursor] = useState(() => new Date());
+  const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+  const firstWeekday = (monthStart.getDay() + 6) % 7;
+  const days = Array.from(
+    { length: 42 },
+    (_, index) =>
+      new Date(
+        cursor.getFullYear(),
+        cursor.getMonth(),
+        index - firstWeekday + 1,
+      ),
+  );
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const monthTitle = new Intl.DateTimeFormat("ru-RU", {
+    month: "long",
+    year: "numeric",
+  }).format(cursor);
+  const scheduleFor = (day: Date) => {
+    const value = new Date(day);
+    value.setHours(10, 0, 0, 0);
+    const minimum = new Date(Date.now() + 600000);
+    return value < minimum ? minimum : value;
+  };
+  const sameDay = (left: Date, right: Date) =>
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate();
+  const time = (value: string) =>
+    new Intl.DateTimeFormat("ru-RU", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(value));
+  return (
+    <section className="panel calendar-page">
+      <div className="calendar-toolbar">
+        <div>
+          <button
+            aria-label="Предыдущий месяц"
+            onClick={() =>
+              setCursor(
+                new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1),
+              )
+            }
+          >
+            ‹
+          </button>
+          <h2>{monthTitle}</h2>
+          <button
+            aria-label="Следующий месяц"
+            onClick={() =>
+              setCursor(
+                new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1),
+              )
+            }
+          >
+            ›
+          </button>
+        </div>
+        <Button onClick={() => add(scheduleFor(new Date()))}>
+          <Plus /> Новая плановая
+        </Button>
+      </div>
+      <div className="calendar-weekdays">
+        {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((day) => (
+          <span key={day}>{day}</span>
+        ))}
+      </div>
+      <div className="calendar-grid">
+        {days.map((day) => {
+          const past = day < today;
+          const items = requests.filter(
+            (item) =>
+              item.urgency === "SCHEDULED" &&
+              item.scheduledAt &&
+              new Date(item.scheduledAt) >= new Date() &&
+              !["DONE", "CANCELLED"].includes(item.status) &&
+              sameDay(new Date(item.scheduledAt), day),
+          );
+          return (
+            <div
+              key={day.toISOString()}
+              className={`calendar-cell ${day.getMonth() !== cursor.getMonth() ? "muted-day" : ""} ${sameDay(day, today) ? "today" : ""} ${past ? "" : "clickable"}`}
+              onClick={() => !past && add(scheduleFor(day))}
+            >
+              <span>{day.getDate()}</span>
+              {items.map((item) => (
+                <button
+                  key={item.id}
+                  title={`Открыть заявку #${item.id}`}
+                  style={{ borderColor: item.type.color || "#ee7865" }}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    open(item);
+                  }}
+                >
+                  <b>
+                    {time(item.scheduledAt!)} · {item.type.name}
+                  </b>
+                  <small>
+                    {item.store?.name ??
+                      item.organization?.legalName ??
+                      item.description}
+                  </small>
+                </button>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+      <p className="calendar-hint">
+        В календаре показываются только будущие активные плановые заявки.
+      </p>
+    </section>
+  );
+}
+
+function StoreDetails({
+  store,
+  user,
+  close,
+}: {
+  store: Store;
+  user: User;
+  close: () => void;
+}) {
+  const canViewSecrets = can(user, "VIEW_STORE_SECRETS"),
+    canEditAccess = user.role !== "CLIENT";
+  const [access, setAccess] = useState<StoreAccess | null>(null),
+    [loading, setLoading] = useState(canViewSecrets),
+    [saving, setSaving] = useState(false),
+    [saved, setSaved] = useState(false),
+    [error, setError] = useState("");
+  useEffect(() => {
+    if (!canViewSecrets) return;
+    api<StoreAccess | null>("/stores/" + store.id + "/access")
+      .then(setAccess)
+      .catch((reason) => setError(errorText(reason)))
+      .finally(() => setLoading(false));
+  }, [store.id, canViewSecrets]);
+  const details = access ?? store.access;
+  const saveAccess = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    setSaved(false);
+    const values = Object.fromEntries(
+      Array.from(new FormData(event.currentTarget).entries()).filter(
+        ([, value]) => typeof value === "string" && value.trim(),
+      ),
+    ) as Record<string, string>;
+    try {
+      await api("/stores/" + store.id + "/access", {
+        method: "PUT",
+        body: JSON.stringify(values),
+      });
+      setAccess(
+        (previous) => ({ ...(previous ?? {}), ...values }) as StoreAccess,
+      );
+      setSaved(true);
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <Modal title={store.name} close={close} wide>
+      <div className="detail-grid">
+        <div>
+          <small>Организация</small>
+          <b>{store.organization?.legalName ?? "Не указана"}</b>
+        </div>
+        <div>
+          <small>Статус</small>
+          <b>
+            {store.status === "ACTIVE"
+              ? "Активна"
+              : store.status === "PENDING"
+                ? "На модерации"
+                : "Отклонена"}
+          </b>
+        </div>
+        <div>
+          <small>Заявок</small>
+          <b>{store._count?.requests ?? 0}</b>
+        </div>
+        <div>
+          <small>Адрес</small>
+          <b>{store.address}</b>
+        </div>
+        <div>
+          <small>Телефон</small>
+          <b>{store.phone || "Не указан"}</b>
+        </div>
+        <div>
+          <small>Контакт</small>
+          <b>
+            {store.user?.ipName ??
+              store.organization?.contactName ??
+              "Не указан"}
+          </b>
+        </div>
+      </div>
+      <section className="store-access">
+        <h3>Рабочие доступы</h3>
+        {loading ? (
+          <p>Загрузка доступов…</p>
+        ) : (
+          <>
+            <div className="detail-grid">
+              <div>
+                <small>AnyDesk</small>
+                <b>{details?.anydeskId || "Не указан"}</b>
+              </div>
+              <div>
+                <small>ОФД</small>
+                <b>{details?.ofdUrl || "Не указан"}</b>
+                <span>{details?.ofdLogin || ""}</span>
+              </div>
+              <div>
+                <small>Налоговая</small>
+                <b>{details?.nalogUrl || "Не указан"}</b>
+                <span>{details?.nalogLogin || ""}</span>
+              </div>
+            </div>
+            <StoreAccessLinks access={details} />
+          </>
+        )}
+        {canEditAccess && (
+          <form className="access-form" onSubmit={saveAccess}>
+            <h3>Заполнить или обновить доступы</h3>
+            <p>
+              Пустое поле не изменяет сохранённое значение. Пароли видят только
+              сотрудники с отдельным разрешением.
+            </p>
+            <div className="form-grid">
+              <Field label="AnyDesk ID">
+                <input
+                  name="anydeskId"
+                  defaultValue={details?.anydeskId ?? ""}
+                />
+              </Field>
+              <Field label="Пароль AnyDesk">
+                <input
+                  name="anydeskPassword"
+                  type="password"
+                  placeholder={
+                    canViewSecrets && access?.anydeskPassword
+                      ? "Сохранён — введите для замены"
+                      : "Введите пароль"
+                  }
+                />
+              </Field>
+            </div>
+            <div className="form-grid">
+              <Field label="Сайт ОФД">
+                <input
+                  name="ofdUrl"
+                  type="url"
+                  placeholder="https://…"
+                  defaultValue={details?.ofdUrl ?? ""}
+                />
+              </Field>
+              <Field label="Логин ОФД">
+                <input name="ofdLogin" defaultValue={details?.ofdLogin ?? ""} />
+              </Field>
+            </div>
+            <Field label="Пароль ОФД">
+              <input
+                name="ofdPassword"
+                type="password"
+                placeholder={
+                  canViewSecrets && access?.ofdPassword
+                    ? "Сохранён — введите для замены"
+                    : "Введите пароль"
+                }
+              />
+            </Field>
+            <div className="form-grid">
+              <Field label="Сайт налоговой">
+                <input
+                  name="nalogUrl"
+                  type="url"
+                  placeholder="https://…"
+                  defaultValue={details?.nalogUrl ?? ""}
+                />
+              </Field>
+              <Field label="Логин налоговой">
+                <input
+                  name="nalogLogin"
+                  defaultValue={details?.nalogLogin ?? ""}
+                />
+              </Field>
+            </div>
+            <Field label="Пароль налоговой">
+              <input
+                name="nalogPassword"
+                type="password"
+                placeholder={
+                  canViewSecrets && access?.nalogPassword
+                    ? "Сохранён — введите для замены"
+                    : "Введите пароль"
+                }
+              />
+            </Field>
+            {error && <div className="form-error">{error}</div>}
+            {saved && <div className="inline-message">Доступы сохранены.</div>}
+            <div className="modal-actions">
+              <Button type="submit" disabled={saving}>
+                {saving ? "Сохранение…" : "Сохранить доступы"}
+              </Button>
+            </div>
+          </form>
+        )}
+      </section>
+    </Modal>
+  );
+}
+
+function Organizations({
+  organizations,
+  user,
+  reload,
+  openStores,
+}: {
+  organizations: Organization[];
+  user: User;
+  reload: () => void;
+  openStores: (organizationId: number) => void;
+}) {
+  const [adding, setAdding] = useState(false),
+    [error, setError] = useState(""),
+    [contacts, setContacts] = useState([{ fullName: "", phone: "", note: "" }]);
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.currentTarget));
+    try {
+      await api("/organizations", {
+        method: "POST",
+        body: JSON.stringify({
+          ...values,
+          contacts: contacts.filter((contact) => contact.fullName.trim()),
+        }),
+      });
+      setAdding(false);
+      setContacts([{ fullName: "", phone: "", note: "" }]);
+      reload();
+    } catch (reason) {
+      setError(errorText(reason));
+    }
+  };
+  const approve = async (id: number) => {
+    try {
+      setError("");
+      await api("/organizations/" + id + "/approve", { method: "POST" });
+      reload();
+    } catch (reason) {
+      setError(errorText(reason));
+    }
+  };
+  const reject = async (id: number) => {
+    const rejectionReason = window.prompt(
+      "Укажите причину отказа (её увидит клиент):",
+    );
+    if (!rejectionReason?.trim()) return;
+    try {
+      setError("");
+      await api("/organizations/" + id + "/reject", {
+        method: "POST",
+        body: JSON.stringify({ rejectionReason }),
+      });
+      reload();
+    } catch (reason) {
+      setError(errorText(reason));
+    }
+  };
+  const canApprove = user.role !== "CLIENT";
+  return (
+    <>
+      <div className="section-actions">
+        <span>{organizations.length} организаций</span>
+        <Button onClick={() => setAdding(true)}>
+          <Plus /> Добавить организацию
+        </Button>
+      </div>
+      {error && <div className="page-error">{error}</div>}
+      <div className="store-grid">
+        {[...organizations]
+          .sort(
+            (left, right) =>
+              Number(right.status === "PENDING") -
+              Number(left.status === "PENDING"),
+          )
+          .map((organization) => (
+            <article
+              className={
+                "store-card clickable-card" +
+                (organization.status === "PENDING" ? " pending-card" : "")
+              }
+              onClick={() => openStores(organization.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  openStores(organization.id);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              key={organization.id}
+            >
+              <div className="store-card-head">
+                <span className="store-icon">
+                  <Building2 />
+                </span>
+                <span
+                  className={
+                    "store-status " + organization.status.toLowerCase()
+                  }
+                >
+                  {organization.status === "ACTIVE"
+                    ? "Активна"
+                    : organization.status === "PENDING"
+                      ? "На модерации"
+                      : "Отклонена"}
+                </span>
+              </div>
+              <h3>{organization.legalName}</h3>
+              <p>
+                {organization.type === "IP"
+                  ? "ИП"
+                  : organization.type === "OOO"
+                    ? "ООО"
+                    : "Организация"}{" "}
+                {organization.inn && "· ИНН " + organization.inn}
+              </p>
+              <p>
+                {organization.contacts?.length
+                  ? organization.contacts
+                      .map(
+                        (contact) =>
+                          `${contact.fullName}${contact.phone ? " · " + contact.phone : ""}`,
+                      )
+                      .join("; ")
+                  : organization.contactName ||
+                    organization.phone ||
+                    organization.email ||
+                    "Контакты не указаны"}
+              </p>
+              <div className="store-metrics">
+                <span>
+                  <b>{organization.stores?.length ?? 0}</b> точек
+                </span>
+                <span>
+                  <b>{organization._count?.requests ?? 0}</b> заявок
+                </span>
+              </div>
+              {canApprove && organization.status === "PENDING" && (
+                <div className="moderation-actions">
+                  <Button
+                    kind="secondary"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void approve(organization.id);
+                    }}
+                  >
+                    <Check /> Принять{" "}
+                    {organization.type === "IP" ? "ИП" : "организацию"}
+                  </Button>
+                  <Button
+                    kind="secondary"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void reject(organization.id);
+                    }}
+                  >
+                    Отклонить
+                  </Button>
+                </div>
+              )}
+              <small className="card-hint">Открыть торговые точки →</small>
+            </article>
+          ))}
+      </div>
+      {!organizations.length && (
+        <Empty
+          title="Организаций нет"
+          text="Добавьте первую организацию, чтобы связать с ней точки и заявки."
+        />
+      )}
+      {adding && (
+        <Modal title="Новая организация" close={() => setAdding(false)}>
+          <form onSubmit={submit}>
+            <Field label="Тип">
+              <select name="type">
+                <option value="IP">ИП</option>
+                <option value="OOO">ООО</option>
+                <option value="OTHER">Другое</option>
+              </select>
+            </Field>
+            <Field label="Полное название">
+              <input name="legalName" minLength={2} required />
+            </Field>
+            <Field label="Сокращённое название">
+              <input name="shortName" />
+            </Field>
+            <div className="form-grid">
+              <Field label="ИНН">
+                <input name="inn" />
+              </Field>
+              <Field label="КПП">
+                <input name="kpp" />
+              </Field>
+            </div>
+            <Field label="ОГРН / ОГРНИП">
+              <input name="ogrn" />
+            </Field>
+            <Field label="Юридический адрес">
+              <textarea name="legalAddress" />
+            </Field>
+            <Field label="Основной телефон организации">
+              <input name="phone" />
+            </Field>
+            <Field label="Email">
+              <input name="email" type="email" />
+            </Field>
+            <section className="contact-editor">
+              <h3>Контактные лица</h3>
+              {contacts.map((contact, index) => (
+                <div className="contact-row" key={index}>
+                  <input
+                    value={contact.fullName}
+                    onChange={(event) =>
+                      setContacts((items) =>
+                        items.map((item, position) =>
+                          position === index
+                            ? { ...item, fullName: event.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                    placeholder="ФИО"
+                  />
+                  <input
+                    value={contact.phone}
+                    onChange={(event) =>
+                      setContacts((items) =>
+                        items.map((item, position) =>
+                          position === index
+                            ? { ...item, phone: event.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                    placeholder="Телефон"
+                  />
+                  <input
+                    value={contact.note}
+                    onChange={(event) =>
+                      setContacts((items) =>
+                        items.map((item, position) =>
+                          position === index
+                            ? { ...item, note: event.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                    placeholder="Примечание"
+                  />
+                  {contacts.length > 1 && (
+                    <Button
+                      kind="ghost"
+                      type="button"
+                      onClick={() =>
+                        setContacts((items) =>
+                          items.filter((_, position) => position !== index),
+                        )
+                      }
+                    >
+                      Удалить
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button
+                kind="secondary"
+                type="button"
+                onClick={() =>
+                  setContacts((items) => [
+                    ...items,
+                    { fullName: "", phone: "", note: "" },
+                  ])
+                }
+              >
+                + Ещё контакт
+              </Button>
+            </section>
+            <div className="modal-actions">
+              <Button
+                type="button"
+                kind="secondary"
+                onClick={() => setAdding(false)}
+              >
+                Отмена
+              </Button>
+              <Button>Сохранить</Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </>
+  );
+}
+
+function Stores({
+  stores,
+  organizations,
+  user,
+  reload,
+  organizationFilter,
+  clearFilter,
+}: {
+  stores: Store[];
+  organizations: Organization[];
+  user: User;
+  reload: () => void;
+  organizationFilter: number | null;
+  clearFilter: () => void;
+}) {
+  const [adding, setAdding] = useState(false),
+    [selected, setSelected] = useState<Store | null>(null),
+    [error, setError] = useState(""),
+    [selectedOrganizationId, setSelectedOrganizationId] = useState<
+      number | null
+    >(organizationFilter);
+  const visibleOrganizations = selectedOrganizationId
+    ? organizations.filter(
+        (organization) => organization.id === selectedOrganizationId,
+      )
+    : organizations;
+  const groups = visibleOrganizations
+    .map((organization) => ({
+      organization,
+      stores: stores
+        .filter((store) => store.organizationId === organization.id)
+        .sort(
+          (left, right) =>
+            Number(right.status === "PENDING") -
+            Number(left.status === "PENDING"),
+        ),
+    }))
+    .filter((group) => group.stores.length || Boolean(selectedOrganizationId))
+    .sort(
+      (left, right) =>
+        Number(
+          right.organization.status === "PENDING" ||
+            right.stores.some((store) => store.status === "PENDING"),
+        ) -
+        Number(
+          left.organization.status === "PENDING" ||
+            left.stores.some((store) => store.status === "PENDING"),
+        ),
+    );
+  const visibleCount = groups.reduce(
+    (total, group) => total + group.stores.length,
+    0,
+  );
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.currentTarget));
+    await api("/stores", {
+      method: "POST",
+      body: JSON.stringify({
+        ...values,
+        organizationId: Number(values.organizationId),
+      }),
+    });
+    setAdding(false);
+    reload();
+  };
+  const approve = async (id: number) => {
+    try {
+      setError("");
+      await api("/stores/" + id + "/approve", { method: "POST" });
+      reload();
+    } catch (reason) {
+      setError(errorText(reason));
+    }
+  };
+  const reject = async (id: number) => {
+    const rejectionReason = window.prompt(
+      "Укажите причину отказа (её увидит клиент):",
+    );
+    if (!rejectionReason?.trim()) return;
+    try {
+      setError("");
+      await api("/stores/" + id + "/reject", {
+        method: "POST",
+        body: JSON.stringify({ rejectionReason }),
+      });
+      reload();
+    } catch (reason) {
+      setError(errorText(reason));
+    }
+  };
+  return (
+    <>
+      {error && <div className="page-error">{error}</div>}
+      <div className="section-actions">
+        <span>
+          {visibleCount} торговых точек
+          {selectedOrganizationId &&
+            " · " + (visibleOrganizations[0]?.legalName ?? "")}
+        </span>
+        <div className="inline-actions">
+          <select
+            className="store-organization-filter"
+            value={selectedOrganizationId ?? ""}
+            aria-label="Фильтр по организации"
+            onChange={(event) => {
+              const value = Number(event.target.value) || null;
+              setSelectedOrganizationId(value);
+              if (!value) clearFilter();
+            }}
+          >
+            <option value="">Все организации</option>
+            {organizations.map((organization) => (
+              <option value={organization.id} key={organization.id}>
+                {organization.legalName}
+              </option>
+            ))}
+          </select>
+          {selectedOrganizationId && (
+            <Button
+              kind="secondary"
+              onClick={() => {
+                setSelectedOrganizationId(null);
+                clearFilter();
+              }}
+            >
+              Все организации
+            </Button>
+          )}
+          <Button onClick={() => setAdding(true)}>
+            <Plus /> Добавить точку
+          </Button>
+        </div>
+      </div>
+      {groups.map((group) => (
+        <section className="store-group" key={group.organization.id}>
+          <div className="store-group-head">
+            <span className="store-icon">
+              <Building2 />
+            </span>
+            <div>
+              <h2>{group.organization.legalName}</h2>
+              <p>
+                {group.stores.length} точек · ИНН{" "}
+                {group.organization.inn || "не указан"}
+              </p>
+            </div>
+          </div>
+          <div className="store-grid">
+            {group.stores.map((store) => (
+              <article
+                className={
+                  "store-card clickable-card" +
+                  (store.status === "PENDING" ? " pending-card" : "")
+                }
+                onClick={() => setSelected(store)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelected(store);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                key={store.id}
+              >
+                <div className="store-card-head">
+                  <span className="store-icon">
+                    <StoreIcon />
+                  </span>
+                  <span
+                    className={"store-status " + store.status.toLowerCase()}
+                  >
+                    {store.status === "ACTIVE"
+                      ? "Активна"
+                      : store.status === "PENDING"
+                        ? "На модерации"
+                        : "Отклонена"}
+                  </span>
+                </div>
+                <h3>{store.name}</h3>
+                <p>{store.address}</p>
+                <p>{store.phone || "Телефон не указан"}</p>
+                <div className="store-metrics">
+                  <span>
+                    <b>{store._count?.requests ?? 0}</b> заявок
+                  </span>
+                </div>
+                <StoreAccessLinks access={store.access} compact />
+                {store.status === "PENDING" && (
+                  <div className="moderation-actions">
+                    <Button
+                      kind="secondary"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void approve(store.id);
+                      }}
+                    >
+                      <Check /> Принять точку
+                    </Button>
+                    <Button
+                      kind="secondary"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void reject(store.id);
+                      }}
+                    >
+                      Отклонить
+                    </Button>
+                  </div>
+                )}
+                <small className="card-hint">Открыть подробности →</small>
+              </article>
+            ))}
+          </div>
+        </section>
+      ))}
+      {!groups.length && (
+        <Empty
+          title="Торговых точек нет"
+          text="Добавьте первую точку для этой организации."
+        />
+      )}
+      {adding && (
+        <Modal title="Новая торговая точка" close={() => setAdding(false)}>
+          <form onSubmit={submit}>
+            <Field label="Организация">
+              <select
+                name="organizationId"
+                required
+                defaultValue={selectedOrganizationId ?? undefined}
+              >
+                {organizations
+                  .filter((organization) => organization.status === "ACTIVE")
+                  .map((organization) => (
+                    <option value={organization.id} key={organization.id}>
+                      {organization.legalName}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+            <Field label="Название">
+              <input name="name" required minLength={2} />
+            </Field>
+            <Field label="Адрес">
+              <input name="address" required minLength={5} />
+            </Field>
+            <Field label="Телефон">
+              <input name="phone" />
+            </Field>
+            <div className="modal-actions">
+              <Button
+                type="button"
+                kind="secondary"
+                onClick={() => setAdding(false)}
+              >
+                Отмена
+              </Button>
+              <Button>Сохранить</Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+      {selected && (
+        <StoreDetails
+          store={selected}
+          user={user}
+          close={() => setSelected(null)}
+        />
+      )}
+    </>
+  );
+}
+
+function Templates({
+  types,
+  departments,
+  reload,
+}: {
+  types: RequestType[];
+  departments: Department[];
+  reload: () => void;
+}) {
+  const [editing, setEditing] = useState<RequestType | "new" | null>(null);
+  const [components, setComponents] = useState<Component[]>([]);
+  const [requirements, setRequirements] = useState<
+    Array<{ componentId: number; quantity: number }>
+  >([]);
+  const [error, setError] = useState("");
+  const loadComponents = useCallback(
+    () =>
+      api<Component[]>("/components")
+        .then(setComponents)
+        .catch(() => setComponents([])),
+    [],
+  );
+  useEffect(() => {
+    void loadComponents();
+  }, [loadComponents]);
+  const open = (template: RequestType | "new") => {
+    setEditing(template);
+    setRequirements(
+      template === "new"
+        ? []
+        : template.componentRequirements.map((item) => ({
+            componentId: item.componentId,
+            quantity: item.quantity,
+          })),
+    );
+    setError("");
+  };
+  const addComponent = () => {
+    const first = components.find(
+      (component) =>
+        component.isActive &&
+        !requirements.some((item) => item.componentId === component.id),
+    );
+    if (first)
+      setRequirements((items) => [
+        ...items,
+        { componentId: first.id, quantity: 1 },
+      ]);
+  };
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError("");
+    const values = Object.fromEntries(
+      new FormData(event.currentTarget),
+    ) as Record<string, string>;
+    try {
+      const templateFields = values.templateFields
+        ? JSON.parse(values.templateFields)
+        : [];
+      await api(
+        editing === "new"
+          ? "/request-types"
+          : `/request-types/${(editing as RequestType).id}`,
+        {
+          method: editing === "new" ? "POST" : "PATCH",
+          body: JSON.stringify({
+            ...values,
+            departmentId: Number(values.departmentId),
+            isActive: values.isActive === "on",
+            requiresOrganization: values.requiresOrganization === "on",
+            requiresStore: values.requiresStore === "on",
+            requiresComponents: values.requiresComponents === "on",
+            availableOnWeb: values.availableOnWeb === "on",
+            availableOnTelegram: values.availableOnTelegram === "on",
+            templateFields,
+          }),
+        },
+      );
+      setEditing(null);
+      reload();
+    } catch (reason) {
+      setError(
+        reason instanceof SyntaxError
+          ? "Дополнительные поля указаны в неверном формате JSON"
+          : errorText(reason),
+      );
+    }
+  };
+  const addCatalogComponent = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const name = String(new FormData(form).get("componentName") ?? "").trim();
+    if (!name) return;
+    try {
+      const component = await api<Component>("/components", {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      });
+      form.reset();
+      setComponents((items) =>
+        [...items, component].sort((left, right) =>
+          left.name.localeCompare(right.name, "ru"),
+        ),
+      );
+    } catch (reason) {
+      setError(errorText(reason));
+    }
+  };
+  return (
+    <>
+      <section className="panel component-catalog">
+        <div className="panel-head">
+          <div>
+            <h2>Справочник компонентов</h2>
+            <p>Общий список для всех шаблонов заявок.</p>
+          </div>
+        </div>
+        <div className="component-catalog-body">
+          <form onSubmit={addCatalogComponent} className="component-add">
+            <input
+              name="componentName"
+              placeholder="Например, Фискальный накопитель ФН-1.2"
+              required
+            />
+            <Button>Добавить компонент</Button>
+          </form>
+          <div className="component-tags">
+            {components
+              .filter((component) => component.isActive)
+              .map((component) => (
+                <span key={component.id}>{component.name}</span>
+              ))}
+            {!components.some((component) => component.isActive) && (
+              <small>
+                Справочник пока пуст. Добавьте первый компонент выше.
+              </small>
+            )}
+          </div>
+        </div>
+      </section>
+      <div className="section-actions">
+        <span>
+          {types.filter((type) => type.isActive).length} активных шаблонов
+        </span>
+        <Button onClick={() => open("new")}>
+          <Plus /> Новый шаблон
+        </Button>
+      </div>
+      <div className="type-grid">
+        {types.map((type) => (
+          <article className="type-card" key={type.id}>
+            <i style={{ background: type.color || "#ee7d6a" }} />
+            <div>
+              <h3>{type.name}</h3>
+              <p>
+                {type.description || "Без описания"}
+                <br />
+                {type.department.name} · {priorityLabel[type.defaultPriority]}
+              </p>
+              <span>
+                {type.isActive ? "Активен" : "Отключён"} · полей:{" "}
+                {type.templateFields?.length ?? 0} · компонентов:{" "}
+                {type.componentRequirements.length}
+              </span>
+            </div>
+            <Button kind="ghost" onClick={() => open(type)}>
+              <Pencil />
+            </Button>
+          </article>
+        ))}
+      </div>
+      {editing && (
+        <Modal
+          title={editing === "new" ? "Новый шаблон" : "Настройка шаблона"}
+          close={() => setEditing(null)}
+          wide
+        >
+          <form onSubmit={submit}>
+            <div className="form-grid">
+              <Field label="Название">
+                <input
+                  name="name"
+                  required
+                  defaultValue={editing === "new" ? "" : editing.name}
+                />
+              </Field>
+              <Field label="Отдел">
+                <select
+                  name="departmentId"
+                  defaultValue={
+                    editing === "new"
+                      ? departments[0]?.id
+                      : editing.departmentId
+                  }
+                >
+                  {departments.map((department) => (
+                    <option value={department.id} key={department.id}>
+                      {department.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <Field label="Описание">
+              <textarea
+                name="description"
+                defaultValue={
+                  editing === "new" ? "" : (editing.description ?? "")
+                }
+              />
+            </Field>
+            <div className="form-grid">
+              <Field label="Цвет">
+                <input
+                  name="color"
+                  type="color"
+                  defaultValue={
+                    editing === "new" ? "#ee7d6a" : (editing.color ?? "#ee7d6a")
+                  }
+                />
+              </Field>
+              <Field label="Начальный приоритет">
+                <select
+                  name="defaultPriority"
+                  defaultValue={
+                    editing === "new" ? "NORMAL" : editing.defaultPriority
+                  }
+                >
+                  {Object.entries(priorityLabel).map(([value, label]) => (
+                    <option value={value} key={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <div className="checkbox-row">
+              <label>
+                <input
+                  name="isActive"
+                  type="checkbox"
+                  defaultChecked={editing === "new" || editing.isActive}
+                />{" "}
+                Активен
+              </label>
+              <label>
+                <input
+                  name="requiresOrganization"
+                  type="checkbox"
+                  defaultChecked={
+                    editing === "new" || editing.requiresOrganization
+                  }
+                />{" "}
+                Требовать организацию
+              </label>
+              <label>
+                <input
+                  name="requiresStore"
+                  type="checkbox"
+                  defaultChecked={editing === "new" || editing.requiresStore}
+                />{" "}
+                Требовать точку
+              </label>
+              <label>
+                <input
+                  name="requiresComponents"
+                  type="checkbox"
+                  defaultChecked={
+                    editing !== "new" && editing.requiresComponents
+                  }
+                />{" "}
+                Требовать компоненты
+              </label>
+              <label>
+                <input
+                  name="availableOnWeb"
+                  type="checkbox"
+                  defaultChecked={editing === "new" || editing.availableOnWeb}
+                />{" "}
+                Сайт
+              </label>
+              <label>
+                <input
+                  name="availableOnTelegram"
+                  type="checkbox"
+                  defaultChecked={
+                    editing === "new" || editing.availableOnTelegram
+                  }
+                />{" "}
+                Telegram
+              </label>
+            </div>
+            <Field label="Дополнительные поля (JSON)">
+              <textarea
+                name="templateFields"
+                rows={7}
+                defaultValue={
+                  editing === "new"
+                    ? "[]"
+                    : JSON.stringify(editing.templateFields ?? [], null, 2)
+                }
+              />
+              <small>
+                Пример: [
+                {
+                  '{"key":"serial","label":"Серийный номер","type":"TEXT","required":true}'
+                }
+                ]
+              </small>
+            </Field>
+            {error && <div className="form-error">{error}</div>}
+            <div className="modal-actions">
+              <Button
+                kind="secondary"
+                type="button"
+                onClick={() => setEditing(null)}
+              >
+                Отмена
+              </Button>
+              <Button>Сохранить</Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </>
+  );
+}
+
+function Staff({
+  staff,
+  departments,
+  reload,
+}: {
+  staff: StaffMember[];
+  departments: Department[];
+  reload: () => void;
+}) {
+  const [editing, setEditing] = useState<StaffMember | "new" | null>(null),
+    [error, setError] = useState(""),
+    [telegramLink, setTelegramLink] = useState<{
+      deepLink: string;
+      expiresAt: string;
+    } | null>(null);
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError("");
+    const form = new FormData(event.currentTarget);
+    const role = String(form.get("role")) as StaffMember["role"];
+    const ids = form.getAll("departments").map(Number);
+    const permissions = (Object.keys(permissionLabels) as PermissionKey[]).map(
+      (permission) => ({
+        permission,
+        enabled: form.get(`permission-${permission}`) === "on",
+      }),
+    );
+    try {
+      if (editing === "new")
+        await api("/staff", {
+          method: "POST",
+          body: JSON.stringify({
+            name: form.get("name"),
+            email: form.get("email"),
+            phone: form.get("phone"),
+            password: form.get("password"),
+            role,
+            departmentIds: ids,
+          }),
+        });
+      else
+        await api(`/staff/${editing!.id}/access`, {
+          method: "PUT",
+          body: JSON.stringify({
+            role,
+            departments: ids.map((departmentId) => ({
+              departmentId,
+              membershipRole: role === "DEPARTMENT_HEAD" ? "HEAD" : "MASTER",
+            })),
+            permissions,
+          }),
+        });
+      setEditing(null);
+      reload();
+    } catch (reason) {
+      setError(errorText(reason));
+    }
+  };
+  const createTelegramLink = async (id: number) => {
+    try {
+      setError("");
+      setTelegramLink(
+        await api<{ deepLink: string; expiresAt: string }>(
+          `/staff/${id}/telegram-link`,
+          { method: "POST" },
+        ),
+      );
+    } catch (reason) {
+      setError(errorText(reason));
+    }
+  };
+  const enabled = (key: PermissionKey) => {
+    if (!editing || editing === "new") return false;
+    return (
+      editing.permissionOverrides.find((item) => item.permission === key)
+        ?.enabled ?? defaultPermissions[editing.role].includes(key)
+    );
+  };
+  return (
+    <>
+      <div className="section-actions">
+        <span>{staff.length} сотрудников</span>
+        <Button onClick={() => setEditing("new")}>
+          <Plus /> Добавить сотрудника
+        </Button>
+      </div>
+      <section className="panel data-table">
+        <div className="table-row table-head">
+          <span>Сотрудник</span>
+          <span>Роль</span>
+          <span>Отделы</span>
+          <span>Статус</span>
+          <span />
+        </div>
+        {staff.map((person) => (
+          <div className="table-row" key={person.id}>
+            <span>
+              <b>{person.ipName}</b>
+              <small>
+                {person.email} · {person.phone}
+              </small>
+            </span>
+            <span>{roleLabel[person.role]}</span>
+            <span>
+              {person.departmentMemberships
+                .map((d) => d.department.name)
+                .join(", ") || "—"}
+            </span>
+            <span>
+              {person.status === "ACTIVE" ? "Активен" : "Заблокирован"}
+            </span>
+            <span>
+              <Button kind="ghost" onClick={() => setEditing(person)}>
+                <UserRoundCog />
+              </Button>
+            </span>
+          </div>
+        ))}
+      </section>
+      {editing && (
+        <Modal
+          title={
+            editing === "new" ? "Новый сотрудник" : `Права: ${editing.ipName}`
+          }
+          close={() => setEditing(null)}
+          wide
+        >
+          <form onSubmit={submit}>
+            {editing === "new" && (
+              <>
+                <div className="form-grid">
+                  <Field label="Имя">
+                    <input name="name" required />
+                  </Field>
+                  <Field label="Телефон">
+                    <input name="phone" required />
+                  </Field>
+                </div>
+                <div className="form-grid">
+                  <Field label="Email">
+                    <input name="email" type="email" required />
+                  </Field>
+                  <Field label="Временный пароль">
+                    <input name="password" minLength={8} required />
+                  </Field>
+                </div>
+              </>
+            )}
+            <Field label="Роль">
+              <select
+                name="role"
+                defaultValue={editing === "new" ? "MASTER" : editing.role}
+              >
+                {(["DIRECTOR", "DEPARTMENT_HEAD", "MASTER"] as const).map(
+                  (role) => (
+                    <option value={role} key={role}>
+                      {roleLabel[role]}
+                    </option>
+                  ),
+                )}
+              </select>
+            </Field>
+            <section className="staff-access-editor">
+              <section className="access-group departments-group">
+                <div className="access-group-head">
+                  <div>
+                    <h3>Отделы</h3>
+                    <p>Определяют рабочую очередь сотрудника.</p>
+                  </div>
+                </div>
+                <div className="access-list">
+                  {departments.map((department) => (
+                    <label className="access-row" key={department.id}>
+                      <input
+                        name="departments"
+                        type="checkbox"
+                        value={department.id}
+                        defaultChecked={
+                          editing !== "new" &&
+                          editing.departmentMemberships.some(
+                            (item) => item.departmentId === department.id,
+                          )
+                        }
+                      />
+                      <span>
+                        <b>{department.name}</b>
+                        <small>
+                          {department.isActive
+                            ? "Активный отдел"
+                            : "Отдел отключён"}
+                        </small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </section>
+              <section className="access-groups">
+                <div className="access-group-head">
+                  <div>
+                    <h3>Индивидуальные разрешения</h3>
+                    <p>
+                      Переключатели дополняют или ограничивают права выбранной
+                      роли.
+                    </p>
+                  </div>
+                </div>
+                {permissionGroups.map((group) => (
+                  <section className="access-group" key={group.title}>
+                    <div className="access-group-head">
+                      <div>
+                        <h4>{group.title}</h4>
+                        <p>{group.description}</p>
+                      </div>
+                    </div>
+                    <div className="access-list">
+                      {group.permissions.map((key) => (
+                        <label className="access-row" key={key}>
+                          <input
+                            name={`permission-${key}`}
+                            type="checkbox"
+                            defaultChecked={enabled(key)}
+                          />
+                          <span>
+                            <b>{permissionLabels[key]}</b>
+                            <small>
+                              {defaultPermissions[
+                                editing === "new" ? "MASTER" : editing.role
+                              ].includes(key)
+                                ? "Входит в права роли"
+                                : "Дополнительное разрешение"}
+                            </small>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </section>
+            </section>
+            {editing !== "new" && (
+              <section className="telegram-link">
+                <div>
+                  <b>Рабочий Telegram</b>
+                  <p>
+                    {editing.linkedTelegramChats?.length ? (
+                      <>
+                        Подключён: @
+                        {editing.linkedTelegramChats[0].username ??
+                          editing.linkedTelegramChats[0].title}
+                      </>
+                    ) : (
+                      "Не подключён"
+                    )}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  kind="secondary"
+                  onClick={() => void createTelegramLink(editing.id)}
+                >
+                  {editing.linkedTelegramChats?.length
+                    ? "Новая ссылка"
+                    : "Подключить Telegram"}
+                </Button>
+                {telegramLink && (
+                  <a
+                    className="link-button"
+                    href={telegramLink.deepLink}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Открыть ссылку (20 мин.)
+                  </a>
+                )}
+              </section>
+            )}
+            {error && <div className="form-error">{error}</div>}
+            <div className="modal-actions">
+              <Button
+                type="button"
+                kind="secondary"
+                onClick={() => setEditing(null)}
+              >
+                Отмена
+              </Button>
+              <Button>Сохранить</Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </>
+  );
+}
+
+function Telegram({
+  integrations,
+  chats,
+  organizations,
+  stores,
+  reload,
+}: {
+  integrations: TelegramIntegration[];
+  chats: TelegramChat[];
+  organizations: Organization[];
+  stores: Store[];
+  reload: () => void;
+}) {
+  const [editing, setEditing] = useState<number | null>(null),
+    [saving, setSaving] = useState(false),
+    [error, setError] = useState("");
+  const saveLinks = async (
+    event: FormEvent<HTMLFormElement>,
+    chatId: number,
+  ) => {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    const form = new FormData(event.currentTarget);
+    try {
+      await api("/telegram/chats/" + chatId + "/links", {
+        method: "PUT",
+        body: JSON.stringify({
+          organizationIds: form.getAll("organizationIds").map(Number),
+          storeIds: form.getAll("storeIds").map(Number),
+        }),
+      });
+      setEditing(null);
+      await reload();
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <>
+      <div className="stats-grid">
+        {integrations.map((item) => (
+          <div className="stat-card violet" key={item.id}>
+            <span>
+              <MessageCircle />
+            </span>
+            <div>
+              <small>
+                {item.kind === "BOT" ? "Telegram-бот" : "Корпоративный аккаунт"}
+              </small>
+              <strong style={{ fontSize: 15 }}>
+                {item.status === "ACTIVE" ? "Подключён" : "Нужна настройка"}
+              </strong>
+            </div>
+          </div>
+        ))}
+      </div>
+      <section className="panel table-panel">
+        <div className="panel-head">
+          <div>
+            <h2>Telegram-аккаунты и привязки</h2>
+            <p>
+              Один аккаунт можно связать с несколькими организациями и точками.
+              Для привязки пользователь должен сначала написать боту.
+            </p>
+          </div>
+        </div>
+        {error && <div className="form-error">{error}</div>}
+        {chats.length ? (
+          chats.map((chat) => {
+            const organizationIds = chat.organizationLinks.map(
+                (link) => link.organization.id,
+              ),
+              storeIds = chat.storeLinks.map((link) => link.store.id);
+            return (
+              <article className="telegram-row" key={chat.id}>
+                <div>
+                  <b>{chat.title}</b>
+                  <span>
+                    {chat.username ? "@" + chat.username : "Без username"}
+                  </span>
+                  <small>
+                    {chat.messages[0]?.body ?? "Нет сообщений"} ·{" "}
+                    {formatDate(chat.lastMessageAt)}
+                  </small>
+                  <p className="telegram-links-summary">
+                    Организации:{" "}
+                    {chat.organizationLinks.length
+                      ? chat.organizationLinks
+                          .map((link) => link.organization.legalName)
+                          .join(", ")
+                      : "не привязаны"}
+                    <br />
+                    Точки:{" "}
+                    {chat.storeLinks.length
+                      ? chat.storeLinks
+                          .map((link) => link.store.name)
+                          .join(", ")
+                      : "не привязаны"}
+                  </p>
+                </div>
+                <Button
+                  kind="secondary"
+                  onClick={() => {
+                    setEditing(editing === chat.id ? null : chat.id);
+                    setError("");
+                  }}
+                >
+                  {editing === chat.id ? "Скрыть" : "Настроить привязки"}
+                </Button>
+                {editing === chat.id && (
+                  <form
+                    className="telegram-links-form"
+                    onSubmit={(event) => void saveLinks(event, chat.id)}
+                  >
+                    <Field label="Организации">
+                      <select
+                        name="organizationIds"
+                        multiple
+                        defaultValue={organizationIds.map(String)}
+                      >
+                        {organizations
+                          .filter((item) => item.status === "ACTIVE")
+                          .map((item) => (
+                            <option value={item.id} key={item.id}>
+                              {item.legalName}
+                            </option>
+                          ))}
+                      </select>
+                      <small>Ctrl / Cmd + клик — выбрать несколько.</small>
+                    </Field>
+                    <Field label="Торговые точки">
+                      <select
+                        name="storeIds"
+                        multiple
+                        defaultValue={storeIds.map(String)}
+                      >
+                        {stores
+                          .filter((item) => item.status === "ACTIVE")
+                          .map((item) => (
+                            <option value={item.id} key={item.id}>
+                              {item.organization?.legalName
+                                ? item.organization.legalName + " · "
+                                : ""}
+                              {item.name} — {item.address}
+                            </option>
+                          ))}
+                      </select>
+                      <small>
+                        Привязка точки имеет приоритет при создании заявки
+                        ботом.
+                      </small>
+                    </Field>
+                    <div className="modal-actions">
+                      <Button type="submit" disabled={saving}>
+                        {saving ? "Сохранение…" : "Сохранить привязки"}
+                      </Button>
+                    </div>
+                  </form>
+                )}
+              </article>
+            );
+          })
+        ) : (
+          <Empty
+            title="Telegram ещё не подключён"
+            text="Попросите пользователя написать боту: после первого сообщения аккаунт появится в этом списке."
+          />
+        )}
+      </section>
+    </>
+  );
 }
 
 function Reports() {
-  const firstDay = () => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)
-  const [from, setFrom] = useState(firstDay), [to, setTo] = useState(() => new Date().toISOString().slice(0, 10)), [stats, setStats] = useState<import('./types').Stats | null>(null), [error, setError] = useState(''), [view, setView] = useState<'overview' | 'clients' | 'team' | 'requests'>('overview')
-  const load = useCallback(async () => { try { setError(''); setStats(await api<import('./types').Stats>(`/requests/stats?from=${from}&to=${to}`)) } catch (reason) { setError(errorText(reason)) } }, [from, to])
-  useEffect(() => { void load() }, [load])
-  const list = (title: string, rows: Array<{ id: number; name: string; count: number }>) => <section className="panel table-panel"><div className="panel-head"><h2>{title}</h2></div>{rows.length ? <div className="report-list">{rows.map(row => <div key={row.id}><span>{row.name}</span><b>{row.count}</b></div>)}</div> : <p>За выбранный период данных нет.</p>}</section>
-  const sourceLabel: Record<string, string> = { WEB: 'CRM / сайт', TELEGRAM_BOT: 'Telegram-бот', TELEGRAM_ACCOUNT: 'Telegram-аккаунт' }
-  return <>{error && <div className="page-error">{error}</div>}<section className="panel table-panel"><div className="toolbar"><Field label="С"><input type="date" value={from} max={to} onChange={event => setFrom(event.target.value)} /></Field><Field label="По"><input type="date" value={to} min={from} onChange={event => setTo(event.target.value)} /></Field><Button kind="secondary" onClick={() => void load()}><RefreshCw /> Обновить</Button></div><div className="segmented report-tabs"><button type="button" className={view === 'overview' ? 'active' : ''} onClick={() => setView('overview')}>Сводка</button><button type="button" className={view === 'clients' ? 'active' : ''} onClick={() => setView('clients')}>Клиенты и точки</button><button type="button" className={view === 'team' ? 'active' : ''} onClick={() => setView('team')}>Команда</button><button type="button" className={view === 'requests' ? 'active' : ''} onClick={() => setView('requests')}>Реестр заявок</button></div></section>{stats && <><div className="stats-grid"><div className="stat-card coral"><span><ClipboardList /></span><div><small>Заявок за период</small><strong>{stats.total}</strong></div></div><div className="stat-card amber"><span><AlertTriangle /></span><div><small>Просрочено</small><strong>{stats.overdue}</strong></div></div><div className="stat-card green"><span><Check /></span><div><small>Выполнено</small><strong>{stats.completed}</strong></div></div><div className="stat-card violet"><span><Activity /></span><div><small>Среднее выполнение</small><strong>{stats.averageResolutionHours} ч</strong></div></div></div>{view === 'overview' && <div className="report-grid">{list('По статусам', stats.byStatus.map(item => ({ id: Object.keys(statusLabel).indexOf(item.status), name: statusLabel[item.status], count: item._count._all })))}{list('По шаблонам', stats.byType.map(item => ({ id: item.typeId, name: item.type?.name ?? 'Удалённый шаблон', count: item._count._all })))}{list('По отделам', stats.departments)}<section className="panel table-panel"><div className="panel-head"><h2>Источники обращений</h2></div><div className="report-list">{stats.sources.map(item => <div key={item.source}><span>{sourceLabel[item.source]}</span><b>{item.count}</b></div>)}</div></section></div>}{view === 'clients' && <div className="report-grid">{list('Заявки по организациям', stats.clients)}{list('Заявки по торговым точкам', stats.stores)}</div>}{view === 'team' && <div className="report-grid">{list('Нагрузка по сотрудникам', stats.employees)}{list('Заявки по отделам', stats.departments)}</div>}{view === 'requests' && <section className="panel table-panel"><div className="panel-head"><h2>Реестр заявок</h2></div><div className="report-list">{stats.requests.map(row => <div key={row.id}><span>#{row.id} · {row.organization?.legalName ?? 'Без организации'} · {row.store?.name ?? 'Без точки'}<small> {row.department.name} · {row.assignees.join(', ') || 'не назначена'} · {formatDate(row.createdAt)}</small></span><b>{statusLabel[row.status]}</b></div>)}</div></section>}</>}</>
+  const firstDay = () =>
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+      .toISOString()
+      .slice(0, 10);
+  const [from, setFrom] = useState(firstDay),
+    [to, setTo] = useState(() => new Date().toISOString().slice(0, 10)),
+    [stats, setStats] = useState<import("./types").Stats | null>(null),
+    [error, setError] = useState(""),
+    [view, setView] = useState<"overview" | "clients" | "team" | "requests">(
+      "overview",
+    );
+  const load = useCallback(async () => {
+    try {
+      setError("");
+      setStats(
+        await api<import("./types").Stats>(
+          `/requests/stats?from=${from}&to=${to}`,
+        ),
+      );
+    } catch (reason) {
+      setError(errorText(reason));
+    }
+  }, [from, to]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  const list = (
+    title: string,
+    rows: Array<{ id: number; name: string; count: number }>,
+  ) => (
+    <section className="panel table-panel">
+      <div className="panel-head">
+        <h2>{title}</h2>
+      </div>
+      {rows.length ? (
+        <div className="report-list">
+          {rows.map((row) => (
+            <div key={row.id}>
+              <span>{row.name}</span>
+              <b>{row.count}</b>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p>За выбранный период данных нет.</p>
+      )}
+    </section>
+  );
+  const sourceLabel: Record<string, string> = {
+    WEB: "CRM / сайт",
+    TELEGRAM_BOT: "Telegram-бот",
+    TELEGRAM_ACCOUNT: "Telegram-аккаунт",
+  };
+  return (
+    <>
+      {error && <div className="page-error">{error}</div>}
+      <section className="panel table-panel">
+        <div className="toolbar">
+          <Field label="С">
+            <input
+              type="date"
+              value={from}
+              max={to}
+              onChange={(event) => setFrom(event.target.value)}
+            />
+          </Field>
+          <Field label="По">
+            <input
+              type="date"
+              value={to}
+              min={from}
+              onChange={(event) => setTo(event.target.value)}
+            />
+          </Field>
+          <Button kind="secondary" onClick={() => void load()}>
+            <RefreshCw /> Обновить
+          </Button>
+        </div>
+        <div className="segmented report-tabs">
+          <button
+            type="button"
+            className={view === "overview" ? "active" : ""}
+            onClick={() => setView("overview")}
+          >
+            Сводка
+          </button>
+          <button
+            type="button"
+            className={view === "clients" ? "active" : ""}
+            onClick={() => setView("clients")}
+          >
+            Клиенты и точки
+          </button>
+          <button
+            type="button"
+            className={view === "team" ? "active" : ""}
+            onClick={() => setView("team")}
+          >
+            Команда
+          </button>
+          <button
+            type="button"
+            className={view === "requests" ? "active" : ""}
+            onClick={() => setView("requests")}
+          >
+            Реестр заявок
+          </button>
+        </div>
+      </section>
+      {stats && (
+        <>
+          <div className="stats-grid">
+            <div className="stat-card coral">
+              <span>
+                <ClipboardList />
+              </span>
+              <div>
+                <small>Заявок за период</small>
+                <strong>{stats.total}</strong>
+              </div>
+            </div>
+            <div className="stat-card amber">
+              <span>
+                <AlertTriangle />
+              </span>
+              <div>
+                <small>Просрочено</small>
+                <strong>{stats.overdue}</strong>
+              </div>
+            </div>
+            <div className="stat-card green">
+              <span>
+                <Check />
+              </span>
+              <div>
+                <small>Выполнено</small>
+                <strong>{stats.completed}</strong>
+              </div>
+            </div>
+            <div className="stat-card violet">
+              <span>
+                <Activity />
+              </span>
+              <div>
+                <small>Среднее выполнение</small>
+                <strong>{stats.averageResolutionHours} ч</strong>
+              </div>
+            </div>
+          </div>
+          {view === "overview" && (
+            <div className="report-grid">
+              {list(
+                "По статусам",
+                stats.byStatus.map((item) => ({
+                  id: Object.keys(statusLabel).indexOf(item.status),
+                  name: statusLabel[item.status],
+                  count: item._count._all,
+                })),
+              )}
+              {list(
+                "По шаблонам",
+                stats.byType.map((item) => ({
+                  id: item.typeId,
+                  name: item.type?.name ?? "Удалённый шаблон",
+                  count: item._count._all,
+                })),
+              )}
+              {list("По отделам", stats.departments)}
+              <section className="panel table-panel">
+                <div className="panel-head">
+                  <h2>Источники обращений</h2>
+                </div>
+                <div className="report-list">
+                  {stats.sources.map((item) => (
+                    <div key={item.source}>
+                      <span>{sourceLabel[item.source]}</span>
+                      <b>{item.count}</b>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
+          )}
+          {view === "clients" && (
+            <div className="report-grid">
+              {list("Заявки по организациям", stats.clients)}
+              {list("Заявки по торговым точкам", stats.stores)}
+            </div>
+          )}
+          {view === "team" && (
+            <div className="report-grid">
+              {list("Нагрузка по сотрудникам", stats.employees)}
+              {list("Заявки по отделам", stats.departments)}
+            </div>
+          )}
+          {view === "requests" && (
+            <section className="panel table-panel">
+              <div className="panel-head">
+                <h2>Реестр заявок</h2>
+              </div>
+              <div className="report-list">
+                {stats.requests.map((row) => (
+                  <div key={row.id}>
+                    <span>
+                      #{row.id} ·{" "}
+                      {row.organization?.legalName ?? "Без организации"} ·{" "}
+                      {row.store?.name ?? "Без точки"}
+                      <small>
+                        {" "}
+                        {row.department.name} ·{" "}
+                        {row.assignees.join(", ") || "не назначена"} ·{" "}
+                        {formatDate(row.createdAt)}
+                      </small>
+                    </span>
+                    <b>{statusLabel[row.status]}</b>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </>
+      )}
+    </>
+  );
 }
 
 function App() {
-  const [user, setUser] = useState<User | null>(null), [booting, setBooting] = useState(true), [page, setPage] = useState('dashboard'), [mobileNav, setMobileNav] = useState(false), [selected, setSelected] = useState<ServiceRequest | null>(null), [createRequest, setCreateRequest] = useState(false), [calendarDate, setCalendarDate] = useState<Date | null>(null), [storeOrganizationId, setStoreOrganizationId] = useState<number | null>(null), [loadError, setLoadError] = useState(''), [boardRefresh, setBoardRefresh] = useState(0)
-  const [requests, setRequests] = useState<ServiceRequest[]>([]), [stores, setStores] = useState<Store[]>([]), [organizations, setOrganizations] = useState<Organization[]>([]), [types, setTypes] = useState<RequestType[]>([]), [departments, setDepartments] = useState<Department[]>([]), [staff, setStaff] = useState<StaffMember[]>([]), [integrations, setIntegrations] = useState<TelegramIntegration[]>([]), [chats, setChats] = useState<TelegramChat[]>([])
-  const load = useCallback(async () => { if (!user?.status || user.status !== 'ACTIVE') return; setLoadError(''); try { const basics = await Promise.all([api<ServiceRequest[]>('/requests'), api<Store[]>('/stores'), api<Organization[]>('/organizations'), api<RequestType[]>('/request-types'), api<Department[]>('/departments')]); setRequests(basics[0]); setStores(basics[1]); setOrganizations(basics[2]); setTypes(basics[3]); setDepartments(basics[4]); if (can(user, 'MANAGE_STAFF')) setStaff(await api<StaffMember[]>('/staff')); if (can(user, 'VIEW_TELEGRAM')) { const telegram = await Promise.all([api<TelegramIntegration[]>('/telegram/integrations'), api<TelegramChat[]>('/telegram/chats')]); setIntegrations(telegram[0]); setChats(telegram[1]) } } catch (reason) { setLoadError(errorText(reason)) } }, [user])
-  useEffect(() => { restoreSession().then(setUser).finally(() => setBooting(false)) }, [])
-  useEffect(() => { void load() }, [load])
-  useEffect(() => { if (!user || user.status !== 'ACTIVE') return; const refresh = () => { if (document.visibilityState === 'visible') void load() }; const timer = window.setInterval(refresh, 5000); window.addEventListener('focus', refresh); document.addEventListener('visibilitychange', refresh); return () => { window.clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh) } }, [user, load])
-  const exit = async () => { await logout(); setUser(null) }
-  if (booting) return <main className="boot"><RefreshCw className="spin" /> Загрузка БАЗИС CRM…</main>
-  if (!user) return <Auth onAuth={setUser} />
-  if (user.status !== 'ACTIVE') return <main className="state-page"><ShieldCheck /><h1>{user.status === 'REJECTED' ? 'Регистрация отклонена' : 'Регистрация на проверке'}</h1><p>{user.rejectionReason || 'Руководитель проверит учётную запись, организацию и точки.'}</p><Button kind="secondary" onClick={exit}><LogOut /> Выйти</Button></main>
-  const nav = [{ id: 'dashboard', label: 'Обзор', Icon: LayoutDashboard }, { id: 'requests', label: 'Заявки', Icon: ClipboardList }, { id: 'calendar', label: 'Календарь', Icon: CalendarDays }, { id: 'organizations', label: 'Организации', Icon: Building2 }, { id: 'stores', label: 'Торговые точки', Icon: StoreIcon }, ...(user.role !== 'CLIENT' ? [{ id: 'my-boards', label: 'Мои доски', Icon: ListTodo }, { id: 'team-boards', label: 'Доски', Icon: Columns3 }] : []), ...(can(user, 'VIEW_REPORTS') ? [{ id: 'reports', label: 'Отчёты', Icon: FileText }] : []), ...(can(user, 'MANAGE_TEMPLATES') ? [{ id: 'templates', label: 'Шаблоны', Icon: Settings2 }] : []), ...(can(user, 'MANAGE_STAFF') ? [{ id: 'staff', label: 'Сотрудники', Icon: Users }] : []), ...(can(user, 'VIEW_TELEGRAM') ? [{ id: 'telegram', label: 'Telegram', Icon: MessageCircle }] : [])]
-  const urgent = requests.filter(r => r.priority === 'CRITICAL' && !['DONE', 'CANCELLED'].includes(r.status))
-  const pendingOrganizations = organizations.filter(item => item.status === 'PENDING').length, pendingStores = stores.filter(item => item.status === 'PENDING').length
-  const body = page === 'requests' ? <RequestsList requests={requests} user={user} departments={departments} types={types} open={item => setSelected(item)} /> : page === 'calendar' ? <Calendar requests={requests} open={item => setSelected(item)} add={date => { setCalendarDate(date); setCreateRequest(true) }} /> : page === 'organizations' ? <Organizations organizations={organizations} user={user} reload={load} openStores={organizationId => { setStoreOrganizationId(organizationId); setPage('stores') }} /> : page === 'stores' ? <Stores stores={stores} organizations={organizations} user={user} reload={load} organizationFilter={storeOrganizationId} clearFilter={() => setStoreOrganizationId(null)} /> : page === 'my-boards' ? <BoardsPage user={user} type="PERSONAL" refreshKey={boardRefresh} /> : page === 'team-boards' ? <BoardsPage user={user} type="TEAM" refreshKey={boardRefresh} /> : page === 'reports' ? <ReportsPage /> : page === 'templates' ? <Templates types={types} departments={departments} reload={load} /> : page === 'staff' ? <Staff staff={staff} departments={departments} reload={load} /> : page === 'telegram' ? <Telegram integrations={integrations} chats={chats} organizations={organizations} stores={stores} reload={load} /> : <><div className="stats-grid"><div className="stat-card coral"><span><ClipboardList /></span><div><small>Все заявки</small><strong>{requests.length}</strong></div></div><div className="stat-card amber"><span><AlertTriangle /></span><div><small>Критические</small><strong>{urgent.length}</strong></div></div><div className="stat-card green"><span><StoreIcon /></span><div><small>Активные точки</small><strong>{stores.filter(s => s.status === 'ACTIVE').length}</strong></div></div><div className="stat-card violet"><span><Activity /></span><div><small>В работе</small><strong>{requests.filter(r => r.status === 'IN_PROGRESS').length}</strong></div></div></div><section className="panel table-panel"><div className="panel-head"><div><h2>Приоритетные заявки</h2><p>Критические и новые обращения</p></div></div><div className="request-grid">{requests.filter(r => !['DONE', 'CANCELLED'].includes(r.status)).slice(0, 6).map(item => <RequestCard key={item.id} item={item} open={() => setSelected(item)} />)}{!requests.length && <Empty title="Рабочая очередь пуста" text="Новые обращения появятся здесь." />}</div></section></>
-  return <main className="app-shell"><aside className={`sidebar ${mobileNav ? 'open' : ''}`}><Brand /><div className="workspace"><span>{user.ipName.slice(0, 1)}</span><div><small>РАБОЧЕЕ ПРОСТРАНСТВО</small><b>{user.role === 'CLIENT' ? user.ipName : 'ЦТО БАЗИС'}</b></div></div><nav>{nav.map(({ id, label, Icon }) => <button className={page === id ? 'active' : ''} onClick={() => { if (id === 'stores') setStoreOrganizationId(null); setPage(id); setMobileNav(false) }} key={id}><Icon /><span>{label}</span>{((id === 'requests' && urgent.length > 0) || (id === 'organizations' && pendingOrganizations > 0) || (id === 'stores' && pendingStores > 0)) && <em>{id === 'requests' ? urgent.length : id === 'organizations' ? pendingOrganizations : pendingStores}</em>}</button>)}</nav><div className="sidebar-footer"><span className="avatar">{user.ipName.slice(0, 2).toUpperCase()}</span><div><b>{user.ipName}</b><small>{roleLabel[user.role]}</small></div><button onClick={exit}><LogOut /></button></div></aside>{mobileNav && <button className="nav-scrim" onClick={() => setMobileNav(false)} />}<section className="content"><header><button className="menu-button" onClick={() => setMobileNav(true)}><Menu /></button><div className="breadcrumb">БАЗИС CRM / {nav.find(n => n.id === page)?.label}</div><div className="header-actions"><Button kind="secondary" onClick={() => page === 'my-boards' || page === 'team-boards' ? setBoardRefresh(value => value + 1) : void load()}><RefreshCw /> Обновить</Button></div></header><div className="page"><div className="title-row"><div><span className="eyebrow">{roleLabel[user.role]}</span><h1>{nav.find(n => n.id === page)?.label}</h1><p>{page === 'dashboard' ? 'Рабочая картина по доступным вам заявкам.' : 'Данные отображаются с учётом индивидуальных прав.'}</p></div>{page === 'requests' && <Button onClick={() => { setCalendarDate(null); setCreateRequest(true) }}><Plus /> Новая заявка</Button>}</div>{loadError && <div className="page-error">{loadError}</div>}{body}</div></section>{selected && <RequestModal item={selected} user={user} departments={departments} close={() => setSelected(null)} reload={load} />}{createRequest && <CreateRequest organizations={organizations} stores={stores} types={types} user={user} close={() => { setCreateRequest(false); setCalendarDate(null) }} reload={load} initialUrgency={calendarDate ? 'SCHEDULED' : 'URGENT'} initialScheduledAt={calendarDate} />}</main>
+  const [user, setUser] = useState<User | null>(null),
+    [booting, setBooting] = useState(true),
+    [page, setPage] = useState("dashboard"),
+    [mobileNav, setMobileNav] = useState(false),
+    [selected, setSelected] = useState<ServiceRequest | null>(null),
+    [createRequest, setCreateRequest] = useState(false),
+    [calendarDate, setCalendarDate] = useState<Date | null>(null),
+    [storeOrganizationId, setStoreOrganizationId] = useState<number | null>(
+      null,
+    ),
+    [loadError, setLoadError] = useState(""),
+    [boardRefresh, setBoardRefresh] = useState(0);
+  const [requests, setRequests] = useState<ServiceRequest[]>([]),
+    [stores, setStores] = useState<Store[]>([]),
+    [organizations, setOrganizations] = useState<Organization[]>([]),
+    [types, setTypes] = useState<RequestType[]>([]),
+    [departments, setDepartments] = useState<Department[]>([]),
+    [staff, setStaff] = useState<StaffMember[]>([]),
+    [integrations, setIntegrations] = useState<TelegramIntegration[]>([]),
+    [chats, setChats] = useState<TelegramChat[]>([]);
+  const load = useCallback(async () => {
+    if (!user?.status || user.status !== "ACTIVE") return;
+    setLoadError("");
+    try {
+      const basics = await Promise.all([
+        api<ServiceRequest[]>("/requests"),
+        api<Store[]>("/stores"),
+        api<Organization[]>("/organizations"),
+        api<RequestType[]>("/request-types"),
+        api<Department[]>("/departments"),
+      ]);
+      setRequests(basics[0]);
+      setStores(basics[1]);
+      setOrganizations(basics[2]);
+      setTypes(basics[3]);
+      setDepartments(basics[4]);
+      if (can(user, "MANAGE_STAFF"))
+        setStaff(await api<StaffMember[]>("/staff"));
+      if (can(user, "VIEW_TELEGRAM")) {
+        const telegram = await Promise.all([
+          api<TelegramIntegration[]>("/telegram/integrations"),
+          api<TelegramChat[]>("/telegram/chats"),
+        ]);
+        setIntegrations(telegram[0]);
+        setChats(telegram[1]);
+      }
+    } catch (reason) {
+      setLoadError(errorText(reason));
+    }
+  }, [user]);
+  useEffect(() => {
+    restoreSession()
+      .then(setUser)
+      .finally(() => setBooting(false));
+  }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  useEffect(() => {
+    if (!user || user.status !== "ACTIVE") return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    const timer = window.setInterval(refresh, 5000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [user, load]);
+  const exit = async () => {
+    await logout();
+    setUser(null);
+  };
+  if (booting)
+    return (
+      <main className="boot">
+        <RefreshCw className="spin" /> Загрузка БАЗИС CRM…
+      </main>
+    );
+  if (!user) return <Auth onAuth={setUser} />;
+  if (user.status !== "ACTIVE")
+    return (
+      <main className="state-page">
+        <ShieldCheck />
+        <h1>
+          {user.status === "REJECTED"
+            ? "Регистрация отклонена"
+            : "Регистрация на проверке"}
+        </h1>
+        <p>
+          {user.rejectionReason ||
+            "Руководитель проверит учётную запись, организацию и точки."}
+        </p>
+        <Button kind="secondary" onClick={exit}>
+          <LogOut /> Выйти
+        </Button>
+      </main>
+    );
+  const nav = [
+    { id: "dashboard", label: "Обзор", Icon: LayoutDashboard },
+    { id: "requests", label: "Заявки", Icon: ClipboardList },
+    { id: "calendar", label: "Календарь", Icon: CalendarDays },
+    { id: "organizations", label: "Организации", Icon: Building2 },
+    { id: "stores", label: "Торговые точки", Icon: StoreIcon },
+    ...(user.role !== "CLIENT"
+      ? [
+          { id: "my-boards", label: "Мои доски", Icon: ListTodo },
+          { id: "team-boards", label: "Доски", Icon: Columns3 },
+        ]
+      : []),
+    ...(can(user, "VIEW_REPORTS")
+      ? [{ id: "reports", label: "Отчёты", Icon: FileText }]
+      : []),
+    ...(can(user, "MANAGE_TEMPLATES")
+      ? [{ id: "templates", label: "Шаблоны", Icon: Settings2 }]
+      : []),
+    ...(can(user, "MANAGE_STAFF")
+      ? [{ id: "staff", label: "Сотрудники", Icon: Users }]
+      : []),
+    ...(can(user, "VIEW_TELEGRAM")
+      ? [{ id: "telegram", label: "Telegram", Icon: MessageCircle }]
+      : []),
+  ];
+  const urgent = requests.filter(
+    (r) =>
+      r.priority === "CRITICAL" && !["DONE", "CANCELLED"].includes(r.status),
+  );
+  const pendingOrganizations = organizations.filter(
+      (item) => item.status === "PENDING",
+    ).length,
+    pendingStores = stores.filter((item) => item.status === "PENDING").length;
+  const body =
+    page === "requests" ? (
+      <RequestsList
+        requests={requests}
+        user={user}
+        departments={departments}
+        types={types}
+        open={(item) => setSelected(item)}
+      />
+    ) : page === "calendar" ? (
+      <Calendar
+        requests={requests}
+        open={(item) => setSelected(item)}
+        add={(date) => {
+          setCalendarDate(date);
+          setCreateRequest(true);
+        }}
+      />
+    ) : page === "organizations" ? (
+      <Organizations
+        organizations={organizations}
+        user={user}
+        reload={load}
+        openStores={(organizationId) => {
+          setStoreOrganizationId(organizationId);
+          setPage("stores");
+        }}
+      />
+    ) : page === "stores" ? (
+      <Stores
+        stores={stores}
+        organizations={organizations}
+        user={user}
+        reload={load}
+        organizationFilter={storeOrganizationId}
+        clearFilter={() => setStoreOrganizationId(null)}
+      />
+    ) : page === "my-boards" ? (
+      <BoardsPage user={user} type="PERSONAL" refreshKey={boardRefresh} />
+    ) : page === "team-boards" ? (
+      <BoardsPage user={user} type="TEAM" refreshKey={boardRefresh} />
+    ) : page === "reports" ? (
+      <ReportsPage />
+    ) : page === "templates" ? (
+      <Templates types={types} departments={departments} reload={load} />
+    ) : page === "staff" ? (
+      <Staff staff={staff} departments={departments} reload={load} />
+    ) : page === "telegram" ? (
+      <Telegram
+        integrations={integrations}
+        chats={chats}
+        organizations={organizations}
+        stores={stores}
+        reload={load}
+      />
+    ) : (
+      <>
+        <div className="stats-grid">
+          <div className="stat-card coral">
+            <span>
+              <ClipboardList />
+            </span>
+            <div>
+              <small>Все заявки</small>
+              <strong>{requests.length}</strong>
+            </div>
+          </div>
+          <div className="stat-card amber">
+            <span>
+              <AlertTriangle />
+            </span>
+            <div>
+              <small>Критические</small>
+              <strong>{urgent.length}</strong>
+            </div>
+          </div>
+          <div className="stat-card green">
+            <span>
+              <StoreIcon />
+            </span>
+            <div>
+              <small>Активные точки</small>
+              <strong>
+                {stores.filter((s) => s.status === "ACTIVE").length}
+              </strong>
+            </div>
+          </div>
+          <div className="stat-card violet">
+            <span>
+              <Activity />
+            </span>
+            <div>
+              <small>В работе</small>
+              <strong>
+                {requests.filter((r) => r.status === "IN_PROGRESS").length}
+              </strong>
+            </div>
+          </div>
+        </div>
+        <section className="panel table-panel">
+          <div className="panel-head">
+            <div>
+              <h2>Приоритетные заявки</h2>
+              <p>Критические и новые обращения</p>
+            </div>
+          </div>
+          <div className="request-grid">
+            {requests
+              .filter((r) => !["DONE", "CANCELLED"].includes(r.status))
+              .slice(0, 6)
+              .map((item) => (
+                <RequestCard
+                  key={item.id}
+                  item={item}
+                  open={() => setSelected(item)}
+                />
+              ))}
+            {!requests.length && (
+              <Empty
+                title="Рабочая очередь пуста"
+                text="Новые обращения появятся здесь."
+              />
+            )}
+          </div>
+        </section>
+      </>
+    );
+  return (
+    <main className="app-shell">
+      <aside className={`sidebar ${mobileNav ? "open" : ""}`}>
+        <Brand />
+        <div className="workspace">
+          <span>{user.ipName.slice(0, 1)}</span>
+          <div>
+            <small>РАБОЧЕЕ ПРОСТРАНСТВО</small>
+            <b>{user.role === "CLIENT" ? user.ipName : "ЦТО БАЗИС"}</b>
+          </div>
+        </div>
+        <nav>
+          {nav.map(({ id, label, Icon }) => (
+            <button
+              className={page === id ? "active" : ""}
+              onClick={() => {
+                if (id === "stores") setStoreOrganizationId(null);
+                setPage(id);
+                setMobileNav(false);
+              }}
+              key={id}
+            >
+              <Icon />
+              <span>{label}</span>
+              {((id === "requests" && urgent.length > 0) ||
+                (id === "organizations" && pendingOrganizations > 0) ||
+                (id === "stores" && pendingStores > 0)) && (
+                <em>
+                  {id === "requests"
+                    ? urgent.length
+                    : id === "organizations"
+                      ? pendingOrganizations
+                      : pendingStores}
+                </em>
+              )}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-footer">
+          <span className="avatar">
+            {user.ipName.slice(0, 2).toUpperCase()}
+          </span>
+          <div>
+            <b>{user.ipName}</b>
+            <small>{roleLabel[user.role]}</small>
+          </div>
+          <button onClick={exit}>
+            <LogOut />
+          </button>
+        </div>
+      </aside>
+      {mobileNav && (
+        <button className="nav-scrim" onClick={() => setMobileNav(false)} />
+      )}
+      <section className="content">
+        <header>
+          <button className="menu-button" onClick={() => setMobileNav(true)}>
+            <Menu />
+          </button>
+          <div className="breadcrumb">
+            БАЗИС CRM / {nav.find((n) => n.id === page)?.label}
+          </div>
+          <div className="header-actions">
+            <Button
+              kind="secondary"
+              onClick={() =>
+                page === "my-boards" || page === "team-boards"
+                  ? setBoardRefresh((value) => value + 1)
+                  : void load()
+              }
+            >
+              <RefreshCw /> Обновить
+            </Button>
+          </div>
+        </header>
+        <div className="page">
+          <div className="title-row">
+            <div>
+              <span className="eyebrow">{roleLabel[user.role]}</span>
+              <h1>{nav.find((n) => n.id === page)?.label}</h1>
+              <p>
+                {page === "dashboard"
+                  ? "Рабочая картина по доступным вам заявкам."
+                  : "Данные отображаются с учётом индивидуальных прав."}
+              </p>
+            </div>
+            {page === "requests" && (
+              <Button
+                onClick={() => {
+                  setCalendarDate(null);
+                  setCreateRequest(true);
+                }}
+              >
+                <Plus /> Новая заявка
+              </Button>
+            )}
+          </div>
+          {loadError && <div className="page-error">{loadError}</div>}
+          {body}
+        </div>
+      </section>
+      {selected && (
+        <RequestModal
+          item={selected}
+          user={user}
+          departments={departments}
+          close={() => setSelected(null)}
+          reload={load}
+        />
+      )}
+      {createRequest && (
+        <CreateRequest
+          organizations={organizations}
+          stores={stores}
+          types={types}
+          user={user}
+          close={() => {
+            setCreateRequest(false);
+            setCalendarDate(null);
+          }}
+          reload={load}
+          initialUrgency={calendarDate ? "SCHEDULED" : "URGENT"}
+          initialScheduledAt={calendarDate}
+        />
+      )}
+    </main>
+  );
 }
 
-export default App
+export default App;
