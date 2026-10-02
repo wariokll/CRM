@@ -87,11 +87,14 @@ export interface RequestType {
   requiresStore: boolean
   availableOnWeb: boolean
   availableOnTelegram: boolean
+  requiresComponents: boolean
   defaultPriority: Priority
   templateFields?: TemplateField[] | null
+  componentRequirements: Array<{ componentId: number; quantity: number; component: Component }>
 }
 
 export interface TemplateField { key: string; label: string; type: 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'DATE' | 'SELECT' | 'CHECKBOX' | 'FILE'; required: boolean; options?: string[] }
+export interface Component { id: number; name: string; isActive: boolean }
 
 export interface ServiceRequest {
   id: number
@@ -106,8 +109,10 @@ export interface ServiceRequest {
   scheduledAt?: string | null
   description: string
   templateData?: Record<string, unknown> | null
+  componentsData?: Array<{ componentId: number; name: string; quantity: number }> | null
   status: RequestStatus
   adminComment?: string | null
+  recurrenceSchedule?: { id: number; intervalDays: number; nextScheduledAt: string; isActive: boolean } | null
   createdAt: string
   updatedAt: string
   closedAt?: string | null

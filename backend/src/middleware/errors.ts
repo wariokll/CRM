@@ -4,7 +4,7 @@ import { AppError } from '../utils/app-error.js'
 
 const fieldNames: Record<string, string> = {
   status: 'Статус', priority: 'Приоритет', departmentId: 'Отдел', assigneeIds: 'Исполнители', adminComment: 'Комментарий',
-  storeId: 'Торговая точка', organizationId: 'Организация', typeId: 'Шаблон заявки', urgency: 'Срочность', scheduledAt: 'Дата работ', description: 'Описание', templateData: 'Дополнительные поля',
+  storeId: 'Торговая точка', organizationId: 'Организация', typeId: 'Шаблон заявки', urgency: 'Срочность', scheduledAt: 'Дата работ', recurrenceIntervalDays: 'Интервал повторения', components: 'Компоненты', description: 'Описание', templateData: 'Дополнительные поля',
   name: 'Название', slug: 'Код отдела', email: 'Email', phone: 'Телефон', password: 'Пароль', ipName: 'Название организации',
   legalName: 'Полное название', shortName: 'Сокращённое название', inn: 'ИНН', kpp: 'КПП', ogrn: 'ОГРН / ОГРНИП', legalAddress: 'Юридический адрес', contactName: 'Контактное лицо',
   departmentIds: 'Отделы', permissions: 'Разрешения', body: 'Текст сообщения', visibility: 'Видимость комментария',

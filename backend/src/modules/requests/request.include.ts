@@ -5,6 +5,7 @@ export const requestInclude = {
   department: true,
   createdBy: { select: { id: true, ipName: true, phone: true, email: true } },
   contact: true,
+  recurrenceSchedule: { select: { id: true, intervalDays: true, nextScheduledAt: true, isActive: true } },
   assignees: { include: { user: { select: { id: true, ipName: true, email: true, phone: true, role: true } } }, orderBy: { assignedAt: 'asc' as const } },
   comments: { include: { author: { select: { id: true, ipName: true, role: true } } }, orderBy: { createdAt: 'asc' as const } },
   departmentHistory: { include: { fromDepartment: true, toDepartment: true, transferredBy: { select: { id: true, ipName: true } } }, orderBy: { createdAt: 'asc' as const } },

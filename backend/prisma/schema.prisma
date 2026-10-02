@@ -292,15 +292,40 @@ model RequestType {
   requiresStore        Boolean    @default(true) @map("requires_store")
   availableOnWeb       Boolean    @default(true) @map("available_on_web")
   availableOnTelegram  Boolean    @default(true) @map("available_on_telegram")
+  requiresComponents   Boolean    @default(false) @map("requires_components")
   defaultPriority      Priority   @default(NORMAL) @map("default_priority")
   templateFields       Json?      @map("template_fields")
   department           Department @relation(fields: [departmentId], references: [id])
+  componentRequirements RequestTypeComponent[]
   requests             Request[]
   createdAt            DateTime   @default(now()) @map("created_at")
   updatedAt            DateTime   @updatedAt @map("updated_at")
 
   @@index([departmentId])
   @@map("request_types")
+}
+
+model Component {
+  id           Int                    @id @default(autoincrement())
+  name         String                 @unique @db.VarChar(200)
+  isActive     Boolean                @default(true) @map("is_active")
+  requirements RequestTypeComponent[]
+  createdAt    DateTime               @default(now()) @map("created_at")
+  updatedAt    DateTime               @updatedAt @map("updated_at")
+
+  @@map("components")
+}
+
+model RequestTypeComponent {
+  requestTypeId Int         @map("request_type_id")
+  componentId   Int         @map("component_id")
+  quantity      Int         @default(1)
+  requestType   RequestType @relation(fields: [requestTypeId], references: [id], onDelete: Cascade)
+  component     Component   @relation(fields: [componentId], references: [id])
+
+  @@id([requestTypeId, componentId])
+  @@index([componentId])
+  @@map("request_type_components")
 }
 
 model Contact {
@@ -333,9 +358,11 @@ model Request {
   scheduledAt         DateTime?                  @map("scheduled_at")
   description         String                     @db.Text
   templateData        Json?                      @map("template_data")
+  componentsData      Json?                      @map("components_data")
   status              RequestStatus              @default(NEW)
   adminComment        String?                    @map("admin_comment") @db.Text
   assignedAdminId     Int?                       @map("assigned_admin_id")
+  recurrenceScheduleId Int?                      @map("recurrence_schedule_id")
   store               Store?                     @relation(fields: [storeId], references: [id], onDelete: SetNull)
   organization        Organization?              @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   createdBy           User?                      @relation("created_requests", fields: [createdByUserId], references: [id], onDelete: SetNull)
@@ -343,6 +370,7 @@ model Request {
   type                RequestType                @relation(fields: [typeId], references: [id])
   department          Department                 @relation(fields: [departmentId], references: [id])
   legacyAssignedAdmin User?                      @relation("legacy_assigned_requests", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  recurrenceSchedule  RecurringRequestSchedule?  @relation(fields: [recurrenceScheduleId], references: [id], onDelete: SetNull)
   assignees           RequestAssignee[]
   comments            RequestComment[]
   departmentHistory   RequestDepartmentHistory[]
@@ -361,7 +389,32 @@ model Request {
   @@index([priority])
   @@index([urgency])
   @@index([scheduledAt])
+  @@index([recurrenceScheduleId])
   @@map("requests")
+}
+
+model RecurringRequestSchedule {
+  id              Int       @id @default(autoincrement())
+  storeId         Int?      @map("store_id")
+  organizationId  Int?      @map("organization_id")
+  createdByUserId Int?      @map("created_by_user_id")
+  typeId          Int       @map("type_id")
+  departmentId    Int       @map("department_id")
+  priority        Priority  @default(NORMAL)
+  description     String    @db.Text
+  templateData    Json?     @map("template_data")
+  componentsData  Json?     @map("components_data")
+  assigneeUserId  Int?      @map("assignee_user_id")
+  intervalDays    Int       @map("interval_days")
+  nextScheduledAt DateTime  @map("next_scheduled_at")
+  isActive        Boolean   @default(true) @map("is_active")
+  createdById     Int       @map("created_by_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  requests        Request[]
+
+  @@index([isActive, nextScheduledAt])
+  @@map("recurring_request_schedules")
 }
 
 model RequestAssignee {

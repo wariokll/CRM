@@ -11,10 +11,12 @@ import { prisma } from './db.js'
 import { errorHandler } from './middleware/errors.js'
 import { authRouter } from './routes/auth.js'
 import { departmentsRouter } from './routes/departments.js'
+import { componentsRouter } from './routes/components.js'
 import { moderationRouter } from './routes/moderation.js'
 import { organizationsRouter } from './routes/organizations.js'
 import { requestsRouter } from './routes/requests.js'
 import { requestTypesRouter } from './routes/request-types.js'
+import { recurringRequestsRouter } from './routes/recurring-requests.js'
 import { staffRouter } from './routes/staff.js'
 import { storesRouter } from './routes/stores.js'
 import { telegramRouter } from './routes/telegram.js'
@@ -39,9 +41,11 @@ app.get('/api/health/telegram', async (_req, res) => {
 })
 app.use('/api/auth', authRouter)
 app.use('/api/departments', departmentsRouter)
+app.use('/api/components', componentsRouter)
 app.use('/api/organizations', organizationsRouter)
 app.use('/api/stores', storesRouter)
 app.use('/api/requests', requestsRouter)
+app.use('/api/recurring-requests', recurringRequestsRouter)
 app.use('/api/request-types', requestTypesRouter)
 app.use('/api/moderation', moderationRouter)
 app.use('/api/users', usersRouter)

@@ -8,9 +8,12 @@ export const createRequestSchema = z.object({
   departmentId: z.number().int().positive().optional(),
   urgency: z.nativeEnum(Urgency),
   priority: z.nativeEnum(Priority).optional(),
+  assigneeId: z.number().int().positive().optional(),
+  recurrenceIntervalDays: z.number().int().min(1).max(3650).optional(),
   scheduledAt: z.coerce.date().optional(),
   description: z.string().min(5).max(5000),
   templateData: z.record(z.string(), z.unknown()).optional(),
+  components: z.array(z.object({ componentId: z.number().int().positive(), quantity: z.number().int().min(1).max(100000) })).max(50).optional(),
   source: z.nativeEnum(RequestSource).optional(),
 })
 

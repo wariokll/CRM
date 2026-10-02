@@ -6,10 +6,11 @@ import { authenticate } from '../middleware/auth.js'
 import { canChangeRequestStatus } from '../utils/request-status.js'
 import { notifyRequestAssignees, notifyRequestClient } from '../utils/telegram-notifications.js'
 import { getUserAccess, hasPermission, requirePermission } from '../utils/permissions.js'
-import { buildRequestReport, parseReportPeriod } from '../modules/requests/reports.service.js'
+import { buildProcurementReport, buildRequestReport, parseReportPeriod } from '../modules/requests/reports.service.js'
 import { canManageRequest, requestVisibilityWhere } from '../modules/requests/request-policy.js'
 import { createRequestSchema, updateRequestSchema, validateRequiredTemplateFields } from '../modules/requests/request.contracts.js'
 import { requestInclude } from '../modules/requests/request.include.js'
+import { moveToPreviousBusinessDay, nextRecurringDate } from '../utils/business-days.js'
 
 export const requestsRouter = Router()
 requestsRouter.use(authenticate)
@@ -52,6 +53,14 @@ requestsRouter.get('/stats', requirePermission(PermissionKey.VIEW_REPORTS), asyn
   catch (error) { res.status(400).json({ message: error instanceof Error ? error.message : 'Некорректный период' }) }
 })
 
+requestsRouter.get('/procurement', requirePermission(PermissionKey.VIEW_REPORTS), async (req, res) => {
+  try {
+    const { from, to } = parseReportPeriod(req.query.from, req.query.to)
+    const componentId = Number(req.query.componentId) || undefined
+    res.json(await buildProcurementReport(req.access!, from, to, componentId))
+  } catch (error) { res.status(400).json({ message: error instanceof Error ? error.message : 'Некорректный период' }) }
+})
+
 requestsRouter.post('/', async (req, res) => {
   const body = createRequestSchema.parse(req.body)
   const access = await getUserAccess(req.auth!.userId)
@@ -73,13 +82,48 @@ requestsRouter.post('/', async (req, res) => {
   }
   if (body.urgency === Urgency.SCHEDULED && !body.scheduledAt) return res.status(400).json({ message: 'Укажите дату плановой заявки' })
   if (body.scheduledAt && (body.scheduledAt.getTime() > Date.now() + 366 * 86400000 || body.scheduledAt.getTime() < Date.now())) return res.status(400).json({ message: 'Дата должна быть в пределах следующего года' })
+  if (body.recurrenceIntervalDays && body.urgency !== Urgency.SCHEDULED) return res.status(400).json({ message: 'Повторение доступно только для плановой заявки' })
+  if (body.recurrenceIntervalDays && access.role === Role.CLIENT) return res.status(403).json({ message: 'Повторяющееся расписание может создать только сотрудник' })
   try { validateRequiredTemplateFields(type.templateFields, body.templateData ?? {}) } catch (error) { return res.status(400).json({ message: error instanceof Error ? error.message : 'Заполните обязательные поля' }) }
+  if (type.requiresComponents && !body.components?.length) return res.status(400).json({ message: 'Добавьте хотя бы один необходимый компонент' })
+  const componentIds = [...new Set(body.components?.map(item => item.componentId) ?? [])]
+  if (componentIds.length !== (body.components?.length ?? 0)) return res.status(400).json({ message: 'Один компонент нельзя указать в заявке дважды' })
+  const catalogComponents = componentIds.length ? await prisma.component.findMany({ where: { id: { in: componentIds }, isActive: true }, select: { id: true, name: true } }) : []
+  if (catalogComponents.length !== componentIds.length) return res.status(400).json({ message: 'Один из выбранных компонентов недоступен' })
+  const componentNames = new Map(catalogComponents.map(component => [component.id, component.name]))
+  const componentsData = body.components?.map(item => ({ componentId: item.componentId, name: componentNames.get(item.componentId)!, quantity: item.quantity }))
   const requestedDepartment = body.departmentId ?? type.departmentId
   if (access.role === Role.CLIENT && requestedDepartment !== type.departmentId) return res.status(403).json({ message: 'Отдел определяется шаблоном заявки' })
+  let assignee: { id: number, ipName: string } | null = null
+  if (body.assigneeId) {
+    if (access.role === Role.CLIENT) return res.status(403).json({ message: 'Клиент не может назначать исполнителя' })
+    if (access.role === Role.MASTER && body.assigneeId !== access.userId) return res.status(403).json({ message: 'Мастер может назначить исполнителем только себя' })
+    assignee = await prisma.user.findFirst({
+      where: { id: body.assigneeId, status: 'ACTIVE', role: { not: Role.CLIENT } },
+      select: { id: true, ipName: true },
+    })
+    if (!assignee) return res.status(400).json({ message: 'Выбранный исполнитель недоступен или не является сотрудником' })
+  }
   const primaryMember = organizationId ? await prisma.organizationMember.findFirst({ where: { organizationId }, orderBy: { isPrimary: 'desc' } }) : null
   const createdByUserId = access.role === Role.CLIENT ? access.userId : primaryMember?.userId ?? access.userId
   const priority = access.role !== Role.CLIENT && hasPermission(access, PermissionKey.SET_PRIORITY) ? body.priority ?? type.defaultPriority : type.defaultPriority
+  const scheduledAt = body.urgency === Urgency.URGENT ? null : body.scheduledAt ? moveToPreviousBusinessDay(body.scheduledAt) : null
   const request = await prisma.$transaction(async transaction => {
+    const recurrenceSchedule = body.recurrenceIntervalDays && scheduledAt ? await transaction.recurringRequestSchedule.create({ data: {
+      storeId: store?.id ?? null,
+      organizationId,
+      createdByUserId,
+      typeId: type.id,
+      departmentId: requestedDepartment,
+      priority,
+      description: body.description,
+      templateData: body.templateData as Prisma.InputJsonValue | undefined,
+      componentsData: componentsData as Prisma.InputJsonValue | undefined,
+      assigneeUserId: assignee?.id ?? null,
+      intervalDays: body.recurrenceIntervalDays,
+      nextScheduledAt: nextRecurringDate(body.scheduledAt!, body.recurrenceIntervalDays),
+      createdById: access.userId,
+    } }) : null
     const created = await transaction.request.create({ data: {
       storeId: store?.id ?? null,
       organizationId,
@@ -89,14 +133,21 @@ requestsRouter.post('/', async (req, res) => {
       urgency: body.urgency,
       priority,
       source: body.source ?? RequestSource.WEB,
-      scheduledAt: body.urgency === Urgency.URGENT ? null : body.scheduledAt,
+      scheduledAt,
       description: body.description,
       templateData: body.templateData as Prisma.InputJsonValue | undefined,
+      componentsData: componentsData as Prisma.InputJsonValue | undefined,
+      recurrenceScheduleId: recurrenceSchedule?.id,
     } })
     await transaction.requestDepartmentHistory.create({ data: { requestId: created.id, toDepartmentId: requestedDepartment, transferredByUserId: access.userId } })
-    await transaction.requestActivity.create({ data: { requestId: created.id, authorUserId: access.userId, kind: 'CREATED', message: 'Заявка создана' } })
+    await transaction.requestActivity.create({ data: { requestId: created.id, authorUserId: access.userId, kind: 'CREATED', message: recurrenceSchedule ? `Создана повторяющаяся заявка: каждые ${body.recurrenceIntervalDays} дн.` : 'Заявка создана' } })
+    if (assignee) {
+      await transaction.requestAssignee.create({ data: { requestId: created.id, userId: assignee.id, assignedByUserId: access.userId } })
+      await transaction.requestActivity.create({ data: { requestId: created.id, authorUserId: access.userId, kind: 'ASSIGNEES_CHANGED', message: `Исполнитель назначен при создании: ${assignee.ipName}` } })
+    }
     return transaction.request.findUniqueOrThrow({ where: { id: created.id }, include: requestInclude })
   })
+  if (assignee) void notifyRequestAssignees(request.id, `Вам назначена новая заявка «${type.name}». Откройте БАЗИС CRM для деталей.`, [assignee.id])
   res.status(201).json(request)
 })
 

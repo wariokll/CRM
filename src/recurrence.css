@@ -1,0 +1,29 @@
+.input-with-suffix {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.input-with-suffix input {
+  flex: 1;
+}
+
+.input-with-suffix span {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.component-catalog { margin-bottom: 22px; }
+.component-catalog-body { padding: 0 23px 20px; }
+.component-add { display: flex; gap: 9px; }
+.component-add input, .component-requirement select, .component-requirement input { min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; }
+.component-add input { flex: 1; }
+.component-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.component-tags span { padding: 5px 9px; border-radius: 999px; background: #eef3fb; color: #526b8d; font-size: 11px; }
+.component-tags small, .template-components p { color: var(--muted); font-size: 11px; }
+.template-components { margin: 16px 0; padding: 15px; border: 1px solid var(--line); border-radius: 10px; }
+.template-components h3 { margin: 0; font-size: 13px; }
+.template-components p { margin: 4px 0 12px; }
+.component-requirement { display: grid; grid-template-columns: minmax(0, 1fr) 100px auto; gap: 8px; margin: 8px 0; }
+@media (max-width: 760px) { .component-add, .component-requirement { grid-template-columns: 1fr; display: grid; } }
