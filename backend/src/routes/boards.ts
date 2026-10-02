@@ -27,7 +27,7 @@ const boardInclude = {
     orderBy: [{ position: 'asc' }, { id: 'asc' }],
     include: {
       cards: {
-        where: { deletedAt: null },
+        where: { deletedAt: null, archivedAt: null },
         orderBy: [{ position: 'asc' }, { id: 'asc' }],
       },
     },
@@ -208,7 +208,7 @@ boardsRouter.post('/columns/:columnId/cards', async (req, res) => {
   const column = await prisma.boardColumn.findFirst({ where: { id: columnId, deletedAt: null }, select: { boardId: true } })
   if (!column) throw new AppError('Столбец не найден', 404)
   await findBoard(column.boardId, req.auth!.userId)
-  const aggregate = await prisma.boardCard.aggregate({ where: { columnId, deletedAt: null }, _max: { position: true } })
+  const aggregate = await prisma.boardCard.aggregate({ where: { columnId, deletedAt: null, archivedAt: null }, _max: { position: true } })
   const card = await prisma.boardCard.create({ data: { columnId, title: body.title, description: body.description || null, deadline: body.deadline ? new Date(`${body.deadline}T00:00:00.000Z`) : null, position: (aggregate._max.position ?? -1) + 1 } })
   res.status(201).json(card)
 })
@@ -216,10 +216,10 @@ boardsRouter.post('/columns/:columnId/cards', async (req, res) => {
 boardsRouter.patch('/cards/:cardId', async (req, res) => {
   const cardId = idSchema.parse(req.params.cardId)
   const body = z.object({ title: titleSchema, description: z.string().max(5000).optional().default(''), deadline: dateSchema.nullable().optional(), version: versionSchema }).parse(req.body)
-  const card = await prisma.boardCard.findFirst({ where: { id: cardId, deletedAt: null }, select: { column: { select: { boardId: true, deletedAt: true } } } })
+  const card = await prisma.boardCard.findFirst({ where: { id: cardId, deletedAt: null, archivedAt: null }, select: { column: { select: { boardId: true, deletedAt: true } } } })
   if (!card || card.column.deletedAt) throw new AppError('Карточка не найдена', 404)
   await findBoard(card.column.boardId, req.auth!.userId)
-  const result = await prisma.boardCard.updateMany({ where: { id: cardId, deletedAt: null, version: body.version }, data: { title: body.title, description: body.description || null, deadline: body.deadline ? new Date(`${body.deadline}T00:00:00.000Z`) : null, version: { increment: 1 } } })
+  const result = await prisma.boardCard.updateMany({ where: { id: cardId, deletedAt: null, archivedAt: null, version: body.version }, data: { title: body.title, description: body.description || null, deadline: body.deadline ? new Date(`${body.deadline}T00:00:00.000Z`) : null, version: { increment: 1 } } })
   if (!result.count) throw new AppError('Данные были изменены другим пользователем', 409)
   res.json(await prisma.boardCard.findUniqueOrThrow({ where: { id: cardId } }))
 })
@@ -227,10 +227,21 @@ boardsRouter.patch('/cards/:cardId', async (req, res) => {
 boardsRouter.delete('/cards/:cardId', async (req, res) => {
   const cardId = idSchema.parse(req.params.cardId)
   const { version } = z.object({ version: versionSchema }).parse(req.body)
-  const card = await prisma.boardCard.findFirst({ where: { id: cardId, deletedAt: null }, select: { column: { select: { boardId: true, deletedAt: true } } } })
+  const card = await prisma.boardCard.findFirst({ where: { id: cardId, deletedAt: null, archivedAt: null }, select: { column: { select: { boardId: true, deletedAt: true } } } })
   if (!card || card.column.deletedAt) throw new AppError('Карточка не найдена', 404)
   await findBoard(card.column.boardId, req.auth!.userId)
-  const result = await prisma.boardCard.updateMany({ where: { id: cardId, deletedAt: null, version }, data: { deletedAt: new Date(), version: { increment: 1 } } })
+  const result = await prisma.boardCard.updateMany({ where: { id: cardId, deletedAt: null, archivedAt: null, version }, data: { deletedAt: new Date(), version: { increment: 1 } } })
+  if (!result.count) throw new AppError('Данные были изменены другим пользователем', 409)
+  res.status(204).end()
+})
+
+boardsRouter.post('/cards/:cardId/archive', async (req, res) => {
+  const cardId = idSchema.parse(req.params.cardId)
+  const { version } = z.object({ version: versionSchema }).parse(req.body)
+  const card = await prisma.boardCard.findFirst({ where: { id: cardId, deletedAt: null, archivedAt: null }, select: { column: { select: { boardId: true, deletedAt: true } } } })
+  if (!card || card.column.deletedAt) throw new AppError('Карточка не найдена', 404)
+  await findBoard(card.column.boardId, req.auth!.userId)
+  const result = await prisma.boardCard.updateMany({ where: { id: cardId, deletedAt: null, archivedAt: null, version }, data: { archivedAt: new Date(), version: { increment: 1 } } })
   if (!result.count) throw new AppError('Данные были изменены другим пользователем', 409)
   res.status(204).end()
 })
@@ -238,17 +249,17 @@ boardsRouter.delete('/cards/:cardId', async (req, res) => {
 boardsRouter.post('/cards/:cardId/move', async (req, res) => {
   const cardId = idSchema.parse(req.params.cardId)
   const { targetColumnId, position, version } = z.object({ targetColumnId: idSchema, position: z.number().int().min(0), version: versionSchema }).parse(req.body)
-  const card = await prisma.boardCard.findFirst({ where: { id: cardId, deletedAt: null }, select: { columnId: true, column: { select: { boardId: true, deletedAt: true } } } })
+  const card = await prisma.boardCard.findFirst({ where: { id: cardId, deletedAt: null, archivedAt: null }, select: { columnId: true, column: { select: { boardId: true, deletedAt: true } } } })
   if (!card || card.column.deletedAt) throw new AppError('Карточка не найдена', 404)
   await findBoard(card.column.boardId, req.auth!.userId)
   const target = await prisma.boardColumn.findFirst({ where: { id: targetColumnId, boardId: card.column.boardId, deletedAt: null }, select: { id: true } })
   if (!target) throw new AppError('Целевой столбец не найден', 404)
   await serializable(() => prisma.$transaction(async transaction => {
-    const current = await transaction.boardCard.findFirst({ where: { id: cardId, deletedAt: null } })
+    const current = await transaction.boardCard.findFirst({ where: { id: cardId, deletedAt: null, archivedAt: null } })
     if (!current) throw new AppError('Карточка не найдена', 404)
     if (!versionMatches(current.version, version)) throw new AppError('Данные были изменены другим пользователем', 409)
-    const sourceCards = await transaction.boardCard.findMany({ where: { columnId: current.columnId, deletedAt: null, id: { not: cardId } }, orderBy: [{ position: 'asc' }, { id: 'asc' }] })
-    const destinationCards = current.columnId === targetColumnId ? sourceCards : await transaction.boardCard.findMany({ where: { columnId: targetColumnId, deletedAt: null }, orderBy: [{ position: 'asc' }, { id: 'asc' }] })
+    const sourceCards = await transaction.boardCard.findMany({ where: { columnId: current.columnId, deletedAt: null, archivedAt: null, id: { not: cardId } }, orderBy: [{ position: 'asc' }, { id: 'asc' }] })
+    const destinationCards = current.columnId === targetColumnId ? sourceCards : await transaction.boardCard.findMany({ where: { columnId: targetColumnId, deletedAt: null, archivedAt: null }, orderBy: [{ position: 'asc' }, { id: 'asc' }] })
     destinationCards.splice(Math.min(position, destinationCards.length), 0, current)
     const affected = current.columnId === targetColumnId ? destinationCards : [...sourceCards, ...destinationCards]
     for (let index = 0; index < sourceCards.length && current.columnId !== targetColumnId; index += 1) {

@@ -1,7 +1,7 @@
-import { DndContext, DragOverlay, PointerSensor, closestCorners, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { DndContext, DragOverlay, PointerSensor, closestCorners, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, horizontalListSortingStrategy, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { AlertTriangle, Calendar, GripVertical, LockKeyhole, Pencil, Plus, Search, Settings2, Trash2, Users, X } from 'lucide-react'
+import { AlertTriangle, Archive, Calendar, GripVertical, LockKeyhole, Pencil, Plus, Search, Settings2, Trash2, Users, X } from 'lucide-react'
 import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { api, ApiError } from '../../api'
 import type { BoardAccessUser, BoardCard, BoardColumn, BoardDetails, BoardSummary, BoardType, User } from '../../types'
@@ -39,6 +39,11 @@ function SortableColumn({ column, rename, remove, addCard, openCard }: { column:
     </SortableContext>
     <button className="add-card" onClick={addCard}><Plus /> Добавить карточку</button>
   </section>
+}
+
+function ArchiveDropzone({ active }: { active: boolean }) {
+  const droppable = useDroppable({ id: 'card-archive', data: { type: 'archive' } })
+  return <div ref={droppable.setNodeRef} className={`archive-dropzone ${active ? 'ready' : ''} ${droppable.isOver ? 'over' : ''}`}><Archive /><span>{droppable.isOver ? 'Отпустите, чтобы архивировать' : 'Перетащите карточку в архив'}</span></div>
 }
 
 function CardDialog({ card, columnId, close, save, remove }: { card: BoardCard | null; columnId: number; close: () => void; save: (data: { title: string; description: string; deadline: string | null }) => Promise<void>; remove?: () => Promise<void> }) {
@@ -167,10 +172,18 @@ export function BoardsPage({ user, type, refreshKey = 0 }: { user: User; type: B
     }
     if (activeData?.type !== 'card') return
     const sourceColumn = board.columns.find(item => item.id === activeData.columnId)
+    const movedCard = sourceColumn?.cards.find(item => item.id === activeData.cardId)
+    if (!sourceColumn || !movedCard) return
+    if (overData?.type === 'archive') {
+      const previous = board
+      setBoard({ ...board, columns: board.columns.map(column => ({ ...column, cards: column.cards.filter(card => card.id !== movedCard.id) })) })
+      try { await api(`/boards/cards/${movedCard.id}/archive`, { method: 'POST', body: JSON.stringify({ version: movedCard.version }) }) }
+      catch (reason) { setBoard(previous); try { await onConflict(reason) } catch { setError(errorText(reason)) } }
+      return
+    }
     const targetColumnId = overData?.type === 'card' ? Number(overData.columnId) : overData?.type === 'column' ? Number(overData.columnId) : null
     const targetColumn = board.columns.find(item => item.id === targetColumnId)
-    const movedCard = sourceColumn?.cards.find(item => item.id === activeData.cardId)
-    if (!sourceColumn || !targetColumn || !movedCard) return
+    if (!targetColumn) return
     const targetIndex = overData?.type === 'card' ? Math.max(0, targetColumn.cards.findIndex(item => item.id === overData.cardId)) : targetColumn.cards.length
     const previous = board
     const columns = board.columns.map(column => ({ ...column, cards: column.cards.filter(card => card.id !== movedCard.id) }))
@@ -185,8 +198,7 @@ export function BoardsPage({ user, type, refreshKey = 0 }: { user: User; type: B
     {error && <div className="page-error"><AlertTriangle />{error}</div>}
     {notice && <div className="board-notice"><AlertTriangle />{notice}<button onClick={() => setNotice('')}><X /></button></div>}
     {loading && !board ? <div className="loading-line">Загрузка досок…</div> : !board ? <div className="panel board-empty"><Users /><h2>Командных досок пока нет</h2><p>{canCreate ? 'Создайте первую доску и выдайте доступ сотрудникам.' : 'Попросите создателя доски выдать вам доступ.'}</p></div> : <>
-      <div className="board-toolbar"><div><b>{board.name}</b>{type === 'TEAM' && <span>Создатель: {board.owner.ipName}</span>}</div><div>{isOwner && type === 'TEAM' && <button className="button secondary compact" onClick={() => setAccessOpen(true)}><Users /> Доступ</button>}{isOwner && <button className="button ghost compact" onClick={() => setNameEditor({ kind: 'rename-board' })}><Pencil /> Переименовать</button>}{isOwner && <button className="button ghost compact danger-text" onClick={() => void deleteBoard()}><Trash2 /> Удалить</button>}<button className="button compact" onClick={() => setNameEditor({ kind: 'create-column' })}><Plus /> Столбец</button></div></div>
-      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={({ active }) => { const data = active.data.current; if (data?.type === 'card') setActiveCard(board.columns.flatMap(column => column.cards).find(card => card.id === data.cardId) ?? null) }} onDragCancel={() => setActiveCard(null)} onDragEnd={event => void dragEnd(event)}><SortableContext items={board.columns.map(column => `column-${column.id}`)} strategy={horizontalListSortingStrategy}><div className="kanban-canvas">{board.columns.map(column => <SortableColumn key={column.id} column={column} rename={() => setNameEditor({ kind: 'rename-column', column })} remove={() => void deleteColumn(column)} addCard={() => setCardEditor({ card: null, columnId: column.id })} openCard={card => setCardEditor({ card, columnId: column.id })} />)}{!board.columns.length && <button className="first-column" onClick={() => setNameEditor({ kind: 'create-column' })}><Plus /><b>Добавьте первый столбец</b><span>Например: «Новые», «В работе», «Готово»</span></button>}</div></SortableContext><DragOverlay dropAnimation={{ duration: 160, easing: 'ease-out' }}>{activeCard && <article className={`board-card board-card-overlay ${activeCard.deadline && activeCard.deadline.slice(0, 10) < localToday() ? 'overdue-card' : ''}`}><div className="board-card-title"><b>{activeCard.title}</b><GripVertical className="card-grip" /></div>{activeCard.deadline && <span className="card-deadline"><Calendar /> До {new Intl.DateTimeFormat('ru-RU').format(new Date(`${activeCard.deadline.slice(0, 10)}T00:00:00`))}</span>}</article>}</DragOverlay></DndContext>
+      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={({ active }) => { const data = active.data.current; if (data?.type === 'card') setActiveCard(board.columns.flatMap(column => column.cards).find(card => card.id === data.cardId) ?? null) }} onDragCancel={() => setActiveCard(null)} onDragEnd={event => void dragEnd(event)}><div className="board-toolbar"><div><b>{board.name}</b>{type === 'TEAM' && <span>Создатель: {board.owner.ipName}</span>}</div><ArchiveDropzone active={Boolean(activeCard)} /><div>{isOwner && type === 'TEAM' && <button className="button secondary compact" onClick={() => setAccessOpen(true)}><Users /> Доступ</button>}{isOwner && <button className="button ghost compact" onClick={() => setNameEditor({ kind: 'rename-board' })}><Pencil /> Переименовать</button>}{isOwner && <button className="button ghost compact danger-text" onClick={() => void deleteBoard()}><Trash2 /> Удалить</button>}<button className="button compact" onClick={() => setNameEditor({ kind: 'create-column' })}><Plus /> Столбец</button></div></div><SortableContext items={board.columns.map(column => `column-${column.id}`)} strategy={horizontalListSortingStrategy}><div className="kanban-canvas">{board.columns.map(column => <SortableColumn key={column.id} column={column} rename={() => setNameEditor({ kind: 'rename-column', column })} remove={() => void deleteColumn(column)} addCard={() => setCardEditor({ card: null, columnId: column.id })} openCard={card => setCardEditor({ card, columnId: column.id })} />)}{!board.columns.length && <button className="first-column" onClick={() => setNameEditor({ kind: 'create-column' })}><Plus /><b>Добавьте первый столбец</b><span>Например: «Новые», «В работе», «Готово»</span></button>}</div></SortableContext><DragOverlay dropAnimation={{ duration: 160, easing: 'ease-out' }}>{activeCard && <article className={`board-card board-card-overlay ${activeCard.deadline && activeCard.deadline.slice(0, 10) < localToday() ? 'overdue-card' : ''}`}><div className="board-card-title"><b>{activeCard.title}</b><GripVertical className="card-grip" /></div>{activeCard.deadline && <span className="card-deadline"><Calendar /> До {new Intl.DateTimeFormat('ru-RU').format(new Date(`${activeCard.deadline.slice(0, 10)}T00:00:00`))}</span>}</article>}</DragOverlay></DndContext>
     </>}
     {cardEditor && <CardDialog card={cardEditor.card} columnId={cardEditor.columnId} close={() => setCardEditor(null)} save={saveCard} remove={cardEditor.card ? deleteCard : undefined} />}
     {nameEditor && <NameDialog title={nameEditor.kind === 'create-board' ? 'Новая доска' : nameEditor.kind === 'rename-board' ? 'Переименовать доску' : nameEditor.kind === 'create-column' ? 'Новый столбец' : 'Переименовать столбец'} label={nameEditor.kind.includes('board') ? 'Название доски' : 'Название столбца'} initialValue={nameEditor.kind === 'rename-board' ? board?.name : nameEditor.column?.name} close={() => setNameEditor(null)} save={saveName} />}

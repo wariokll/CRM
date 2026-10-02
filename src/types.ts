@@ -170,6 +170,7 @@ export interface BoardCard {
   version: number
   createdAt: string
   updatedAt: string
+  archivedAt?: string | null
 }
 
 export interface BoardColumn {
