@@ -1,0 +1,14 @@
+.git
+.github
+node_modules
+backend/node_modules
+dist
+backend/dist
+backend/.env
+backend/.logs
+backend/.pids
+backend/.mysql-data
+backend/.runtime-tmp
+deploy/.env.production
+*.log
+README.md

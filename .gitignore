@@ -14,3 +14,4 @@ backend/mysql.local.ini
 backend/.db-root-password
 backend/.env
 .env
+deploy/.env.production

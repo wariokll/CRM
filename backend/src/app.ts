@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { pinoHttp } from 'pino-http'
+import { TelegramIntegrationKind, TelegramIntegrationStatus } from '@prisma/client'
 import { config } from './config.js'
 import { prisma } from './db.js'
 import { errorHandler } from './middleware/errors.js'
@@ -20,6 +21,8 @@ import { telegramRouter } from './routes/telegram.js'
 import { usersRouter } from './routes/users.js'
 
 export const app = express()
+// Caddy terminates TLS in production; Express must trust its forwarded protocol for secure cookies.
+if (config.isProduction) app.set('trust proxy', 1)
 app.use(pinoHttp())
 app.use(cors({ origin: config.clientOrigin, credentials: true }))
 app.use(express.json({ limit: '1mb' }))
@@ -27,6 +30,12 @@ app.use(cookieParser())
 app.get('/api/health', async (_req, res) => {
   await prisma.$queryRaw`SELECT 1`
   res.json({ ok: true, database: true })
+})
+app.get('/api/health/telegram', async (_req, res) => {
+  if (!config.telegramBotToken) return res.json({ ok: true, configured: false, status: 'DISABLED' })
+  const integration = await prisma.telegramIntegration.findUnique({ where: { kind: TelegramIntegrationKind.BOT }, select: { status: true, lastConnectedAt: true, lastError: true } })
+  const healthy = integration?.status === TelegramIntegrationStatus.ACTIVE
+  res.status(healthy ? 200 : 503).json({ ok: healthy, configured: true, status: integration?.status ?? 'CONNECTING', lastConnectedAt: integration?.lastConnectedAt ?? null, ...(integration?.lastError && { error: integration.lastError }) })
 })
 app.use('/api/auth', authRouter)
 app.use('/api/departments', departmentsRouter)
