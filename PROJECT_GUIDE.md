@@ -193,6 +193,8 @@ npm test
 
 - Сборка Express и маршрутов: [backend/src/app.ts](./backend/src/app.ts).
 - Конфигурация окружения: [backend/src/config.ts](./backend/src/config.ts).
+- Карта модулей и production-checklist: [ARCHITECTURE.md](./ARCHITECTURE.md).
+- Шаблон production-переменных без секретов: [backend/.env.production.example](./backend/.env.production.example).
 - Подключение Prisma: [backend/src/db.ts](./backend/src/db.ts).
 - Подробные сообщения ошибок полей: [backend/src/middleware/errors.ts](./backend/src/middleware/errors.ts).
 - Шифрование чувствительных реквизитов торговых точек: [backend/src/utils/crypto.ts](./backend/src/utils/crypto.ts).

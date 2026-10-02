@@ -1,5 +1,6 @@
 import type { ErrorRequestHandler } from 'express'
 import { ZodError } from 'zod'
+import { AppError } from '../utils/app-error.js'
 
 const fieldNames: Record<string, string> = {
   status: 'Статус', priority: 'Приоритет', departmentId: 'Отдел', assigneeIds: 'Исполнители', adminComment: 'Комментарий',
@@ -23,6 +24,7 @@ function formatIssue(issue: ZodError['issues'][number]) {
 }
 
 export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
+  if (error instanceof AppError) return res.status(error.status).json({ message: error.message })
   if (error instanceof ZodError) {
     const issues = error.issues.map(formatIssue)
     return res.status(400).json({ message: issues.length === 1 ? issues[0] : `Исправьте поля: ${issues.join('; ')}`, issues })

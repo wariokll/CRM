@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseFieldValue, templateFields } from './bot.js'
+import { parseFieldValue, templateFields } from '../modules/telegram/template-fields.js'
 
 describe('Telegram template fields', () => {
   it('keeps only complete fields from a request template', () => {

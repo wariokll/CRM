@@ -5,73 +5,14 @@ import { prisma } from '../db.js'
 import { authenticate } from '../middleware/auth.js'
 import { canChangeRequestStatus } from '../utils/request-status.js'
 import { notifyRequestAssignees, notifyRequestClient } from '../utils/telegram-notifications.js'
-import { getUserAccess, hasPermission, requirePermission, type UserAccess } from '../utils/permissions.js'
+import { getUserAccess, hasPermission, requirePermission } from '../utils/permissions.js'
+import { buildRequestReport, parseReportPeriod } from '../modules/requests/reports.service.js'
+import { canManageRequest, requestVisibilityWhere } from '../modules/requests/request-policy.js'
+import { createRequestSchema, updateRequestSchema, validateRequiredTemplateFields } from '../modules/requests/request.contracts.js'
+import { requestInclude } from '../modules/requests/request.include.js'
 
 export const requestsRouter = Router()
 requestsRouter.use(authenticate)
-
-const createSchema = z.object({
-  storeId: z.number().int().positive().nullable().optional(),
-  organizationId: z.number().int().positive().nullable().optional(),
-  typeId: z.number().int().positive(),
-  departmentId: z.number().int().positive().optional(),
-  urgency: z.nativeEnum(Urgency),
-  priority: z.nativeEnum(Priority).optional(),
-  scheduledAt: z.coerce.date().optional(),
-  description: z.string().min(5).max(5000),
-  templateData: z.record(z.string(), z.unknown()).optional(),
-  source: z.nativeEnum(RequestSource).optional(),
-})
-
-const updateSchema = z.object({
-  status: z.nativeEnum(RequestStatus).optional(),
-  priority: z.nativeEnum(Priority).optional(),
-  departmentId: z.number().int().positive().optional(),
-  assigneeIds: z.array(z.number().int().positive()).optional(),
-  adminComment: z.string().max(5000).nullable().optional(),
-})
-
-const requestInclude = {
-  store: { include: { organization: true, access: { select: { anydeskId: true, ofdUrl: true, ofdLogin: true, nalogUrl: true, nalogLogin: true, updatedAt: true } } } },
-  organization: true,
-  type: { include: { department: true } },
-  department: true,
-  createdBy: { select: { id: true, ipName: true, phone: true, email: true } },
-  contact: true,
-  assignees: { include: { user: { select: { id: true, ipName: true, email: true, phone: true, role: true } } }, orderBy: { assignedAt: 'asc' as const } },
-  comments: { include: { author: { select: { id: true, ipName: true, role: true } } }, orderBy: { createdAt: 'asc' as const } },
-  departmentHistory: { include: { fromDepartment: true, toDepartment: true, transferredBy: { select: { id: true, ipName: true } } }, orderBy: { createdAt: 'asc' as const } },
-  activities: { include: { author: { select: { id: true, ipName: true, role: true } } }, orderBy: { createdAt: 'asc' as const } },
-} as const
-
-function visibilityWhere(access: UserAccess): Prisma.RequestWhereInput {
-  if (access.role === Role.CLIENT) {
-    return { OR: [{ createdByUserId: access.userId }, { organization: { members: { some: { userId: access.userId } } } }] }
-  }
-  if (access.role === Role.DIRECTOR || hasPermission(access, PermissionKey.VIEW_ALL_REQUESTS)) return {}
-  if (access.role === Role.DEPARTMENT_HEAD) {
-    return { OR: [
-      { departmentId: { in: access.departmentIds } },
-      { departmentHistory: { some: { OR: [{ fromDepartmentId: { in: access.departmentIds } }, { toDepartmentId: { in: access.departmentIds } }] } } },
-    ] }
-  }
-  return { departmentId: { in: access.departmentIds } }
-}
-
-function canManageCurrent(access: UserAccess, departmentId: number) {
-  return access.role === Role.DIRECTOR || (access.role === Role.DEPARTMENT_HEAD && access.headedDepartmentIds.includes(departmentId))
-}
-
-function validateTemplateData(fields: unknown, data: Record<string, unknown>) {
-  if (!Array.isArray(fields)) return
-  for (const raw of fields) {
-    if (!raw || typeof raw !== 'object') continue
-    const field = raw as { key?: string; label?: string; required?: boolean }
-    if (!field.required || !field.key) continue
-    const value = data[field.key]
-    if (value === undefined || value === null || value === '') throw new Error(`Заполните поле «${field.label ?? field.key}»`)
-  }
-}
 
 requestsRouter.get('/assignees', async (req, res) => {
   const access = await getUserAccess(req.auth!.userId)
@@ -99,7 +40,7 @@ requestsRouter.get('/', async (req, res) => {
   const departmentId = Number(req.query.departmentId) || undefined
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : ''
   const rows = await prisma.request.findMany({ where: {
-    AND: [visibilityWhere(access)],
+    AND: [requestVisibilityWhere(access)],
     ...(urgency && { urgency }), ...(status && { status }), ...(priority && { priority }), ...(storeId && { storeId }), ...(typeId && { typeId }), ...(departmentId && { departmentId }),
     ...(search && { OR: [{ description: { contains: search } }, { store: { name: { contains: search } } }, { store: { address: { contains: search } } }, { organization: { legalName: { contains: search } } }, { createdBy: { ipName: { contains: search } } }] }),
   }, include: requestInclude, orderBy: [{ priority: 'desc' }, { scheduledAt: 'asc' }, { createdAt: 'desc' }] })
@@ -107,47 +48,12 @@ requestsRouter.get('/', async (req, res) => {
 })
 
 requestsRouter.get('/stats', requirePermission(PermissionKey.VIEW_REPORTS), async (req, res) => {
-  const access = req.access!
-  const from = typeof req.query.from === 'string' ? new Date(req.query.from) : new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-  const to = typeof req.query.to === 'string' ? new Date(req.query.to) : new Date()
-  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return res.status(400).json({ message: 'Некорректный период' })
-  to.setHours(23, 59, 59, 999)
-  const where: Prisma.RequestWhereInput = { AND: [visibilityWhere(access), { createdAt: { gte: from, lte: to } }] }
-  const [total, byStatus, byType, urgent, activeClients, reportRows] = await Promise.all([
-    prisma.request.count({ where }),
-    prisma.request.groupBy({ by: ['status'], where, _count: { _all: true } }),
-    prisma.request.groupBy({ by: ['typeId'], where, _count: { _all: true } }),
-    prisma.request.count({ where: { AND: [where, { urgency: Urgency.URGENT }] } }),
-    prisma.user.count({ where: { role: Role.CLIENT, status: 'ACTIVE' } }),
-    prisma.request.findMany({ where, select: {
-      id: true, status: true, priority: true, createdAt: true, closedAt: true, scheduledAt: true, source: true,
-      organization: { select: { id: true, legalName: true } },
-      store: { select: { id: true, name: true } },
-      department: { select: { id: true, name: true } },
-      assignees: { select: { user: { select: { id: true, ipName: true } } } },
-    } }),
-  ])
-  const types = await prisma.requestType.findMany({ where: { id: { in: byType.map(item => item.typeId) } }, select: { id: true, name: true, color: true } })
-  const aggregate = <T extends { id: number; name: string }>(entries: Array<T | null | undefined>) => Object.values(entries.filter(Boolean).reduce<Record<number, { id: number; name: string; count: number }>>((result, entry) => {
-    const item = entry!
-    result[item.id] ??= { ...item, count: 0 }
-    result[item.id].count += 1
-    return result
-  }, {})).sort((left, right) => right.count - left.count || left.name.localeCompare(right.name, 'ru'))
-  const clients = aggregate(reportRows.map(row => row.organization ? { id: row.organization.id, name: row.organization.legalName } : null))
-  const stores = aggregate(reportRows.map(row => row.store ? { id: row.store.id, name: row.store.name } : null))
-  const employees = aggregate(reportRows.flatMap(row => row.assignees.map(assignee => ({ id: assignee.user.id, name: assignee.user.ipName }))))
-  const departments = aggregate(reportRows.map(row => ({ id: row.department.id, name: row.department.name })))
-  const completed = reportRows.filter(row => row.status === RequestStatus.DONE)
-  const averageResolutionHours = completed.length ? Math.round(completed.reduce((sum, row) => sum + ((row.closedAt?.getTime() ?? row.createdAt.getTime()) - row.createdAt.getTime()) / 3600000, 0) / completed.length * 10) / 10 : 0
-  const terminalStatuses: RequestStatus[] = [RequestStatus.DONE, RequestStatus.CANCELLED]
-  const overdue = reportRows.filter(row => row.scheduledAt && row.scheduledAt < new Date() && !terminalStatuses.includes(row.status)).length
-  const sources = Object.entries(reportRows.reduce<Record<string, number>>((result, row) => { result[row.source] = (result[row.source] ?? 0) + 1; return result }, {})).map(([source, count]) => ({ source, count }))
-  res.json({ total, urgent, activeClients, completed: completed.length, overdue, averageResolutionHours, byStatus, byType: byType.map(item => ({ ...item, type: types.find(type => type.id === item.typeId) })), clients, stores, employees, departments, sources, requests: reportRows.map(row => ({ id: row.id, status: row.status, priority: row.priority, createdAt: row.createdAt, closedAt: row.closedAt, scheduledAt: row.scheduledAt, source: row.source, organization: row.organization, store: row.store, department: row.department, assignees: row.assignees.map(item => item.user.ipName) })) })
+  try { const { from, to } = parseReportPeriod(req.query.from, req.query.to); res.json(await buildRequestReport(req.access!, from, to)) }
+  catch (error) { res.status(400).json({ message: error instanceof Error ? error.message : 'Некорректный период' }) }
 })
 
 requestsRouter.post('/', async (req, res) => {
-  const body = createSchema.parse(req.body)
+  const body = createRequestSchema.parse(req.body)
   const access = await getUserAccess(req.auth!.userId)
   if (!access || access.status !== 'ACTIVE') return res.status(403).json({ message: 'Аккаунт ещё не одобрен' })
   const type = await prisma.requestType.findFirst({ where: { id: body.typeId, isActive: true }, include: { department: true } })
@@ -167,7 +73,7 @@ requestsRouter.post('/', async (req, res) => {
   }
   if (body.urgency === Urgency.SCHEDULED && !body.scheduledAt) return res.status(400).json({ message: 'Укажите дату плановой заявки' })
   if (body.scheduledAt && (body.scheduledAt.getTime() > Date.now() + 366 * 86400000 || body.scheduledAt.getTime() < Date.now())) return res.status(400).json({ message: 'Дата должна быть в пределах следующего года' })
-  try { validateTemplateData(type.templateFields, body.templateData ?? {}) } catch (error) { return res.status(400).json({ message: error instanceof Error ? error.message : 'Заполните обязательные поля' }) }
+  try { validateRequiredTemplateFields(type.templateFields, body.templateData ?? {}) } catch (error) { return res.status(400).json({ message: error instanceof Error ? error.message : 'Заполните обязательные поля' }) }
   const requestedDepartment = body.departmentId ?? type.departmentId
   if (access.role === Role.CLIENT && requestedDepartment !== type.departmentId) return res.status(403).json({ message: 'Отдел определяется шаблоном заявки' })
   const primaryMember = organizationId ? await prisma.organizationMember.findFirst({ where: { organizationId }, orderBy: { isPrimary: 'desc' } }) : null
@@ -198,10 +104,10 @@ requestsRouter.patch('/:id', async (req, res) => {
   const id = Number(req.params.id)
   const access = await getUserAccess(req.auth!.userId)
   if (!access || access.role === Role.CLIENT) return res.status(403).json({ message: 'Недостаточно прав' })
-  const row = await prisma.request.findFirst({ where: { id, AND: [visibilityWhere(access)] }, include: { assignees: true, type: { select: { name: true } } } })
+  const row = await prisma.request.findFirst({ where: { id, AND: [requestVisibilityWhere(access)] }, include: { assignees: true, type: { select: { name: true } } } })
   if (!row) return res.status(404).json({ message: 'Заявка не найдена' })
-  const update = updateSchema.parse(req.body)
-  const managesCurrent = canManageCurrent(access, row.departmentId)
+  const update = updateRequestSchema.parse(req.body)
+  const managesCurrent = canManageRequest(access, row.departmentId)
   const isAssignedMaster = access.role === Role.MASTER && row.assignees.some(assignee => assignee.userId === access.userId)
   if (!managesCurrent && !isAssignedMaster) return res.status(403).json({ message: 'Сначала возьмите заявку в работу: сейчас доступен просмотр и комментарии' })
   if (update.status) {
@@ -274,7 +180,7 @@ requestsRouter.post('/:id/comments', async (req, res) => {
   const id = Number(req.params.id)
   const access = await getUserAccess(req.auth!.userId)
   if (!access) return res.status(401).json({ message: 'Пользователь не найден' })
-  const row = await prisma.request.findFirst({ where: { id, AND: [visibilityWhere(access)] } })
+  const row = await prisma.request.findFirst({ where: { id, AND: [requestVisibilityWhere(access)] } })
   if (!row) return res.status(404).json({ message: 'Заявка не найдена' })
   const body = z.object({ body: z.string().trim().min(1).max(5000), visibility: z.nativeEnum(CommentVisibility).default(CommentVisibility.CLIENT) }).parse(req.body)
   if (access.role === Role.CLIENT && body.visibility !== CommentVisibility.CLIENT) return res.status(403).json({ message: 'Недостаточно прав' })

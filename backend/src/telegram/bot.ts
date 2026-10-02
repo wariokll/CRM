@@ -1,6 +1,7 @@
 import { Priority, RequestSource, Role, TelegramIntegrationKind, TelegramIntegrationStatus, Urgency, UserStatus, type Prisma } from '@prisma/client'
 import { config } from '../config.js'
 import { prisma } from '../db.js'
+import { fieldPrompt, parseFieldValue, templateFields, type TelegramTemplateField } from '../modules/telegram/template-fields.js'
 
 type TelegramUser = { id: number; first_name: string; last_name?: string; username?: string }
 type TelegramChat = { id: number; title?: string; username?: string; first_name?: string; last_name?: string }
@@ -9,8 +10,7 @@ type TelegramCallback = { id: string; from: TelegramUser; message?: TelegramMess
 type TelegramUpdate = { update_id: number; message?: TelegramMessage; callback_query?: TelegramCallback }
 type BotResponse<T> = { ok: boolean; result?: T; description?: string }
 
-type TemplateField = { key: string; label: string; type: 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'DATE' | 'SELECT' | 'CHECKBOX' | 'FILE'; required?: boolean; options?: string[] }
-type Session = { typeId: number; organizationId?: number; storeId?: number; allowedStoreIds?: number[]; allowedOrganizationIds?: number[]; fields?: TemplateField[]; fieldIndex?: number; templateData?: Record<string, unknown> }
+type Session = { typeId: number; organizationId?: number; storeId?: number; allowedStoreIds?: number[]; allowedOrganizationIds?: number[]; fields?: TelegramTemplateField[]; fieldIndex?: number; templateData?: Record<string, unknown> }
 const sessions = new Map<string, Session>()
 let stopped = false
 
@@ -110,32 +110,9 @@ async function createRequest(chatId: number, session: Session, description: stri
   })
 }
 
-export function templateFields(value: unknown): TemplateField[] {
-  if (!Array.isArray(value)) return []
-  return value.filter((field): field is TemplateField => Boolean(field && typeof field === 'object' && typeof (field as TemplateField).key === 'string' && typeof (field as TemplateField).label === 'string'))
-}
-
-function fieldPrompt(field: TemplateField) {
-  const required = field.required ? 'обязательно' : 'можно отправить «-», чтобы пропустить'
-  if (field.type === 'SELECT' && field.options?.length) return `${field.label} (${required}):\n${field.options.map((option, index) => `${index + 1}. ${option}`).join('\n')}\nОтправьте номер или значение.`
-  if (field.type === 'CHECKBOX') return `${field.label}: ответьте «да» или «нет»${field.required ? ' (обязательно)' : ''}.`
-  if (field.type === 'DATE') return `${field.label} (${required}): укажите дату в формате ДД.ММ.ГГГГ.`
-  if (field.type === 'NUMBER') return `${field.label} (${required}): укажите число.`
-  if (field.type === 'FILE') return `${field.label} (${required}): отправьте ссылку на файл или его описание одним сообщением.`
-  return `${field.label} (${required}):`
-}
-
 async function askNextField(chatId: number, externalChatId: string, session: Session) {
   const field = session.fields?.[session.fieldIndex ?? 0]
   return reply(chatId, externalChatId, field ? fieldPrompt(field) : 'Опишите проблему одним сообщением.')
-}
-
-export function parseFieldValue(field: TemplateField, input: string): { ok: true; value?: unknown } | { ok: false; message: string } {
-  if (!input || input === '-') return field.required ? { ok: false, message: `Поле «${field.label}» обязательно. ${fieldPrompt(field)}` } : { ok: true }
-  if (field.type === 'NUMBER' && !Number.isFinite(Number(input.replace(',', '.')))) return { ok: false, message: `Для поля «${field.label}» укажите число.` }
-  if (field.type === 'CHECKBOX') { if (['да', 'yes', '1', '+'].includes(input.toLowerCase())) return { ok: true, value: true }; if (['нет', 'no', '0', '-'].includes(input.toLowerCase())) return { ok: true, value: false }; return { ok: false, message: `Для поля «${field.label}» ответьте «да» или «нет».` } }
-  if (field.type === 'SELECT' && field.options?.length) { const option = field.options[Number(input) - 1] ?? field.options.find(option => option.toLowerCase() === input.toLowerCase()); return option ? { ok: true, value: option } : { ok: false, message: `Выберите один из предложенных вариантов для поля «${field.label}».` } }
-  return { ok: true, value: field.type === 'NUMBER' ? Number(input.replace(',', '.')) : input }
 }
 
 async function statusText(chatId: number) {
