@@ -111,6 +111,11 @@ enum MessageDirection {
   OUTGOING
 }
 
+enum BoardType {
+  PERSONAL
+  TEAM
+}
+
 model User {
   id                     Int                        @id @default(autoincrement())
   ipName                 String                     @map("ip_name")
@@ -138,10 +143,70 @@ model User {
   linkedTelegramChats    TelegramChat[]             @relation("telegram_linked_user")
   telegramLinkCodes      TelegramLinkCode[]
   linkedContacts         Contact[]
+  ownedBoards            Board[]                     @relation("board_owner")
+  boardAccesses          BoardAccess[]
   createdAt              DateTime                   @default(now()) @map("created_at")
   updatedAt              DateTime                   @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+model Board {
+  id        Int          @id @default(autoincrement())
+  name      String       @db.VarChar(120)
+  type      BoardType
+  ownerId   Int          @map("owner_id")
+  owner     User         @relation("board_owner", fields: [ownerId], references: [id], onDelete: Cascade)
+  accesses  BoardAccess[]
+  columns   BoardColumn[]
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  deletedAt DateTime?    @map("deleted_at")
+
+  @@index([ownerId, type, deletedAt])
+  @@map("boards")
+}
+
+model BoardAccess {
+  boardId Int   @map("board_id")
+  userId  Int   @map("user_id")
+  board   Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([boardId, userId])
+  @@index([userId])
+  @@map("board_accesses")
+}
+
+model BoardColumn {
+  id        Int         @id @default(autoincrement())
+  boardId   Int         @map("board_id")
+  name      String      @db.VarChar(120)
+  position  Int         @default(0)
+  version   Int         @default(1)
+  deletedAt DateTime?   @map("deleted_at")
+  board     Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards     BoardCard[]
+
+  @@index([boardId, deletedAt, position])
+  @@map("board_columns")
+}
+
+model BoardCard {
+  id          Int         @id @default(autoincrement())
+  columnId    Int         @map("column_id")
+  title       String      @db.VarChar(200)
+  description String?     @db.Text
+  deadline    DateTime?   @db.Date
+  position    Int         @default(0)
+  version     Int         @default(1)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  deletedAt   DateTime?   @map("deleted_at")
+  column      BoardColumn @relation(fields: [columnId], references: [id], onDelete: Cascade)
+
+  @@index([columnId, deletedAt, position])
+  @@map("board_cards")
 }
 
 model UserPermission {

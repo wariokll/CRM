@@ -10,6 +10,7 @@ import { config } from './config.js'
 import { prisma } from './db.js'
 import { errorHandler } from './middleware/errors.js'
 import { authRouter } from './routes/auth.js'
+import { boardsRouter } from './routes/boards.js'
 import { departmentsRouter } from './routes/departments.js'
 import { componentsRouter } from './routes/components.js'
 import { moderationRouter } from './routes/moderation.js'
@@ -40,6 +41,7 @@ app.get('/api/health/telegram', async (_req, res) => {
   res.status(healthy ? 200 : 503).json({ ok: healthy, configured: true, status: integration?.status ?? 'CONNECTING', lastConnectedAt: integration?.lastConnectedAt ?? null, ...(integration?.lastError && { error: integration.lastError }) })
 })
 app.use('/api/auth', authRouter)
+app.use('/api/boards', boardsRouter)
 app.use('/api/departments', departmentsRouter)
 app.use('/api/components', componentsRouter)
 app.use('/api/organizations', organizationsRouter)

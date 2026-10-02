@@ -147,3 +147,39 @@ export interface Stats {
   sources: Array<{ source: 'WEB' | 'TELEGRAM_ACCOUNT' | 'TELEGRAM_BOT'; count: number }>
   requests: Array<{ id: number; status: RequestStatus; priority: Priority; createdAt: string; closedAt?: string | null; scheduledAt?: string | null; source: 'WEB' | 'TELEGRAM_ACCOUNT' | 'TELEGRAM_BOT'; organization?: Pick<Organization, 'id' | 'legalName'> | null; store?: Pick<Store, 'id' | 'name'> | null; department: Pick<Department, 'id' | 'name'>; assignees: string[] }>
 }
+
+export type BoardType = 'PERSONAL' | 'TEAM'
+
+export interface BoardSummary {
+  id: number
+  name: string
+  type: BoardType
+  ownerId: number
+  owner: Pick<User, 'id' | 'ipName'>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BoardCard {
+  id: number
+  columnId: number
+  title: string
+  description?: string | null
+  deadline?: string | null
+  position: number
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BoardColumn {
+  id: number
+  boardId: number
+  name: string
+  position: number
+  version: number
+  cards: BoardCard[]
+}
+
+export interface BoardDetails extends BoardSummary { columns: BoardColumn[] }
+export interface BoardAccessUser extends Pick<User, 'id' | 'ipName' | 'email' | 'role'> { hasAccess: boolean; isOwner: boolean }
