@@ -828,8 +828,8 @@ svg {
   min-width: 0;
   display: grid;
   align-content: stretch;
-  gap: 11px;
-  padding: 15px;
+  gap: 13px;
+  padding: 17px;
   border: 1px solid #e5e8ed;
   border-radius: 7px;
   background: #fff;
@@ -853,11 +853,11 @@ svg {
 }
 .request-card-top > span:last-child {
   flex: 0 0 auto;
-  padding: 4px 7px;
+  padding: 5px 8px;
   border-radius: 5px;
   background: #f1f3f6;
   color: #545d6b;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
 }
 .type-chip {
@@ -867,7 +867,7 @@ svg {
   gap: 7px;
   overflow: hidden;
   color: #555d68;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -880,10 +880,10 @@ svg {
 }
 .request-card h3 {
   display: -webkit-box;
-  min-height: 2.6em;
+  min-height: 2.5em;
   margin: 0;
   overflow: hidden;
-  font: 700 16px/1.3 Manrope;
+  font: 700 18px/1.25 Manrope;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   text-wrap: pretty;
@@ -902,8 +902,8 @@ svg {
 }
 .request-meta-item > svg {
   flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   margin-top: 2px;
   color: #77818e;
 }
@@ -915,17 +915,16 @@ svg {
   display: block;
   margin-bottom: 3px;
   color: #858d98;
-  font-size: 10px;
-  line-height: 1.1;
+  font-size: 11px;
+  line-height: 1.2;
 }
 .request-meta-copy b {
   display: block;
   overflow: hidden;
   color: #39414c;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  line-height: 1.25;
-  overflow: hidden;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -938,9 +937,9 @@ svg {
   display: inline-flex;
   align-items: center;
   width: max-content;
-  padding: 4px 8px;
+  padding: 5px 9px;
   border-radius: 6px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
 }
 .urgency.urgent,

@@ -1313,6 +1313,13 @@ function RequestsList({
     return requests.filter((item) => {
       const haystack =
         `${item.description} ${item.organization?.legalName ?? ""} ${item.store?.name ?? ""} ${item.type.name}`.toLowerCase();
+      const assignedToMe = item.assignees.some(
+        (assignee) => assignee.user.id === user.id,
+      );
+      const scheduledForToday =
+        item.urgency === "SCHEDULED" &&
+        item.scheduledAt &&
+        new Date(item.scheduledAt).toDateString() === today.toDateString();
       return (
         (showClosed
           ? item.status === "DONE"
@@ -1328,10 +1335,8 @@ function RequestsList({
           )) &&
         matchesSchedule(item.scheduledAt) &&
         (!myToday ||
-          (item.scheduledAt &&
-            new Date(item.scheduledAt).toDateString() ===
-              today.toDateString() &&
-            item.assignees.some((assignee) => assignee.user.id === user.id)))
+          (assignedToMe &&
+            (item.urgency === "URGENT" || scheduledForToday)))
       );
     });
   }, [
