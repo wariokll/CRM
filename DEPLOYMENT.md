@@ -54,13 +54,22 @@ Get-Service BazisCrmApi, BazisCrmTelegramBot
 
 ## 4. Daily backup and restoration check
 
-Create `D:\Backups\BazisCrm`, grant write access only to the scheduled-task service account, then create a Windows Task Scheduler task that runs daily at 02:15:
+Create `D:\Backups\BazisCrm` and grant Modify access to the scheduled-task account. The LAN deployment script creates a daily 02:15 task named `BazisCrmDatabaseBackup`, runs an initial backup, and stores archives under `backups` in the project by default. Override the LAN path with `-BackupDirectory`.
+
+For production, create a daily Windows Task Scheduler task from an elevated PowerShell. The backup script reads host, port, database, user and password from `backend\.env` (`DATABASE_URL`); the password is not placed in the task arguments:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\Services\BazisCrm\deploy\windows\backup-mariadb.ps1 -Database servio_crm -User crm_user -Password 'replace_me'
+$projectRoot = 'D:\Services\BazisCrm'
+$backupScript = Join-Path $projectRoot 'deploy\windows\backup-mariadb.ps1'
+$powershell = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+$action = New-ScheduledTaskAction -Execute $powershell -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$backupScript`" -ProjectRoot `"$projectRoot`" -BackupDirectory `"D:\Backups\BazisCrm`""
+$trigger = New-ScheduledTaskTrigger -Daily -At '2:15AM'
+$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 2) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5)
+Register-ScheduledTask -TaskName 'BazisCrmDatabaseBackup' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force
 ```
 
-Move the database password to a protected scheduled-task secret or a protected local configuration file before using this command in production; do not leave it in Task Scheduler history. The script writes compressed backups, retains 14 days by default, and supports custom paths with `-BackupDirectory` and `-RetentionDays`.
+The script writes compressed backups, retains 14 days by default, and supports custom paths with `-BackupDirectory` and `-RetentionDays`. The task account needs read access to `backend\.env`, execute access to `mariadb-dump.exe`, and Modify access to the backup directory.
 
 At least monthly, restore one backup into an isolated temporary MariaDB instance and verify that `SHOW TABLES` succeeds. Never test restoration against the live database.
 

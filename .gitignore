@@ -1,5 +1,6 @@
 node_modules/
 dist/
+backups/
 .tools/
 .node-runtime/
 backend/node_modules/
