@@ -410,23 +410,41 @@ function RequestCard({
       </div>
       <h3>{item.description}</h3>
       <div className="request-meta">
-        <span>
+        <span className="request-meta-item">
           <Building2 />
-          {item.organization?.legalName ??
-            item.createdBy?.ipName ??
-            "Консультация"}
+          <span className="request-meta-copy">
+            <small>Организация</small>
+            <b>
+              {item.organization?.legalName ??
+                item.createdBy?.ipName ??
+                "Консультация"}
+            </b>
+          </span>
         </span>
-        <span>
+        <span className="request-meta-item">
           <StoreIcon />
-          {item.store?.name ?? "Без точки"}
+          <span className="request-meta-copy">
+            <small>Точка</small>
+            <b>{item.store?.name ?? "Без точки"}</b>
+          </span>
         </span>
       </div>
       <div className="request-meta">
-        <span>{item.department.name}</span>
-        <span>
-          {item.assignees.length
-            ? item.assignees.map((a) => a.user.ipName).join(", ")
-            : "Свободна"}
+        <span className="request-meta-item">
+          <span className="request-meta-copy">
+            <small>Отдел</small>
+            <b>{item.department.name}</b>
+          </span>
+        </span>
+        <span className="request-meta-item">
+          <span className="request-meta-copy">
+            <small>Исполнитель</small>
+            <b>
+              {item.assignees.length
+                ? item.assignees.map((a) => a.user.ipName).join(", ")
+                : "Свободна"}
+            </b>
+          </span>
         </span>
       </div>
       <div className="request-card-bottom">
