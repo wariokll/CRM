@@ -165,6 +165,24 @@ storesRouter.patch("/:id", async (req, res) => {
   res.json(present(updated));
 });
 
+storesRouter.delete("/:id", async (req, res) => {
+  const access = await getUserAccess(req.auth!.userId);
+  if (
+    !access ||
+    access.status !== "ACTIVE" ||
+    !hasPermission(access, PermissionKey.DELETE_STORES)
+  )
+    return res.status(403).json({ message: "Недостаточно прав для удаления торговых точек" });
+  const id = Number(req.params.id);
+  const store = await prisma.store.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!store) return res.status(404).json({ message: "Точка не найдена" });
+  await prisma.store.delete({ where: { id } });
+  res.status(204).end();
+});
+
 storesRouter.get("/:id/access", async (req, res) => {
   const store = await visibleStore(
     Number(req.params.id),

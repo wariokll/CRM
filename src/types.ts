@@ -23,7 +23,10 @@ export type PermissionKey =
   | "MANAGE_TEMPLATES"
   | "VIEW_REPORTS"
   | "MANAGE_STAFF"
-  | "MANAGE_KNOWLEDGE";
+  | "MANAGE_KNOWLEDGE"
+  | "DELETE_ORGANIZATIONS"
+  | "DELETE_STORES"
+  | "DELETE_REQUESTS";
 
 export interface KnowledgeSection {
   id: number;

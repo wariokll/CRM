@@ -655,6 +655,24 @@ requestsRouter.patch("/:id", async (req, res) => {
   );
 });
 
+requestsRouter.delete("/:id", async (req, res) => {
+  const access = await getUserAccess(req.auth!.userId);
+  if (
+    !access ||
+    access.status !== "ACTIVE" ||
+    !hasPermission(access, PermissionKey.DELETE_REQUESTS)
+  )
+    return res.status(403).json({ message: "Недостаточно прав для удаления заявок" });
+  const id = Number(req.params.id);
+  const request = await prisma.request.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!request) return res.status(404).json({ message: "Заявка не найдена" });
+  await prisma.request.delete({ where: { id } });
+  res.status(204).end();
+});
+
 requestsRouter.post("/:id/assignees/self", async (req, res) => {
   const id = Number(req.params.id);
   const access = await getUserAccess(req.auth!.userId);

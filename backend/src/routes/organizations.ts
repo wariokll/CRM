@@ -151,6 +151,24 @@ organizationsRouter.patch("/:id", async (req, res) => {
   );
 });
 
+organizationsRouter.delete("/:id", async (req, res) => {
+  const access = await getUserAccess(req.auth!.userId);
+  if (
+    !access ||
+    access.status !== "ACTIVE" ||
+    !hasPermission(access, PermissionKey.DELETE_ORGANIZATIONS)
+  )
+    return res.status(403).json({ message: "Недостаточно прав для удаления организаций" });
+  const id = Number(req.params.id);
+  const organization = await prisma.organization.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!organization) return res.status(404).json({ message: "Организация не найдена" });
+  await prisma.organization.delete({ where: { id } });
+  res.status(204).end();
+});
+
 organizationsRouter.put("/:id/members", async (req, res) => {
   const ctx = await context(req.auth!.userId);
   if (!ctx?.manages)

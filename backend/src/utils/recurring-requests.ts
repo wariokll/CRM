@@ -5,16 +5,16 @@ import {
   nextRecurringDate,
 } from "./business-days.js";
 
-const generationHorizonDays = 21;
+const generationHorizonYears = 1;
 let running = false;
 
-/** Creates planned request instances for the next three weeks from active recurring schedules. */
+/** Creates planned request instances for the next calendar year from active recurring schedules. */
 export async function generateRecurringRequests() {
   if (running) return;
   running = true;
   try {
     const horizon = new Date();
-    horizon.setDate(horizon.getDate() + generationHorizonDays);
+    horizon.setFullYear(horizon.getFullYear() + generationHorizonYears);
     const schedules = await prisma.recurringRequestSchedule.findMany({
       where: { isActive: true, nextScheduledAt: { lte: horizon } },
       orderBy: { nextScheduledAt: "asc" },

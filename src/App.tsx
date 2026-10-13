@@ -28,6 +28,7 @@ import {
   Settings2,
   ShieldCheck,
   Store as StoreIcon,
+  Trash2,
   Users,
   UserRoundCog,
   X,
@@ -99,6 +100,9 @@ const permissionLabels: Record<PermissionKey, string> = {
   VIEW_REPORTS: "Просмотр отчётов",
   MANAGE_STAFF: "Управление сотрудниками и правами",
   MANAGE_KNOWLEDGE: "Полный доступ к базе знаний",
+  DELETE_ORGANIZATIONS: "Полное удаление организаций",
+  DELETE_STORES: "Полное удаление торговых точек",
+  DELETE_REQUESTS: "Полное удаление заявок",
 };
 const permissionGroups: Array<{
   title: string;
@@ -115,6 +119,7 @@ const permissionGroups: Array<{
       "TRANSFER_REQUESTS",
       "SET_PRIORITY",
       "ASSIGN_MASTERS",
+      "DELETE_REQUESTS",
     ],
   },
   {
@@ -125,6 +130,8 @@ const permissionGroups: Array<{
       "MANAGE_ORGANIZATIONS",
       "MANAGE_STORES",
       "VIEW_STORE_SECRETS",
+      "DELETE_ORGANIZATIONS",
+      "DELETE_STORES",
     ],
   },
   {
@@ -596,7 +603,8 @@ function RequestModal({
     [internal, setInternal] = useState(false),
     [assignees, setAssignees] = useState<StaffMember[]>([]),
     [selected, setSelected] = useState(item.assignees.map((a) => a.user.id)),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [deleting, setDeleting] = useState(false);
   const staff = user.role !== "CLIENT";
   const canManage = staff && can(user, "MANAGE_REQUESTS");
   useEffect(() => {
@@ -647,6 +655,21 @@ function RequestModal({
     }
   };
   const finish = async () => save("DONE");
+  const remove = async () => {
+    if (!window.confirm(`Удалить заявку #${item.id} без возможности восстановления?`))
+      return;
+    try {
+      setError("");
+      setDeleting(true);
+      await api(`/requests/${item.id}`, { method: "DELETE" });
+      reload();
+      close();
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setDeleting(false);
+    }
+  };
   const stopRecurrence = async () => {
     if (
       !item.recurrenceSchedule ||
@@ -843,6 +866,11 @@ function RequestModal({
           </div>
           {error && <div className="form-error">{error}</div>}
           <div className="modal-actions">
+            {can(user, "DELETE_REQUESTS") && (
+              <Button kind="danger" onClick={() => void remove()} disabled={deleting}>
+                <Trash2 /> {deleting ? "Удаление…" : "Удалить заявку"}
+              </Button>
+            )}
             {user.role === "MASTER" &&
               !item.assignees.some((a) => a.user.id === user.id) && (
                 <Button kind="secondary" onClick={take}>
@@ -1829,6 +1857,7 @@ function Organizations({
 }) {
   const [adding, setAdding] = useState(false),
     [error, setError] = useState(""),
+    [deletingId, setDeletingId] = useState<number | null>(null),
     [contacts, setContacts] = useState([{ fullName: "", phone: "", note: "" }]);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1871,6 +1900,25 @@ function Organizations({
       reload();
     } catch (reason) {
       setError(errorText(reason));
+    }
+  };
+  const remove = async (organization: Organization) => {
+    const storesCount = organization.stores?.length ?? 0;
+    if (
+      !window.confirm(
+        `Удалить организацию «${organization.legalName}»? Будут удалены связанные точки (${storesCount}), а заявки сохранятся без связи с организацией и точками.`,
+      )
+    )
+      return;
+    try {
+      setError("");
+      setDeletingId(organization.id);
+      await api(`/organizations/${organization.id}`, { method: "DELETE" });
+      reload();
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setDeletingId(null);
     }
   };
   const canApprove = user.role !== "CLIENT";
@@ -1973,6 +2021,21 @@ function Organizations({
                     }}
                   >
                     Отклонить
+                  </Button>
+                </div>
+              )}
+              {can(user, "DELETE_ORGANIZATIONS") && (
+                <div className="moderation-actions">
+                  <Button
+                    kind="danger"
+                    disabled={deletingId === organization.id}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void remove(organization);
+                    }}
+                  >
+                    <Trash2 />
+                    {deletingId === organization.id ? "Удаление…" : "Удалить"}
                   </Button>
                 </div>
               )}
@@ -2128,6 +2191,7 @@ function Stores({
   const [adding, setAdding] = useState(false),
     [selected, setSelected] = useState<Store | null>(null),
     [error, setError] = useState(""),
+    [deletingId, setDeletingId] = useState<number | null>(null),
     [selectedOrganizationId, setSelectedOrganizationId] = useState<
       number | null
     >(organizationFilter);
@@ -2199,6 +2263,24 @@ function Stores({
       reload();
     } catch (reason) {
       setError(errorText(reason));
+    }
+  };
+  const remove = async (store: Store) => {
+    if (
+      !window.confirm(
+        `Удалить точку «${store.name}»? Связанные заявки сохранятся без связи с этой точкой.`,
+      )
+    )
+      return;
+    try {
+      setError("");
+      setDeletingId(store.id);
+      await api(`/stores/${store.id}`, { method: "DELETE" });
+      reload();
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setDeletingId(null);
     }
   };
   return (
@@ -2318,6 +2400,21 @@ function Stores({
                       }}
                     >
                       Отклонить
+                    </Button>
+                  </div>
+                )}
+                {can(user, "DELETE_STORES") && (
+                  <div className="moderation-actions">
+                    <Button
+                      kind="danger"
+                      disabled={deletingId === store.id}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void remove(store);
+                      }}
+                    >
+                      <Trash2 />
+                      {deletingId === store.id ? "Удаление…" : "Удалить"}
                     </Button>
                   </div>
                 )}
