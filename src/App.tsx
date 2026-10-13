@@ -9,6 +9,7 @@ import {
 import {
   Activity,
   AlertTriangle,
+  BookOpen,
   Building2,
   CalendarDays,
   Check,
@@ -35,6 +36,7 @@ import { api, ApiError, login, logout, restoreSession } from "./api";
 import bazisLogo from "./assets/bazis-logo.svg";
 import { ReportsPage } from "./features/reports/ReportsPage";
 import { BoardsPage } from "./features/boards/BoardsPage";
+import { KnowledgePage } from "./features/knowledge/KnowledgePage";
 import "./recurrence.css";
 import type {
   Component,
@@ -96,6 +98,7 @@ const permissionLabels: Record<PermissionKey, string> = {
   MANAGE_TEMPLATES: "Управление шаблонами",
   VIEW_REPORTS: "Просмотр отчётов",
   MANAGE_STAFF: "Управление сотрудниками и правами",
+  MANAGE_KNOWLEDGE: "Полный доступ к базе знаний",
 };
 const permissionGroups: Array<{
   title: string;
@@ -134,6 +137,11 @@ const permissionGroups: Array<{
     description: "Настройка шаблонов и сотрудников CRM.",
     permissions: ["MANAGE_TEMPLATES", "MANAGE_STAFF"],
   },
+  {
+    title: "База знаний",
+    description: "Разделы, статьи и прикреплённые материалы.",
+    permissions: ["MANAGE_KNOWLEDGE"],
+  },
 ];
 const defaultPermissions: Record<User["role"], PermissionKey[]> = {
   DIRECTOR: Object.keys(permissionLabels) as PermissionKey[],
@@ -148,6 +156,7 @@ const defaultPermissions: Record<User["role"], PermissionKey[]> = {
     "SEND_TELEGRAM",
     "MANAGE_TEMPLATES",
     "VIEW_REPORTS",
+    "MANAGE_KNOWLEDGE",
   ],
   MASTER: [
     "MANAGE_REQUESTS",
@@ -155,6 +164,7 @@ const defaultPermissions: Record<User["role"], PermissionKey[]> = {
     "VIEW_TELEGRAM",
     "SEND_TELEGRAM",
     "VIEW_REPORTS",
+    "MANAGE_KNOWLEDGE",
   ],
   CLIENT: [],
 };
@@ -3525,6 +3535,9 @@ function App() {
     ...(can(user, "VIEW_TELEGRAM")
       ? [{ id: "telegram", label: "Telegram", Icon: MessageCircle }]
       : []),
+    ...(can(user, "MANAGE_KNOWLEDGE")
+      ? [{ id: "knowledge", label: "База знаний", Icon: BookOpen }]
+      : []),
   ];
   const urgent = requests.filter(
     (r) =>
@@ -3589,6 +3602,8 @@ function App() {
         stores={stores}
         reload={load}
       />
+    ) : page === "knowledge" ? (
+      <KnowledgePage />
     ) : (
       <>
         <div className="stats-grid">

@@ -75,6 +75,24 @@ export async function api<T>(
   return response.json() as Promise<T>;
 }
 
+export async function apiFile(path: string, retry = true): Promise<Blob> {
+  const headers = new Headers();
+  if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+  const response = await fetch(`/api${path}`, {
+    headers,
+    credentials: "include",
+  });
+  if (response.status === 401 && retry && (await refresh()))
+    return apiFile(path, false);
+  if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as {
+      message?: string;
+    };
+    throw new ApiError(data.message ?? "Не удалось скачать файл", response.status);
+  }
+  return response.blob();
+}
+
 export async function login(email: string, password: string) {
   const data = await api<{ accessToken: string; user: User }>(
     "/auth/login",

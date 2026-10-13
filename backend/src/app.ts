@@ -14,6 +14,7 @@ import { prisma } from "./db.js";
 import { errorHandler } from "./middleware/errors.js";
 import { authRouter } from "./routes/auth.js";
 import { boardsRouter } from "./routes/boards.js";
+import { knowledgeRouter } from "./routes/knowledge.js";
 import { departmentsRouter } from "./routes/departments.js";
 import { componentsRouter } from "./routes/components.js";
 import { moderationRouter } from "./routes/moderation.js";
@@ -56,6 +57,7 @@ app.get("/api/health/telegram", async (_req, res) => {
     });
 });
 app.use("/api/auth", authRouter);
+app.use("/api/knowledge", knowledgeRouter);
 app.use("/api/boards", boardsRouter);
 app.use("/api/departments", departmentsRouter);
 app.use("/api/components", componentsRouter);

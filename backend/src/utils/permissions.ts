@@ -17,6 +17,7 @@ const defaults: Record<Role, readonly PermissionKey[]> = {
     PermissionKey.SEND_TELEGRAM,
     PermissionKey.MANAGE_TEMPLATES,
     PermissionKey.VIEW_REPORTS,
+    PermissionKey.MANAGE_KNOWLEDGE,
   ],
   MASTER: [
     PermissionKey.MANAGE_REQUESTS,
@@ -24,6 +25,7 @@ const defaults: Record<Role, readonly PermissionKey[]> = {
     PermissionKey.VIEW_TELEGRAM,
     PermissionKey.SEND_TELEGRAM,
     PermissionKey.VIEW_REPORTS,
+    PermissionKey.MANAGE_KNOWLEDGE,
   ],
   CLIENT: [],
 };
