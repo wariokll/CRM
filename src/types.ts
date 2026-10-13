@@ -31,6 +31,7 @@ export interface KnowledgeSection {
   parentId: number | null;
   position: number;
   _count: { children: number; articles: number };
+  articles: { id: number; title: string }[];
 }
 
 export interface KnowledgeArticleSummary {

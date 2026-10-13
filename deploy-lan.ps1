@@ -184,28 +184,6 @@ if (-not (Test-Path -LiteralPath $mariaClient)) { throw 'MariaDB command-line cl
 if (-not (Test-Path -LiteralPath $mariaInstaller)) { throw 'MariaDB database initializer was not found.' }
 $env:Path = "$mariaBin;$env:Path"
 
-$caddyCommand = Find-Executable 'caddy.exe' @(
-  (Join-Path $env:ProgramFiles 'Caddy\caddy.exe'),
-  (Join-Path $env:ProgramFiles 'Caddy\caddy.exe'),
-  (Join-Path $env:LOCALAPPDATA 'Programs\Caddy\caddy.exe'),
-  'C:\Tools\Caddy\caddy.exe'
-)
-if (-not $caddyCommand) {
-  try {
-    Install-WinGetPackage 'Caddy.Caddy' 'Caddy'
-  } catch {
-    throw "Caddy was not found and cannot be installed automatically. Install Microsoft App Installer (winget) or download Caddy manually to C:\Program Files\Caddy\caddy.exe or C:\Tools\Caddy\caddy.exe, then rerun this script."
-  }
-  $caddyCommand = Find-Executable 'caddy.exe' @(
-    (Join-Path $env:ProgramFiles 'Caddy\caddy.exe'),
-    (Join-Path $env:LOCALAPPDATA 'Programs\Caddy\caddy.exe'),
-    'C:\Tools\Caddy\caddy.exe'
-  )
-}
-if (-not $caddyCommand) { throw 'Caddy was not found after installation.' }
-$caddyDirectory = Split-Path -Parent $caddyCommand
-$env:Path = "$caddyDirectory;$env:Path"
-
 $nssmCommand = Find-Executable 'nssm.exe' @(
   (Join-Path $env:ProgramFiles 'NSSM\win64\nssm.exe'),
   (Join-Path $env:LOCALAPPDATA 'nssm\win64\nssm.exe'),

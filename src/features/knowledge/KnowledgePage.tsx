@@ -3,7 +3,9 @@ import {
   BookOpen,
   Download,
   FileText,
+  FileUp,
   FolderPlus,
+  FolderOpen,
   Image as ImageIcon,
   Pencil,
   Plus,
@@ -25,10 +27,36 @@ function errorText(reason: unknown) {
   return reason instanceof Error ? reason.message : "Не удалось выполнить действие";
 }
 
+type KnowledgeImportResult = {
+  imported: number;
+  skipped: number;
+  failed: { fileName: string; reason: string }[];
+};
+
 function formatSize(size: number) {
   return size < 1024 * 1024
     ? `${Math.max(1, Math.round(size / 1024))} КБ`
     : `${(size / (1024 * 1024)).toFixed(1)} МБ`;
+}
+
+async function loadKnowledgeSections() {
+  const sections = await api<KnowledgeSection[]>("/knowledge/sections");
+  if (sections.every((section) => Array.isArray(section.articles))) return sections;
+
+  const articles = await api<KnowledgeArticleSummary[]>("/knowledge/articles");
+  const articlesBySection = new Map<number, { id: number; title: string }[]>();
+  for (const article of articles) {
+    const sectionArticles = articlesBySection.get(article.sectionId) ?? [];
+    sectionArticles.push({ id: article.id, title: article.title });
+    articlesBySection.set(article.sectionId, sectionArticles);
+  }
+
+  return sections.map((section) => ({
+    ...section,
+    articles: Array.isArray(section.articles)
+      ? section.articles
+      : articlesBySection.get(section.id) ?? [],
+  }));
 }
 
 export function KnowledgePage() {
@@ -39,15 +67,21 @@ export function KnowledgePage() {
   const [search, setSearch] = useState("");
   const [sectionDialog, setSectionDialog] = useState<KnowledgeSection | "new" | null>(null);
   const [articleDialog, setArticleDialog] = useState<KnowledgeArticle | "new" | null>(null);
+  const [importDialog, setImportDialog] = useState(false);
+  const [importFiles, setImportFiles] = useState<File[]>([]);
+  const [importSectionId, setImportSectionId] = useState<number | null>(null);
+  const [importResult, setImportResult] = useState<KnowledgeImportResult | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [refreshList, setRefreshList] = useState(0);
   const [imageUrls, setImageUrls] = useState<Record<number, string>>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const bodyEditorRef = useRef<HTMLTextAreaElement>(null);
+  const importFilesRef = useRef<HTMLInputElement>(null);
+  const importFolderRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    void api<KnowledgeSection[]>("/knowledge/sections")
+    void loadKnowledgeSections()
       .then((items) => {
         setSections(items);
         if (items.length) setActiveSectionId(items[0].id);
@@ -98,7 +132,7 @@ export function KnowledgePage() {
   }, [article]);
 
   const reloadSections = async (selectId?: number | null) => {
-    const items = await api<KnowledgeSection[]>("/knowledge/sections");
+    const items = await loadKnowledgeSections();
     setSections(items);
     if (selectId !== undefined) setActiveSectionId(selectId);
     else if (activeSectionId && !items.some((item) => item.id === activeSectionId))
@@ -238,6 +272,7 @@ export function KnowledgePage() {
       }
       setArticleDialog(null);
       setActiveSectionId(saved.sectionId);
+      await reloadSections(saved.sectionId);
       setRefreshList((value) => value + 1);
       await openArticle(saved.id);
     } catch (reason) {
@@ -252,6 +287,7 @@ export function KnowledgePage() {
     try {
       await api<void>(`/knowledge/articles/${item.id}`, { method: "DELETE" });
       setArticle(null);
+      await reloadSections(activeSectionId);
       setRefreshList((value) => value + 1);
     } catch (reason) {
       setError(errorText(reason));
@@ -268,6 +304,62 @@ export function KnowledgePage() {
     }
   };
 
+  const selectImportFiles = (files: File[]) => {
+    if (files.length > 20) {
+      setImportFiles([]);
+      setImportResult(null);
+      setError("За один раз можно выбрать не более 20 файлов.");
+      return;
+    }
+    const unsupported = files.find((file) => !/\.(txt|docx)$/i.test(file.name));
+    if (unsupported) {
+      setImportFiles([]);
+      setImportResult(null);
+      setError(`Формат файла «${unsupported.name}» не поддерживается.`);
+      return;
+    }
+    setError("");
+    setImportResult(null);
+    setImportFiles(files);
+  };
+
+  const importKnowledgeFiles = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!importFiles.length || !importSectionId) return;
+    setBusy(true);
+    setError("");
+    const form = new FormData();
+    form.set("sectionId", String(importSectionId));
+    importFiles.forEach((file) => {
+      form.append("files", file);
+      form.append("fileNames", file.name);
+    });
+    try {
+      const result = await api<KnowledgeImportResult>("/knowledge/import", {
+        method: "POST",
+        body: form,
+      });
+      setImportResult(result);
+      setArticle(null);
+      setSearch("");
+      await reloadSections(importSectionId);
+      setRefreshList((value) => value + 1);
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const articleCounts = new Map(sections.map((section) => [section.id, section.articles.length]));
+  for (const section of sections) {
+    let parentId = section.parentId;
+    while (parentId !== null) {
+      articleCounts.set(parentId, (articleCounts.get(parentId) ?? 0) + section.articles.length);
+      parentId = sections.find((item) => item.id === parentId)?.parentId ?? null;
+    }
+  }
+
   const renderSection = (section: KnowledgeSection, depth = 0): ReactNode => (
     <div key={section.id}>
       <button
@@ -281,8 +373,23 @@ export function KnowledgePage() {
       >
         <BookOpen size={14} />
         <span>{section.name}</span>
-        <small>{section._count.articles}</small>
+        <small>{articleCounts.get(section.id) ?? 0}</small>
       </button>
+      {section.articles.map((item) => (
+        <button
+          className={`knowledge-tree-article${article?.id === item.id ? " active" : ""}`}
+          key={item.id}
+          style={{ paddingLeft: 24 + depth * 14 }}
+          onClick={() => {
+            setSearch("");
+            setActiveSectionId(section.id);
+            void openArticle(item.id);
+          }}
+        >
+          <FileText size={13} />
+          <span>{item.title}</span>
+        </button>
+      ))}
       {sections
         .filter((item) => item.parentId === section.id)
         .map((child) => renderSection(child, depth + 1))}
@@ -316,7 +423,7 @@ export function KnowledgePage() {
           >
             <BookOpen size={14} />
             <span>Все статьи</span>
-            <small>{sections.reduce((sum, item) => sum + item._count.articles, 0)}</small>
+            <small>{sections.reduce((sum, item) => sum + item.articles.length, 0)}</small>
           </button>
           {sections.filter((item) => item.parentId === null).map((item) => renderSection(item))}
         </div>
@@ -439,6 +546,18 @@ export function KnowledgePage() {
                 />
               </div>
               <div className="inline-actions">
+                <button
+                  className="button secondary"
+                  onClick={() => {
+                    setImportFiles([]);
+                    setImportSectionId(activeSectionId ?? sections[0]?.id ?? null);
+                    setImportResult(null);
+                    setError("");
+                    setImportDialog(true);
+                  }}
+                >
+                  <FileUp size={15} /> Импорт
+                </button>
                 {currentSection && (
                   <>
                     <button
@@ -610,6 +729,108 @@ export function KnowledgePage() {
               <div className="modal-actions">
                 <button type="button" className="button secondary" onClick={() => setArticleDialog(null)}>Отмена</button>
                 <button className="button primary" disabled={busy || !sections.length}>{busy ? "Сохранение…" : "Сохранить"}</button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {importDialog && (
+        <div className="modal-backdrop" onMouseDown={() => setImportDialog(false)}>
+          <section className="modal knowledge-modal" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <span className="eyebrow">БАЗА ЗНАНИЙ</span>
+                <h2>Импорт статей</h2>
+              </div>
+              <button className="icon-button" onClick={() => setImportDialog(false)} aria-label="Закрыть"><X /></button>
+            </div>
+            <form onSubmit={importKnowledgeFiles}>
+              <label className="field">
+                <span>Раздел</span>
+                <select
+                  required
+                  value={importSectionId ?? ""}
+                  onChange={(event) => setImportSectionId(Number(event.target.value) || null)}
+                >
+                  <option value="">Выберите раздел</option>
+                  {sections.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
+                </select>
+              </label>
+              <input
+                ref={importFilesRef}
+                type="file"
+                hidden
+                multiple
+                accept=".txt,.docx"
+                onChange={(event) => {
+                  selectImportFiles(Array.from(event.currentTarget.files ?? []));
+                  event.currentTarget.value = "";
+                }}
+              />
+              <input
+                ref={importFolderRef}
+                type="file"
+                hidden
+                multiple
+                accept=".txt,.docx"
+                onChange={(event) => {
+                  selectImportFiles(Array.from(event.currentTarget.files ?? []));
+                  event.currentTarget.value = "";
+                }}
+              />
+              <div className="knowledge-import-actions">
+                <button type="button" className="button secondary" onClick={() => importFilesRef.current?.click()}>
+                  <FileUp size={15} /> Выбрать файлы
+                </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => {
+                    importFolderRef.current?.setAttribute("webkitdirectory", "");
+                    importFolderRef.current?.click();
+                  }}
+                >
+                  <FolderOpen size={15} /> Выбрать папку
+                </button>
+              </div>
+              {importFiles.length > 0 && (
+                <div className="knowledge-import-files">
+                  <div className="knowledge-sidebar-head">
+                    <b>Выбрано: {importFiles.length}</b>
+                    <button
+                      type="button"
+                      className="button ghost"
+                      onClick={() => {
+                        setImportFiles([]);
+                        setImportResult(null);
+                      }}
+                    >
+                      Очистить
+                    </button>
+                  </div>
+                  {importFiles.slice(0, 5).map((file, index) => (
+                    <small key={`${(file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name}-${index}`}>
+                      {(file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name}
+                    </small>
+                  ))}
+                  {importFiles.length > 5 && <small>И ещё {importFiles.length - 5}</small>}
+                </div>
+              )}
+              {importResult && (
+                <div className="knowledge-import-result">
+                  <b>Добавлено: {importResult.imported} · пропущено: {importResult.skipped} · ошибок: {importResult.failed.length}</b>
+                  {importResult.failed.map((item, index) => (
+                    <small key={`${item.fileName}-${index}`}>{item.fileName}: {item.reason}</small>
+                  ))}
+                </div>
+              )}
+              {error && <div className="knowledge-error">{error}</div>}
+              <div className="modal-actions">
+                <button type="button" className="button secondary" onClick={() => setImportDialog(false)}>Закрыть</button>
+                <button className="button primary" disabled={busy || !importFiles.length || !importSectionId}>
+                  {busy ? "Импорт…" : "Импортировать"}
+                </button>
               </div>
             </form>
           </section>

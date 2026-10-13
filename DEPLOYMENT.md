@@ -1,20 +1,18 @@
 # Production deployment on Windows Server
 
-This is the primary deployment path for this project. It uses native Windows services for the CRM API and Telegram bot, MariaDB as a Windows service, and Caddy as the HTTPS reverse proxy. Docker Compose remains available in [docker-compose.production.yml](./docker-compose.production.yml) as an alternative, but is not required.
+This deployment path uses native Windows services for the CRM API and Telegram bot, plus MariaDB as a Windows service. Docker Compose remains available in [docker-compose.production.yml](./docker-compose.production.yml) as an alternative, but is not required.
 
 ## 1. Server preparation
 
-Install Node.js 22 LTS, MariaDB 11.7, Caddy for Windows, NSSM (Non-Sucking Service Manager) and Git if deployment is done by cloning the repository.
+Install Node.js 22 LTS, MariaDB 11.7 and NSSM (Non-Sucking Service Manager). Install Git only if deployment is done by cloning the repository. Caddy or another HTTPS reverse proxy is not required for a trusted LAN deployment; configure a TLS reverse proxy separately before publishing the CRM to the public internet.
 
-Place the project outside user profiles, for example `D:\Services\BazisCrm`. Expose only ports `80` and `443` publicly. MariaDB must listen on `127.0.0.1` or a private network only; never expose port `3306` to the internet.
-
-Before launch, point the DNS record for the production domain to the server. Caddy will obtain and renew the TLS certificate automatically.
+Place the project outside user profiles, for example `D:\Services\BazisCrm`. Allow TCP port `3001` only from the intended trusted LAN. MariaDB must listen on `127.0.0.1`; never expose port `3307` to the network or internet.
 
 ## 2. Build, migration and secrets
 
 Copy [backend/.env.production.example](./backend/.env.production.example) to `backend\.env` **on the server only**, then replace all placeholders. This file is ignored by Git.
 
-Generate distinct random values for both JWT secrets, the MariaDB password and `ENCRYPTION_KEY`; replace the Telegram token before launch. Do not reuse local development secrets. Set `CLIENT_ORIGIN` and `TELEGRAM_REGISTRATION_URL` to the real HTTPS domain, and `COOKIE_SECURE=true`.
+Generate distinct random values for both JWT secrets, the MariaDB password and `ENCRYPTION_KEY`; replace the Telegram token before launch. Do not reuse local development secrets. Set `CLIENT_ORIGIN` to the exact origin users open. For trusted-LAN HTTP access, use that HTTP origin and set `COOKIE_SECURE=false`. For public HTTPS access, configure an HTTPS reverse proxy, use the HTTPS origin and set `COOKIE_SECURE=true`; set `TELEGRAM_REGISTRATION_URL` to the corresponding registration URL.
 
 If Telegram needs a proxy, set `TELEGRAM_PROXY_URL` after proxy support is enabled in the application. Use a private HTTP CONNECT or SOCKS5 proxy only; MTProto and public shared proxies do not work for Bot API.
 
@@ -35,8 +33,6 @@ Never run `prisma migrate dev` against production.
 
 ## 3. Run API and bot as Windows services
 
-Copy [deploy/windows/Caddyfile](./deploy/windows/Caddyfile) to the Caddy configuration directory. Set system environment variables `CADDY_DOMAIN` and `CADDY_EMAIL`, then install Caddy as a Windows service according to its official Windows documentation.
-
 Install CRM services from an elevated PowerShell. Replace the NSSM path if needed:
 
 ```powershell
@@ -47,8 +43,8 @@ Set-Location D:\Services\BazisCrm
 The script creates `BazisCrmApi` and `BazisCrmTelegramBot`, configures restart on failure and writes their logs into `backend\.logs`. After installation:
 
 ```powershell
-Invoke-RestMethod https://crm.example.ru/api/health
-Invoke-RestMethod https://crm.example.ru/api/health/telegram
+Invoke-RestMethod http://127.0.0.1:3001/api/health
+Invoke-RestMethod http://127.0.0.1:3001/api/health/telegram
 Get-Service BazisCrmApi, BazisCrmTelegramBot
 ```
 
