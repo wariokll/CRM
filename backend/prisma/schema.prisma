@@ -185,14 +185,16 @@ model BoardAccess {
 }
 
 model BoardColumn {
-  id        Int         @id @default(autoincrement())
-  boardId   Int         @map("board_id")
-  name      String      @db.VarChar(120)
-  position  Int         @default(0)
-  version   Int         @default(1)
-  deletedAt DateTime?   @map("deleted_at")
-  board     Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  cards     BoardCard[]
+  id          Int         @id @default(autoincrement())
+  boardId     Int         @map("board_id")
+  name        String      @db.VarChar(120)
+  position    Int         @default(0)
+  version     Int         @default(1)
+  width       Int         @default(294)
+  cardsPerRow Int         @default(1) @map("cards_per_row")
+  deletedAt   DateTime?   @map("deleted_at")
+  board       Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards       BoardCard[]
 
   @@index([boardId, deletedAt, position])
   @@map("board_columns")

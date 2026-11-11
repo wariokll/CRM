@@ -5,12 +5,22 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { authenticate } from "../middleware/auth.js";
 import {
-  canAccessBoard,
   canCreateTeamBoard,
   moveItem,
   versionMatches,
 } from "../modules/boards/board-policy.js";
 import { AppError } from "../utils/app-error.js";
+import {
+  boardLayoutSchema,
+  restoreCardSchema,
+} from "../modules/boards/board.contracts.js";
+import {
+  findBoard,
+  listArchivedCards,
+  restoreArchivedCard,
+  serializable,
+  updateBoardLayout,
+} from "../modules/boards/board.service.js";
 
 export const boardsRouter = Router();
 boardsRouter.use(authenticate);
@@ -48,27 +58,6 @@ const boardInclude = {
   },
 } satisfies Prisma.BoardInclude;
 
-async function findBoard(boardId: number, userId: number) {
-  const board = await prisma.board.findFirst({
-    where: { id: boardId, deletedAt: null },
-    select: {
-      id: true,
-      ownerId: true,
-      type: true,
-      accesses: { where: { userId }, select: { userId: true } },
-    },
-  });
-  if (!board) throw new AppError("Доска не найдена", 404);
-  const allowed = canAccessBoard({
-    type: board.type,
-    ownerId: board.ownerId,
-    userId,
-    hasExplicitAccess: board.accesses.length > 0,
-  });
-  if (!allowed) throw new AppError("Нет доступа к этой доске", 403);
-  return board;
-}
-
 async function requireOwner(boardId: number, userId: number) {
   const board = await prisma.board.findFirst({
     where: { id: boardId, deletedAt: null },
@@ -82,20 +71,20 @@ async function requireOwner(boardId: number, userId: number) {
 
 async function loadBoard(boardId: number, userId: number) {
   await findBoard(boardId, userId);
-  return prisma.board.findUniqueOrThrow({
-    where: { id: boardId },
-    include: boardInclude,
-  });
-}
-
-async function serializable<T>(operation: () => Promise<T>) {
-  try {
-    return await operation();
-  } catch (error) {
-    if ((error as { code?: string }).code === "P2034")
-      throw new AppError("Данные были изменены другим пользователем", 409);
-    throw error;
-  }
+  const [board, archivedCardCount] = await Promise.all([
+    prisma.board.findUniqueOrThrow({
+      where: { id: boardId },
+      include: boardInclude,
+    }),
+    prisma.boardCard.count({
+      where: {
+        deletedAt: null,
+        archivedAt: { not: null },
+        column: { boardId, deletedAt: null },
+      },
+    }),
+  ]);
+  return { ...board, archivedCardCount };
 }
 
 boardsRouter.get("/", async (req, res) => {
@@ -159,6 +148,34 @@ boardsRouter.get("/:boardId", async (req, res) => {
   res.json(
     await loadBoard(idSchema.parse(req.params.boardId), req.auth!.userId),
   );
+});
+
+boardsRouter.get("/:boardId/archive", async (req, res) => {
+  res.json(
+    await listArchivedCards(
+      idSchema.parse(req.params.boardId),
+      req.auth!.userId,
+    ),
+  );
+});
+
+boardsRouter.patch("/:boardId/layout", async (req, res) => {
+  const boardId = idSchema.parse(req.params.boardId);
+  await updateBoardLayout(
+    boardId,
+    req.auth!.userId,
+    boardLayoutSchema.parse(req.body),
+  );
+  res.json(await loadBoard(boardId, req.auth!.userId));
+});
+
+boardsRouter.post("/cards/:cardId/restore", async (req, res) => {
+  const boardId = await restoreArchivedCard(
+    idSchema.parse(req.params.cardId),
+    req.auth!.userId,
+    restoreCardSchema.parse(req.body),
+  );
+  res.json(await loadBoard(boardId, req.auth!.userId));
 });
 
 boardsRouter.patch("/:boardId", async (req, res) => {

@@ -3,6 +3,8 @@ import {
   DragOverlay,
   PointerSensor,
   closestCorners,
+  pointerWithin,
+  type CollisionDetection,
   useDroppable,
   useSensor,
   useSensors,
@@ -12,7 +14,7 @@ import {
   SortableContext,
   horizontalListSortingStrategy,
   useSortable,
-  verticalListSortingStrategy,
+  rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -29,15 +31,11 @@ import {
   Users,
   X,
 } from "lucide-react";
-import {
-  type FormEvent,
-  type ReactNode,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "../../api";
+import { Dialog, errorText } from "./BoardDialog";
+import { BoardArchiveDialog } from "./BoardArchiveDialog";
+import { BoardLayoutDialog } from "./BoardLayoutDialog";
 import type {
   BoardAccessUser,
   BoardCard,
@@ -48,40 +46,32 @@ import type {
   User,
 } from "../../types";
 
-type DialogProps = {
-  title: string;
-  close: () => void;
-  children: ReactNode;
-  wide?: boolean;
-};
-
-function Dialog({ title, close, children, wide }: DialogProps) {
-  return (
-    <div className="modal-backdrop" onMouseDown={close}>
-      <section
-        className={`modal ${wide ? "wide" : ""}`}
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <div className="modal-head">
-          <div>
-            <span className="eyebrow">КАНБАН-ДОСКА</span>
-            <h2>{title}</h2>
-          </div>
-          <button className="icon-button" onClick={close} aria-label="Закрыть">
-            <X />
-          </button>
-        </div>
-        {children}
-      </section>
-    </div>
+const boardCollisions: CollisionDetection = (args) => {
+  if (args.active.data.current?.type === "column") {
+    return closestCorners({
+      ...args,
+      droppableContainers: args.droppableContainers.filter(
+        (item) => item.data.current?.type === "column",
+      ),
+    });
+  }
+  const hits = pointerWithin(args);
+  const archive = hits.filter((hit) => hit.id === "card-archive");
+  if (archive.length) return archive;
+  const cards = hits.filter(
+    (hit) =>
+      args.droppableContainers.find((item) => item.id === hit.id)?.data.current
+        ?.type === "card",
   );
-}
-
-function errorText(reason: unknown) {
-  return reason instanceof Error
-    ? reason.message
-    : "Не удалось выполнить действие";
-}
+  if (cards.length) return cards;
+  if (hits.length) return hits;
+  return closestCorners({
+    ...args,
+    droppableContainers: args.droppableContainers.filter(
+      (item) => item.id !== "card-archive",
+    ),
+  });
+};
 
 function localToday() {
   const now = new Date();
@@ -142,12 +132,14 @@ function SortableColumn({
   remove,
   addCard,
   openCard,
+  configure,
 }: {
   column: BoardColumn;
   rename: () => void;
   remove: () => void;
   addCard: () => void;
   openCard: (card: BoardCard) => void;
+  configure: () => void;
 }) {
   const sortable = useSortable({
     id: `column-${column.id}`,
@@ -157,6 +149,8 @@ function SortableColumn({
     <section
       ref={sortable.setNodeRef}
       style={{
+        width: column.width,
+        flexBasis: column.width,
         transform: CSS.Transform.toString(sortable.transform),
         transition: sortable.transition,
       }}
@@ -173,6 +167,13 @@ function SortableColumn({
         </button>
         <b>{column.name}</b>
         <span>{column.cards.length}</span>
+        <button
+          onClick={configure}
+          aria-label={"Настроить вид столбца «" + column.name + "»"}
+          title="Ширина и сетка карточек"
+        >
+          <Settings2 />
+        </button>
         <button onClick={rename} aria-label="Переименовать">
           <Pencil />
         </button>
@@ -182,9 +183,15 @@ function SortableColumn({
       </div>
       <SortableContext
         items={column.cards.map((card) => `card-${card.id}`)}
-        strategy={verticalListSortingStrategy}
+        strategy={rectSortingStrategy}
       >
-        <div className="board-card-list">
+        <div
+          className="board-card-list"
+          style={{
+            gridTemplateColumns:
+              "repeat(" + column.cardsPerRow + ", minmax(0, 1fr))",
+          }}
+        >
           {column.cards.map((card) => (
             <SortableCard
               key={card.id}
@@ -513,7 +520,11 @@ export function BoardsPage({
       card: BoardCard | null;
       columnId: number;
     } | null>(null),
-    [accessOpen, setAccessOpen] = useState(false);
+    [accessOpen, setAccessOpen] = useState(false),
+    [archiveOpen, setArchiveOpen] = useState(false),
+    [layoutEditor, setLayoutEditor] = useState<{
+      columnId: number | null;
+    } | null>(null);
   const [nameEditor, setNameEditor] = useState<{
     kind: "create-board" | "rename-board" | "create-column" | "rename-column";
     column?: BoardColumn;
@@ -570,6 +581,11 @@ export function BoardsPage({
     }
   }, [refreshKey]);
   useEffect(() => {
+    setArchiveOpen(false);
+    setLayoutEditor(null);
+    setCardEditor(null);
+    setNameEditor(null);
+    setAccessOpen(false);
     if (selectedId) void loadBoard(selectedId);
   }, [selectedId]);
 
@@ -729,6 +745,7 @@ export function BoardsPage({
       const previous = board;
       setBoard({
         ...board,
+        archivedCardCount: board.archivedCardCount + 1,
         columns: board.columns.map((column) => ({
           ...column,
           cards: column.cards.filter((card) => card.id !== movedCard.id),
@@ -853,7 +870,7 @@ export function BoardsPage({
         <>
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCorners}
+            collisionDetection={boardCollisions}
             onDragStart={({ active }) => {
               const data = active.data.current;
               if (data?.type === "card")
@@ -875,6 +892,22 @@ export function BoardsPage({
               </div>
               <ArchiveDropzone active={Boolean(activeCard)} />
               <div>
+                <button
+                  className="button secondary compact"
+                  onClick={() => setArchiveOpen(true)}
+                >
+                  <Archive /> Архив{" "}
+                  <span className="board-archive-count">
+                    {board.archivedCardCount}
+                  </span>
+                </button>
+                <button
+                  className="button secondary compact"
+                  disabled={!board.columns.length}
+                  onClick={() => setLayoutEditor({ columnId: null })}
+                >
+                  <Settings2 /> Вид доски
+                </button>
                 {isOwner && type === "TEAM" && (
                   <button
                     className="button secondary compact"
@@ -916,6 +949,7 @@ export function BoardsPage({
                   <SortableColumn
                     key={column.id}
                     column={column}
+                    configure={() => setLayoutEditor({ columnId: column.id })}
                     rename={() =>
                       setNameEditor({ kind: "rename-column", column })
                     }
@@ -964,6 +998,34 @@ export function BoardsPage({
             </DragOverlay>
           </DndContext>
         </>
+      )}
+      {archiveOpen && board && (
+        <BoardArchiveDialog
+          key={board.id}
+          board={board}
+          refreshKey={refreshKey}
+          close={() => setArchiveOpen(false)}
+          updated={(updated) =>
+            setBoard((current) =>
+              current?.id === updated.id ? updated : current,
+            )
+          }
+          refresh={() => loadBoard(board.id)}
+        />
+      )}
+      {layoutEditor && board && (
+        <BoardLayoutDialog
+          key={board.id}
+          board={board}
+          initialColumnId={layoutEditor.columnId}
+          close={() => setLayoutEditor(null)}
+          updated={(updated) =>
+            setBoard((current) =>
+              current?.id === updated.id ? updated : current,
+            )
+          }
+          refresh={() => loadBoard(board.id)}
+        />
       )}
       {cardEditor && (
         <CardDialog

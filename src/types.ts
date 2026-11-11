@@ -357,11 +357,19 @@ export interface BoardColumn {
   name: string;
   position: number;
   version: number;
+  width: number;
+  cardsPerRow: number;
   cards: BoardCard[];
 }
 
 export interface BoardDetails extends BoardSummary {
   columns: BoardColumn[];
+  archivedCardCount: number;
+}
+
+export interface ArchivedBoardCard extends BoardCard {
+  archivedAt: string;
+  column: Pick<BoardColumn, "id" | "name">;
 }
 export interface BoardAccessUser extends Pick<
   User,
