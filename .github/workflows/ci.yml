@@ -7,15 +7,30 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.7
+        env:
+          MARIADB_ROOT_PASSWORD: test-root-password
+        ports:
+          - 3308:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm --prefix backend ci
       - run: npm --prefix backend run prisma:generate
-      - run: npm run build
-      - run: npm --prefix backend run build
-      - run: npm --prefix backend test
+      - name: Prepare isolated test database
+        run: |
+          mariadb --protocol=tcp -h 127.0.0.1 -P 3308 -uroot -ptest-root-password -e "CREATE DATABASE servio_crm_test; CREATE USER 'crm_test'@'%' IDENTIFIED BY 'test-password'; GRANT ALL PRIVILEGES ON servio_crm_test.* TO 'crm_test'@'%'; FLUSH PRIVILEGES;"
+          node --input-type=module -e "import { writeFileSync } from 'node:fs'; writeFileSync('backend/.env.test', ['PORT=3002','DATABASE_URL=\"mysql://crm_test:test-password@127.0.0.1:3308/servio_crm_test\"','JWT_ACCESS_SECRET=\"test-only-access-secret-at-least-32-characters\"','JWT_REFRESH_SECRET=\"test-only-refresh-secret-at-least-32-characters\"','ENCRYPTION_KEY=\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"','CLIENT_ORIGIN=\"http://127.0.0.1:4173\"','NODE_ENV=\"test\"','COOKIE_SECURE=\"false\"'].join('\\n')+'\\n');"
+      - run: npx playwright install --with-deps chromium
+      - run: npm run verify

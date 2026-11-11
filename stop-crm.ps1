@@ -1,6 +1,7 @@
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $backend = Join-Path $root 'backend'
-$mysqlAdmin = 'C:\Program Files\MariaDB 11.7\bin\mariadb-admin.exe'
+$mysqlAdminCommand = Get-Command 'mariadb-admin.exe' -ErrorAction SilentlyContinue
+$mysqlAdmin = if ($mysqlAdminCommand) { $mysqlAdminCommand.Source } else { 'C:\Program Files\MariaDB 11.7\bin\mariadb-admin.exe' }
 $databaseRootPassword = Get-Content -LiteralPath (Join-Path $backend '.db-root-password') -Raw
 & $mysqlAdmin --protocol=tcp -h 127.0.0.1 -P 3307 -uroot "--password=$($databaseRootPassword.Trim())" shutdown 2>$null
 $pidFile = Join-Path $backend '.pids\backend.pid'

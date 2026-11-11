@@ -1,5 +1,8 @@
 import { PermissionKey, Role, type Prisma } from "@prisma/client";
-import { hasPermission, type UserAccess } from "../../utils/permissions.js";
+import {
+  hasPermission,
+  type UserAccess,
+} from "../../shared/middleware/authorization.js";
 
 /** Central access rules for request lists, details and reports. */
 export function requestVisibilityWhere(

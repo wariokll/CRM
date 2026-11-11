@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../db.js";
-import { AppError } from "../../utils/app-error.js";
+import { AppError } from "../../shared/errors.js";
 import { canAccessBoard } from "./board-policy.js";
 import type { BoardLayoutInput, RestoreCardInput } from "./board.contracts.js";
 

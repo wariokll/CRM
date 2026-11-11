@@ -95,7 +95,7 @@ npm test
 - календарь с видами месяц/неделя/день;
 - справочник типов заявок с soft delete;
 - административная статистика и адаптивный интерфейс;
-- polling данных раз в 45 секунд;
+- Feature pages use browser routes with direct-link and reload support; server state uses TanStack Query cache and mutation invalidation.
 - таблицы вложений и уведомлений заложены в схему для дальнейшего расширения.
 
 ## Резервное копирование
@@ -120,3 +120,6 @@ npm test
 ## Ограничения браузера
 
 AnyDesk открывается ссылкой `anydesk:<ID>`, а пароль копируется отдельно: браузер не может безопасно подставить его в нативное окно AnyDesk. Логины и пароли ОФД/ФНС также копируются вручную из CRM; автоматическое заполнение сторонних сайтов не используется.
+## Contributor verification
+
+Run `npm run verify` from the repository root before handing off refactoring work. It checks frontend and backend TypeScript, ESLint, Prettier, frontend unit tests, backend integration tests with an isolated test database, production builds, and the Playwright smoke suite.

@@ -1,22 +1,20 @@
-import { useCallback, useEffect, useState } from "react";
-import {
-  Activity,
-  AlertTriangle,
-  Check,
-  ClipboardList,
-  RefreshCw,
-} from "lucide-react";
-import { api, ApiError } from "../../api";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
+import { RefreshCw } from "lucide-react";
+import { ApiError } from "../../api";
+import { queryKeys } from "../../shared/queryKeys";
 import { Button, Field } from "../../components/ui";
-import type { Component, RequestStatus, Stats } from "../../types";
+import { getComponents, getReportData } from "./queries";
+import {
+  ProcurementReport,
+  RequestsReport,
+  reportList,
+  sourceLabel,
+  statuses,
+} from "./ReportDataViews";
+import { ReportStats } from "./ReportStats";
 
-const statuses: Record<RequestStatus, string> = {
-  NEW: "Новая",
-  ACCEPTED: "Принята",
-  IN_PROGRESS: "В работе",
-  DONE: "Выполнена",
-  CANCELLED: "Отменена",
-};
 const errorText = (value: unknown) =>
   value instanceof ApiError || value instanceof Error
     ? value.message
@@ -31,85 +29,49 @@ const formatDate = (value?: string | null) =>
         minute: "2-digit",
       }).format(new Date(value))
     : "—";
-type ProcurementRow = {
-  componentId: number;
-  name: string;
-  quantity: number;
-  requests: number;
-  schedule: Array<{
-    requestId: number;
-    scheduledAt: string | null;
-    organization: string | null;
-    store: string | null;
-    quantity: number;
-  }>;
-};
-
 export function ReportsPage() {
   const firstDay = () =>
     new Date(new Date().getFullYear(), new Date().getMonth(), 1)
       .toISOString()
       .slice(0, 10);
-  const [from, setFrom] = useState(firstDay),
-    [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
-  const [stats, setStats] = useState<Stats | null>(null),
-    [components, setComponents] = useState<Component[]>([]),
-    [procurement, setProcurement] = useState<ProcurementRow[]>([]),
-    [componentId, setComponentId] = useState(""),
-    [error, setError] = useState("");
-  const [view, setView] = useState<
-    "overview" | "clients" | "team" | "requests" | "procurement"
-  >("overview");
-  const load = useCallback(async () => {
-    try {
-      setError("");
-      const query = new URLSearchParams({ from, to });
-      if (componentId) query.set("componentId", componentId);
-      const [nextStats, nextProcurement] = await Promise.all([
-        api<Stats>(`/requests/stats?from=${from}&to=${to}`),
-        api<ProcurementRow[]>(`/requests/procurement?${query}`),
-      ]);
-      setStats(nextStats);
-      setProcurement(nextProcurement);
-    } catch (reason) {
-      setError(errorText(reason));
-    }
-  }, [from, to, componentId]);
-  useEffect(() => {
-    void load();
-  }, [load]);
-  useEffect(() => {
-    void api<Component[]>("/components")
-      .then(setComponents)
-      .catch(() => setComponents([]));
-  }, []);
-  const list = (
-    title: string,
-    rows: Array<{ id: number; name: string; count: number }>,
-  ) => (
-    <section className="panel table-panel">
-      <div className="panel-head">
-        <h2>{title}</h2>
-      </div>
-      {rows.length ? (
-        <div className="report-list">
-          {rows.map((row) => (
-            <div key={row.id}>
-              <span>{row.name}</span>
-              <b>{row.count}</b>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p>За выбранный период данных нет.</p>
-      )}
-    </section>
+  const [searchParams, setSearchParams] = useSearchParams();
+  const from = searchParams.get("from") ?? firstDay();
+  const to = searchParams.get("to") ?? new Date().toISOString().slice(0, 10);
+  const viewParam = searchParams.get("view");
+  const view = (
+    ["overview", "clients", "team", "requests", "procurement"].includes(
+      viewParam ?? "",
+    )
+      ? viewParam
+      : "overview"
+  ) as "overview" | "clients" | "team" | "requests" | "procurement";
+  const [componentId, setComponentIdState] = useState(
+    searchParams.get("componentId") ?? "",
   );
-  const sourceLabel: Record<string, string> = {
-    WEB: "CRM / сайт",
-    TELEGRAM_BOT: "Telegram-бот",
-    TELEGRAM_ACCOUNT: "Telegram-аккаунт",
+  useEffect(() => {
+    setComponentIdState(searchParams.get("componentId") ?? "");
+  }, [searchParams]);
+  const setParam = (key: string, value: string) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (value) next.set(key, value);
+      else next.delete(key);
+      return next;
+    });
   };
+  const setView = (value: typeof view) => setParam("view", value);
+  const reportQuery = useQuery({
+    queryKey: queryKeys.reports.data(from, to, componentId),
+    queryFn: () => getReportData(from, to, componentId),
+  });
+  const componentsQuery = useQuery({
+    queryKey: queryKeys.components.all,
+    queryFn: getComponents,
+  });
+  const stats = reportQuery.data?.stats;
+  const procurement = reportQuery.data?.procurement ?? [];
+  const components = componentsQuery.data ?? [];
+  const error = reportQuery.error ? errorText(reportQuery.error) : "";
   return (
     <>
       {error && <div className="page-error">{error}</div>}
@@ -120,7 +82,7 @@ export function ReportsPage() {
               type="date"
               value={from}
               max={to}
-              onChange={(event) => setFrom(event.target.value)}
+              onChange={(event) => setParam("from", event.target.value)}
             />
           </Field>
           <Field label="По">
@@ -128,14 +90,17 @@ export function ReportsPage() {
               type="date"
               value={to}
               min={from}
-              onChange={(event) => setTo(event.target.value)}
+              onChange={(event) => setParam("to", event.target.value)}
             />
           </Field>
           {view === "procurement" && (
             <Field label="Компонент">
               <select
                 value={componentId}
-                onChange={(event) => setComponentId(event.target.value)}
+                onChange={(event) => {
+                  setComponentIdState(event.target.value);
+                  setParam("componentId", event.target.value);
+                }}
               >
                 <option value="">Все компоненты</option>
                 {components
@@ -148,7 +113,7 @@ export function ReportsPage() {
               </select>
             </Field>
           )}
-          <Button kind="secondary" onClick={() => void load()}>
+          <Button kind="secondary" onClick={() => void reportQuery.refetch()}>
             <RefreshCw /> Обновить
           </Button>
         </div>
@@ -192,49 +157,10 @@ export function ReportsPage() {
       </section>
       {stats && (
         <>
-          {view !== "procurement" && (
-            <div className="stats-grid">
-              <div className="stat-card coral">
-                <span>
-                  <ClipboardList />
-                </span>
-                <div>
-                  <small>Заявок за период</small>
-                  <strong>{stats.total}</strong>
-                </div>
-              </div>
-              <div className="stat-card amber">
-                <span>
-                  <AlertTriangle />
-                </span>
-                <div>
-                  <small>Просрочено</small>
-                  <strong>{stats.overdue}</strong>
-                </div>
-              </div>
-              <div className="stat-card green">
-                <span>
-                  <Check />
-                </span>
-                <div>
-                  <small>Выполнено</small>
-                  <strong>{stats.completed}</strong>
-                </div>
-              </div>
-              <div className="stat-card violet">
-                <span>
-                  <Activity />
-                </span>
-                <div>
-                  <small>Среднее выполнение</small>
-                  <strong>{stats.averageResolutionHours} ч</strong>
-                </div>
-              </div>
-            </div>
-          )}
+          <ReportStats stats={stats} />
           {view === "overview" && (
             <div className="report-grid">
-              {list(
+              {reportList(
                 "По статусам",
                 stats.byStatus.map((item) => ({
                   id: Object.keys(statuses).indexOf(item.status),
@@ -242,7 +168,7 @@ export function ReportsPage() {
                   count: item._count._all,
                 })),
               )}
-              {list(
+              {reportList(
                 "По шаблонам",
                 stats.byType.map((item) => ({
                   id: item.typeId,
@@ -250,7 +176,7 @@ export function ReportsPage() {
                   count: item._count._all,
                 })),
               )}
-              {list("По отделам", stats.departments)}
+              {reportList("По отделам", stats.departments)}
               <section className="panel table-panel">
                 <div className="panel-head">
                   <h2>Источники обращений</h2>
@@ -268,81 +194,25 @@ export function ReportsPage() {
           )}
           {view === "clients" && (
             <div className="report-grid">
-              {list("Заявки по организациям", stats.clients)}
-              {list("Заявки по торговым точкам", stats.stores)}
+              {reportList("Заявки по организациям", stats.clients)}
+              {reportList("Заявки по торговым точкам", stats.stores)}
             </div>
           )}
           {view === "team" && (
             <div className="report-grid">
-              {list("Нагрузка по сотрудникам", stats.employees)}
-              {list("Заявки по отделам", stats.departments)}
+              {reportList("Нагрузка по сотрудникам", stats.employees)}
+              {reportList("Заявки по отделам", stats.departments)}
             </div>
           )}
           {view === "requests" && (
-            <section className="panel table-panel">
-              <div className="panel-head">
-                <h2>Реестр заявок</h2>
-              </div>
-              <div className="report-list">
-                {stats.requests.map((row) => (
-                  <div key={row.id}>
-                    <span>
-                      #{row.id} ·{" "}
-                      {row.organization?.legalName ?? "Без организации"} ·{" "}
-                      {row.store?.name ?? "Без точки"}
-                      <small>
-                        {" "}
-                        {row.department.name} ·{" "}
-                        {row.assignees.join(", ") || "не назначена"} ·{" "}
-                        {formatDate(row.createdAt)}
-                      </small>
-                    </span>
-                    <b>{statuses[row.status]}</b>
-                  </div>
-                ))}
-              </div>
-            </section>
+            <RequestsReport
+              rows={stats.requests}
+              statuses={statuses}
+              formatDate={formatDate}
+            />
           )}
           {view === "procurement" && (
-            <section className="panel table-panel">
-              <div className="panel-head">
-                <div>
-                  <h2>Планируемые закупки</h2>
-                  <p>
-                    Активные плановые заявки по дате работ в выбранном периоде.
-                  </p>
-                </div>
-              </div>
-              {procurement.length ? (
-                <div className="procurement-list">
-                  {procurement.map((row) => (
-                    <article key={row.componentId}>
-                      <div>
-                        <h3>{row.name}</h3>
-                        <p>{row.requests} заявок</p>
-                      </div>
-                      <strong>{row.quantity} шт.</strong>
-                      <details>
-                        <summary>Состав потребности</summary>
-                        {row.schedule.map((item) => (
-                          <p key={`${item.requestId}-${item.quantity}`}>
-                            #{item.requestId} · {formatDate(item.scheduledAt)} ·{" "}
-                            {item.organization ?? "Без организации"}
-                            {item.store ? ` / ${item.store}` : ""} —{" "}
-                            {item.quantity} шт.
-                          </p>
-                        ))}
-                      </details>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <p className="report-empty">
-                  На выбранный период активных плановых заявок с компонентами
-                  нет.
-                </p>
-              )}
-            </section>
+            <ProcurementReport rows={procurement} formatDate={formatDate} />
           )}
         </>
       )}

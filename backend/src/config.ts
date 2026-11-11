@@ -1,29 +1,53 @@
 import "dotenv/config";
+import { z } from "zod";
 
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing required environment variable: ${name}`);
-  return value;
-}
+const environmentSchema = z.object({
+  PORT: z
+    .string()
+    .default("3001")
+    .transform(Number)
+    .pipe(z.number().int().min(1).max(65535)),
+  CLIENT_ORIGIN: z.string().default("http://localhost:5173"),
+  NODE_ENV: z.string().optional(),
+  COOKIE_SECURE: z.string().optional(),
+  JWT_ACCESS_SECRET: z
+    .string()
+    .min(1, "Missing required environment variable: JWT_ACCESS_SECRET"),
+  JWT_REFRESH_SECRET: z
+    .string()
+    .min(1, "Missing required environment variable: JWT_REFRESH_SECRET"),
+  ENCRYPTION_KEY: z
+    .string()
+    .min(1, "Missing required environment variable: ENCRYPTION_KEY"),
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_BOT_USERNAME: z.string().default("TMP_BAZIS_BOT"),
+  TELEGRAM_REGISTRATION_URL: z.string().optional(),
+});
 
-function port(value: string | undefined) {
-  const parsed = Number(value ?? 3001);
-  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535)
-    throw new Error("PORT must be a valid TCP port");
-  return parsed;
+const parsed = environmentSchema.safeParse(process.env);
+if (!parsed.success) {
+  const portIssue = parsed.error.issues.find(
+    (issue) => issue.path[0] === "PORT",
+  );
+  if (portIssue) throw new Error("PORT must be a valid TCP port");
+  throw new Error(
+    parsed.error.issues[0]?.message ?? "Invalid environment configuration",
+  );
 }
+const env = parsed.data;
 
 export const config = {
-  port: port(process.env.PORT),
-  clientOrigin: process.env.CLIENT_ORIGIN ?? "http://localhost:5173",
-  isProduction: process.env.NODE_ENV === "production",
-  cookieSecure: process.env.COOKIE_SECURE === "true",
-  accessSecret: required("JWT_ACCESS_SECRET"),
-  refreshSecret: required("JWT_REFRESH_SECRET"),
-  encryptionKey: required("ENCRYPTION_KEY"),
-  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN,
-  telegramBotUsername: process.env.TELEGRAM_BOT_USERNAME ?? "TMP_BAZIS_BOT",
-  telegramRegistrationUrl: process.env.TELEGRAM_REGISTRATION_URL,
+  port: env.PORT,
+  clientOrigin: env.CLIENT_ORIGIN,
+  isProduction: env.NODE_ENV === "production",
+  isTest: env.NODE_ENV === "test",
+  cookieSecure: env.COOKIE_SECURE === "true",
+  accessSecret: env.JWT_ACCESS_SECRET,
+  refreshSecret: env.JWT_REFRESH_SECRET,
+  encryptionKey: env.ENCRYPTION_KEY,
+  telegramBotToken: env.TELEGRAM_BOT_TOKEN,
+  telegramBotUsername: env.TELEGRAM_BOT_USERNAME,
+  telegramRegistrationUrl: env.TELEGRAM_REGISTRATION_URL,
 };
 
 const localOrigin = (() => {

@@ -1,4 +1,6 @@
 node_modules/
+test-results/
+playwright-report/
 dist/
 backups/
 .tools/
@@ -13,6 +15,9 @@ backend/.logs/
 backend/.pids/
 backend/mysql.local.ini
 backend/.db-root-password
+backend/.db-test-root-password
 backend/.env
+backend/.env.test
+backend/.mysql-test-data/
 .env
 deploy/.env.production

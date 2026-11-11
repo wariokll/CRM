@@ -1,0 +1,1477 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`API characterization > records endpoint responses for CLIENT using an empty or default request 1`] = `
+[
+  [
+    "GET /api/auth/me",
+    200,
+  ],
+  [
+    "GET /api/boards",
+    403,
+  ],
+  [
+    "POST /api/boards",
+    403,
+  ],
+  [
+    "GET /api/boards/:boardId",
+    403,
+  ],
+  [
+    "GET /api/boards/:boardId/archive",
+    403,
+  ],
+  [
+    "PATCH /api/boards/:boardId/layout",
+    403,
+  ],
+  [
+    "POST /api/boards/cards/:cardId/restore",
+    403,
+  ],
+  [
+    "PATCH /api/boards/:boardId",
+    403,
+  ],
+  [
+    "DELETE /api/boards/:boardId",
+    403,
+  ],
+  [
+    "GET /api/boards/:boardId/access",
+    403,
+  ],
+  [
+    "POST /api/boards/:boardId/access",
+    403,
+  ],
+  [
+    "DELETE /api/boards/:boardId/access/:userId",
+    403,
+  ],
+  [
+    "POST /api/boards/:boardId/columns",
+    403,
+  ],
+  [
+    "PATCH /api/boards/columns/:columnId",
+    403,
+  ],
+  [
+    "DELETE /api/boards/columns/:columnId",
+    403,
+  ],
+  [
+    "POST /api/boards/columns/:columnId/move",
+    403,
+  ],
+  [
+    "POST /api/boards/columns/:columnId/cards",
+    403,
+  ],
+  [
+    "PATCH /api/boards/cards/:cardId",
+    403,
+  ],
+  [
+    "DELETE /api/boards/cards/:cardId",
+    403,
+  ],
+  [
+    "POST /api/boards/cards/:cardId/archive",
+    403,
+  ],
+  [
+    "POST /api/boards/cards/:cardId/move",
+    403,
+  ],
+  [
+    "GET /api/components",
+    200,
+  ],
+  [
+    "POST /api/components",
+    403,
+  ],
+  [
+    "PATCH /api/components/:id",
+    403,
+  ],
+  [
+    "GET /api/departments",
+    200,
+  ],
+  [
+    "POST /api/departments",
+    403,
+  ],
+  [
+    "PATCH /api/departments/:id",
+    403,
+  ],
+  [
+    "GET /api/knowledge/sections",
+    403,
+  ],
+  [
+    "POST /api/knowledge/sections",
+    403,
+  ],
+  [
+    "PATCH /api/knowledge/sections/:id",
+    403,
+  ],
+  [
+    "DELETE /api/knowledge/sections/:id",
+    403,
+  ],
+  [
+    "POST /api/knowledge/import",
+    403,
+  ],
+  [
+    "GET /api/knowledge/articles",
+    403,
+  ],
+  [
+    "POST /api/knowledge/articles",
+    403,
+  ],
+  [
+    "GET /api/knowledge/articles/:id",
+    403,
+  ],
+  [
+    "PATCH /api/knowledge/articles/:id",
+    403,
+  ],
+  [
+    "DELETE /api/knowledge/articles/:id",
+    403,
+  ],
+  [
+    "POST /api/knowledge/articles/:id/attachments",
+    403,
+  ],
+  [
+    "GET /api/knowledge/attachments/:id/download",
+    403,
+  ],
+  [
+    "DELETE /api/knowledge/attachments/:id",
+    403,
+  ],
+  [
+    "GET /api/moderation/users",
+    403,
+  ],
+  [
+    "GET /api/moderation/organizations",
+    403,
+  ],
+  [
+    "GET /api/moderation/stores",
+    403,
+  ],
+  [
+    "PATCH /api/moderation/users/:id",
+    403,
+  ],
+  [
+    "PATCH /api/moderation/organizations/:id",
+    403,
+  ],
+  [
+    "PATCH /api/moderation/stores/:id",
+    403,
+  ],
+  [
+    "GET /api/organizations",
+    200,
+  ],
+  [
+    "POST /api/organizations",
+    400,
+  ],
+  [
+    "PATCH /api/organizations/:id",
+    404,
+  ],
+  [
+    "DELETE /api/organizations/:id",
+    403,
+  ],
+  [
+    "PUT /api/organizations/:id/members",
+    403,
+  ],
+  [
+    "POST /api/organizations/:id/approve",
+    403,
+  ],
+  [
+    "POST /api/organizations/:id/reject",
+    403,
+  ],
+  [
+    "POST /api/recurring-requests/:id/stop",
+    403,
+  ],
+  [
+    "GET /api/request-types",
+    200,
+  ],
+  [
+    "POST /api/request-types",
+    403,
+  ],
+  [
+    "PATCH /api/request-types/:id",
+    403,
+  ],
+  [
+    "GET /api/requests/assignees",
+    403,
+  ],
+  [
+    "GET /api/requests",
+    200,
+  ],
+  [
+    "GET /api/requests/stats",
+    403,
+  ],
+  [
+    "GET /api/requests/procurement",
+    403,
+  ],
+  [
+    "POST /api/requests",
+    400,
+  ],
+  [
+    "PATCH /api/requests/:id",
+    403,
+  ],
+  [
+    "DELETE /api/requests/:id",
+    403,
+  ],
+  [
+    "POST /api/requests/:id/assignees/self",
+    403,
+  ],
+  [
+    "DELETE /api/requests/:id/assignees/self",
+    204,
+  ],
+  [
+    "POST /api/requests/:id/comments",
+    404,
+  ],
+  [
+    "GET /api/staff",
+    403,
+  ],
+  [
+    "POST /api/staff",
+    403,
+  ],
+  [
+    "PATCH /api/staff/:id",
+    403,
+  ],
+  [
+    "PUT /api/staff/:id/access",
+    403,
+  ],
+  [
+    "PATCH /api/staff/:id/password",
+    403,
+  ],
+  [
+    "POST /api/staff/:id/telegram-link",
+    403,
+  ],
+  [
+    "GET /api/stores",
+    200,
+  ],
+  [
+    "POST /api/stores",
+    400,
+  ],
+  [
+    "PATCH /api/stores/:id",
+    404,
+  ],
+  [
+    "DELETE /api/stores/:id",
+    403,
+  ],
+  [
+    "GET /api/stores/:id/access",
+    404,
+  ],
+  [
+    "PUT /api/stores/:id/access",
+    404,
+  ],
+  [
+    "POST /api/stores/:id/approve",
+    403,
+  ],
+  [
+    "POST /api/stores/:id/reject",
+    403,
+  ],
+  [
+    "GET /api/telegram/integrations",
+    403,
+  ],
+  [
+    "GET /api/telegram/chats",
+    403,
+  ],
+  [
+    "GET /api/telegram/chats/:id/messages",
+    403,
+  ],
+  [
+    "PATCH /api/telegram/chats/:id/link",
+    403,
+  ],
+  [
+    "PUT /api/telegram/chats/:id/links",
+    403,
+  ],
+  [
+    "POST /api/telegram/chats/:id/messages",
+    403,
+  ],
+  [
+    "GET /api/users",
+    403,
+  ],
+  [
+    "POST /api/users",
+    403,
+  ],
+  [
+    "PATCH /api/users/:id/status",
+    403,
+  ],
+  [
+    "PATCH /api/users/:id/password",
+    403,
+  ],
+]
+`;
+
+exports[`API characterization > records endpoint responses for DEPARTMENT_HEAD using an empty or default request 1`] = `
+[
+  [
+    "GET /api/auth/me",
+    200,
+  ],
+  [
+    "GET /api/boards",
+    200,
+  ],
+  [
+    "POST /api/boards",
+    400,
+  ],
+  [
+    "GET /api/boards/:boardId",
+    404,
+  ],
+  [
+    "GET /api/boards/:boardId/archive",
+    404,
+  ],
+  [
+    "PATCH /api/boards/:boardId/layout",
+    400,
+  ],
+  [
+    "POST /api/boards/cards/:cardId/restore",
+    400,
+  ],
+  [
+    "PATCH /api/boards/:boardId",
+    404,
+  ],
+  [
+    "DELETE /api/boards/:boardId",
+    404,
+  ],
+  [
+    "GET /api/boards/:boardId/access",
+    404,
+  ],
+  [
+    "POST /api/boards/:boardId/access",
+    404,
+  ],
+  [
+    "DELETE /api/boards/:boardId/access/:userId",
+    404,
+  ],
+  [
+    "POST /api/boards/:boardId/columns",
+    404,
+  ],
+  [
+    "PATCH /api/boards/columns/:columnId",
+    400,
+  ],
+  [
+    "DELETE /api/boards/columns/:columnId",
+    400,
+  ],
+  [
+    "POST /api/boards/columns/:columnId/move",
+    400,
+  ],
+  [
+    "POST /api/boards/columns/:columnId/cards",
+    400,
+  ],
+  [
+    "PATCH /api/boards/cards/:cardId",
+    400,
+  ],
+  [
+    "DELETE /api/boards/cards/:cardId",
+    400,
+  ],
+  [
+    "POST /api/boards/cards/:cardId/archive",
+    400,
+  ],
+  [
+    "POST /api/boards/cards/:cardId/move",
+    400,
+  ],
+  [
+    "GET /api/components",
+    200,
+  ],
+  [
+    "POST /api/components",
+    400,
+  ],
+  [
+    "PATCH /api/components/:id",
+    404,
+  ],
+  [
+    "GET /api/departments",
+    200,
+  ],
+  [
+    "POST /api/departments",
+    403,
+  ],
+  [
+    "PATCH /api/departments/:id",
+    403,
+  ],
+  [
+    "GET /api/knowledge/sections",
+    200,
+  ],
+  [
+    "POST /api/knowledge/sections",
+    400,
+  ],
+  [
+    "PATCH /api/knowledge/sections/:id",
+    404,
+  ],
+  [
+    "DELETE /api/knowledge/sections/:id",
+    404,
+  ],
+  [
+    "POST /api/knowledge/import",
+    400,
+  ],
+  [
+    "GET /api/knowledge/articles",
+    200,
+  ],
+  [
+    "POST /api/knowledge/articles",
+    400,
+  ],
+  [
+    "GET /api/knowledge/articles/:id",
+    404,
+  ],
+  [
+    "PATCH /api/knowledge/articles/:id",
+    404,
+  ],
+  [
+    "DELETE /api/knowledge/articles/:id",
+    404,
+  ],
+  [
+    "POST /api/knowledge/articles/:id/attachments",
+    404,
+  ],
+  [
+    "GET /api/knowledge/attachments/:id/download",
+    404,
+  ],
+  [
+    "DELETE /api/knowledge/attachments/:id",
+    404,
+  ],
+  [
+    "GET /api/moderation/users",
+    403,
+  ],
+  [
+    "GET /api/moderation/organizations",
+    403,
+  ],
+  [
+    "GET /api/moderation/stores",
+    403,
+  ],
+  [
+    "PATCH /api/moderation/users/:id",
+    403,
+  ],
+  [
+    "PATCH /api/moderation/organizations/:id",
+    403,
+  ],
+  [
+    "PATCH /api/moderation/stores/:id",
+    403,
+  ],
+  [
+    "GET /api/organizations",
+    200,
+  ],
+  [
+    "POST /api/organizations",
+    400,
+  ],
+  [
+    "PATCH /api/organizations/:id",
+    404,
+  ],
+  [
+    "DELETE /api/organizations/:id",
+    403,
+  ],
+  [
+    "PUT /api/organizations/:id/members",
+    403,
+  ],
+  [
+    "POST /api/organizations/:id/approve",
+    404,
+  ],
+  [
+    "POST /api/organizations/:id/reject",
+    400,
+  ],
+  [
+    "POST /api/recurring-requests/:id/stop",
+    404,
+  ],
+  [
+    "GET /api/request-types",
+    200,
+  ],
+  [
+    "POST /api/request-types",
+    400,
+  ],
+  [
+    "PATCH /api/request-types/:id",
+    404,
+  ],
+  [
+    "GET /api/requests/assignees",
+    200,
+  ],
+  [
+    "GET /api/requests",
+    200,
+  ],
+  [
+    "GET /api/requests/stats",
+    200,
+  ],
+  [
+    "GET /api/requests/procurement",
+    200,
+  ],
+  [
+    "POST /api/requests",
+    400,
+  ],
+  [
+    "PATCH /api/requests/:id",
+    404,
+  ],
+  [
+    "DELETE /api/requests/:id",
+    403,
+  ],
+  [
+    "POST /api/requests/:id/assignees/self",
+    404,
+  ],
+  [
+    "DELETE /api/requests/:id/assignees/self",
+    204,
+  ],
+  [
+    "POST /api/requests/:id/comments",
+    404,
+  ],
+  [
+    "GET /api/staff",
+    403,
+  ],
+  [
+    "POST /api/staff",
+    403,
+  ],
+  [
+    "PATCH /api/staff/:id",
+    403,
+  ],
+  [
+    "PUT /api/staff/:id/access",
+    403,
+  ],
+  [
+    "PATCH /api/staff/:id/password",
+    403,
+  ],
+  [
+    "POST /api/staff/:id/telegram-link",
+    403,
+  ],
+  [
+    "GET /api/stores",
+    200,
+  ],
+  [
+    "POST /api/stores",
+    400,
+  ],
+  [
+    "PATCH /api/stores/:id",
+    404,
+  ],
+  [
+    "DELETE /api/stores/:id",
+    403,
+  ],
+  [
+    "GET /api/stores/:id/access",
+    404,
+  ],
+  [
+    "PUT /api/stores/:id/access",
+    404,
+  ],
+  [
+    "POST /api/stores/:id/approve",
+    404,
+  ],
+  [
+    "POST /api/stores/:id/reject",
+    400,
+  ],
+  [
+    "GET /api/telegram/integrations",
+    200,
+  ],
+  [
+    "GET /api/telegram/chats",
+    200,
+  ],
+  [
+    "GET /api/telegram/chats/:id/messages",
+    200,
+  ],
+  [
+    "PATCH /api/telegram/chats/:id/link",
+    404,
+  ],
+  [
+    "PUT /api/telegram/chats/:id/links",
+    404,
+  ],
+  [
+    "POST /api/telegram/chats/:id/messages",
+    400,
+  ],
+  [
+    "GET /api/users",
+    403,
+  ],
+  [
+    "POST /api/users",
+    403,
+  ],
+  [
+    "PATCH /api/users/:id/status",
+    403,
+  ],
+  [
+    "PATCH /api/users/:id/password",
+    403,
+  ],
+]
+`;
+
+exports[`API characterization > records endpoint responses for DIRECTOR using an empty or default request 1`] = `
+[
+  [
+    "GET /api/auth/me",
+    200,
+  ],
+  [
+    "GET /api/boards",
+    200,
+  ],
+  [
+    "POST /api/boards",
+    400,
+  ],
+  [
+    "GET /api/boards/:boardId",
+    404,
+  ],
+  [
+    "GET /api/boards/:boardId/archive",
+    404,
+  ],
+  [
+    "PATCH /api/boards/:boardId/layout",
+    400,
+  ],
+  [
+    "POST /api/boards/cards/:cardId/restore",
+    400,
+  ],
+  [
+    "PATCH /api/boards/:boardId",
+    404,
+  ],
+  [
+    "DELETE /api/boards/:boardId",
+    404,
+  ],
+  [
+    "GET /api/boards/:boardId/access",
+    404,
+  ],
+  [
+    "POST /api/boards/:boardId/access",
+    404,
+  ],
+  [
+    "DELETE /api/boards/:boardId/access/:userId",
+    404,
+  ],
+  [
+    "POST /api/boards/:boardId/columns",
+    404,
+  ],
+  [
+    "PATCH /api/boards/columns/:columnId",
+    400,
+  ],
+  [
+    "DELETE /api/boards/columns/:columnId",
+    400,
+  ],
+  [
+    "POST /api/boards/columns/:columnId/move",
+    400,
+  ],
+  [
+    "POST /api/boards/columns/:columnId/cards",
+    400,
+  ],
+  [
+    "PATCH /api/boards/cards/:cardId",
+    400,
+  ],
+  [
+    "DELETE /api/boards/cards/:cardId",
+    400,
+  ],
+  [
+    "POST /api/boards/cards/:cardId/archive",
+    400,
+  ],
+  [
+    "POST /api/boards/cards/:cardId/move",
+    400,
+  ],
+  [
+    "GET /api/components",
+    200,
+  ],
+  [
+    "POST /api/components",
+    400,
+  ],
+  [
+    "PATCH /api/components/:id",
+    404,
+  ],
+  [
+    "GET /api/departments",
+    200,
+  ],
+  [
+    "POST /api/departments",
+    400,
+  ],
+  [
+    "PATCH /api/departments/:id",
+    404,
+  ],
+  [
+    "GET /api/knowledge/sections",
+    200,
+  ],
+  [
+    "POST /api/knowledge/sections",
+    400,
+  ],
+  [
+    "PATCH /api/knowledge/sections/:id",
+    404,
+  ],
+  [
+    "DELETE /api/knowledge/sections/:id",
+    404,
+  ],
+  [
+    "POST /api/knowledge/import",
+    400,
+  ],
+  [
+    "GET /api/knowledge/articles",
+    200,
+  ],
+  [
+    "POST /api/knowledge/articles",
+    400,
+  ],
+  [
+    "GET /api/knowledge/articles/:id",
+    404,
+  ],
+  [
+    "PATCH /api/knowledge/articles/:id",
+    404,
+  ],
+  [
+    "DELETE /api/knowledge/articles/:id",
+    404,
+  ],
+  [
+    "POST /api/knowledge/articles/:id/attachments",
+    404,
+  ],
+  [
+    "GET /api/knowledge/attachments/:id/download",
+    404,
+  ],
+  [
+    "DELETE /api/knowledge/attachments/:id",
+    404,
+  ],
+  [
+    "GET /api/moderation/users",
+    200,
+  ],
+  [
+    "GET /api/moderation/organizations",
+    200,
+  ],
+  [
+    "GET /api/moderation/stores",
+    200,
+  ],
+  [
+    "PATCH /api/moderation/users/:id",
+    400,
+  ],
+  [
+    "PATCH /api/moderation/organizations/:id",
+    400,
+  ],
+  [
+    "PATCH /api/moderation/stores/:id",
+    400,
+  ],
+  [
+    "GET /api/organizations",
+    200,
+  ],
+  [
+    "POST /api/organizations",
+    400,
+  ],
+  [
+    "PATCH /api/organizations/:id",
+    404,
+  ],
+  [
+    "DELETE /api/organizations/:id",
+    404,
+  ],
+  [
+    "PUT /api/organizations/:id/members",
+    400,
+  ],
+  [
+    "POST /api/organizations/:id/approve",
+    404,
+  ],
+  [
+    "POST /api/organizations/:id/reject",
+    400,
+  ],
+  [
+    "POST /api/recurring-requests/:id/stop",
+    404,
+  ],
+  [
+    "GET /api/request-types",
+    200,
+  ],
+  [
+    "POST /api/request-types",
+    400,
+  ],
+  [
+    "PATCH /api/request-types/:id",
+    404,
+  ],
+  [
+    "GET /api/requests/assignees",
+    200,
+  ],
+  [
+    "GET /api/requests",
+    200,
+  ],
+  [
+    "GET /api/requests/stats",
+    200,
+  ],
+  [
+    "GET /api/requests/procurement",
+    200,
+  ],
+  [
+    "POST /api/requests",
+    400,
+  ],
+  [
+    "PATCH /api/requests/:id",
+    404,
+  ],
+  [
+    "DELETE /api/requests/:id",
+    404,
+  ],
+  [
+    "POST /api/requests/:id/assignees/self",
+    404,
+  ],
+  [
+    "DELETE /api/requests/:id/assignees/self",
+    204,
+  ],
+  [
+    "POST /api/requests/:id/comments",
+    404,
+  ],
+  [
+    "GET /api/staff",
+    200,
+  ],
+  [
+    "POST /api/staff",
+    400,
+  ],
+  [
+    "PATCH /api/staff/:id",
+    404,
+  ],
+  [
+    "PUT /api/staff/:id/access",
+    400,
+  ],
+  [
+    "PATCH /api/staff/:id/password",
+    400,
+  ],
+  [
+    "POST /api/staff/:id/telegram-link",
+    404,
+  ],
+  [
+    "GET /api/stores",
+    200,
+  ],
+  [
+    "POST /api/stores",
+    400,
+  ],
+  [
+    "PATCH /api/stores/:id",
+    404,
+  ],
+  [
+    "DELETE /api/stores/:id",
+    404,
+  ],
+  [
+    "GET /api/stores/:id/access",
+    404,
+  ],
+  [
+    "PUT /api/stores/:id/access",
+    404,
+  ],
+  [
+    "POST /api/stores/:id/approve",
+    404,
+  ],
+  [
+    "POST /api/stores/:id/reject",
+    400,
+  ],
+  [
+    "GET /api/telegram/integrations",
+    200,
+  ],
+  [
+    "GET /api/telegram/chats",
+    200,
+  ],
+  [
+    "GET /api/telegram/chats/:id/messages",
+    200,
+  ],
+  [
+    "PATCH /api/telegram/chats/:id/link",
+    404,
+  ],
+  [
+    "PUT /api/telegram/chats/:id/links",
+    404,
+  ],
+  [
+    "POST /api/telegram/chats/:id/messages",
+    400,
+  ],
+  [
+    "GET /api/users",
+    200,
+  ],
+  [
+    "POST /api/users",
+    400,
+  ],
+  [
+    "PATCH /api/users/:id/status",
+    400,
+  ],
+  [
+    "PATCH /api/users/:id/password",
+    400,
+  ],
+]
+`;
+
+exports[`API characterization > records endpoint responses for MASTER using an empty or default request 1`] = `
+[
+  [
+    "GET /api/auth/me",
+    200,
+  ],
+  [
+    "GET /api/boards",
+    200,
+  ],
+  [
+    "POST /api/boards",
+    400,
+  ],
+  [
+    "GET /api/boards/:boardId",
+    404,
+  ],
+  [
+    "GET /api/boards/:boardId/archive",
+    404,
+  ],
+  [
+    "PATCH /api/boards/:boardId/layout",
+    400,
+  ],
+  [
+    "POST /api/boards/cards/:cardId/restore",
+    400,
+  ],
+  [
+    "PATCH /api/boards/:boardId",
+    404,
+  ],
+  [
+    "DELETE /api/boards/:boardId",
+    404,
+  ],
+  [
+    "GET /api/boards/:boardId/access",
+    404,
+  ],
+  [
+    "POST /api/boards/:boardId/access",
+    404,
+  ],
+  [
+    "DELETE /api/boards/:boardId/access/:userId",
+    404,
+  ],
+  [
+    "POST /api/boards/:boardId/columns",
+    404,
+  ],
+  [
+    "PATCH /api/boards/columns/:columnId",
+    400,
+  ],
+  [
+    "DELETE /api/boards/columns/:columnId",
+    400,
+  ],
+  [
+    "POST /api/boards/columns/:columnId/move",
+    400,
+  ],
+  [
+    "POST /api/boards/columns/:columnId/cards",
+    400,
+  ],
+  [
+    "PATCH /api/boards/cards/:cardId",
+    400,
+  ],
+  [
+    "DELETE /api/boards/cards/:cardId",
+    400,
+  ],
+  [
+    "POST /api/boards/cards/:cardId/archive",
+    400,
+  ],
+  [
+    "POST /api/boards/cards/:cardId/move",
+    400,
+  ],
+  [
+    "GET /api/components",
+    200,
+  ],
+  [
+    "POST /api/components",
+    403,
+  ],
+  [
+    "PATCH /api/components/:id",
+    403,
+  ],
+  [
+    "GET /api/departments",
+    200,
+  ],
+  [
+    "POST /api/departments",
+    403,
+  ],
+  [
+    "PATCH /api/departments/:id",
+    403,
+  ],
+  [
+    "GET /api/knowledge/sections",
+    200,
+  ],
+  [
+    "POST /api/knowledge/sections",
+    400,
+  ],
+  [
+    "PATCH /api/knowledge/sections/:id",
+    404,
+  ],
+  [
+    "DELETE /api/knowledge/sections/:id",
+    404,
+  ],
+  [
+    "POST /api/knowledge/import",
+    400,
+  ],
+  [
+    "GET /api/knowledge/articles",
+    200,
+  ],
+  [
+    "POST /api/knowledge/articles",
+    400,
+  ],
+  [
+    "GET /api/knowledge/articles/:id",
+    404,
+  ],
+  [
+    "PATCH /api/knowledge/articles/:id",
+    404,
+  ],
+  [
+    "DELETE /api/knowledge/articles/:id",
+    404,
+  ],
+  [
+    "POST /api/knowledge/articles/:id/attachments",
+    404,
+  ],
+  [
+    "GET /api/knowledge/attachments/:id/download",
+    404,
+  ],
+  [
+    "DELETE /api/knowledge/attachments/:id",
+    404,
+  ],
+  [
+    "GET /api/moderation/users",
+    403,
+  ],
+  [
+    "GET /api/moderation/organizations",
+    403,
+  ],
+  [
+    "GET /api/moderation/stores",
+    403,
+  ],
+  [
+    "PATCH /api/moderation/users/:id",
+    403,
+  ],
+  [
+    "PATCH /api/moderation/organizations/:id",
+    403,
+  ],
+  [
+    "PATCH /api/moderation/stores/:id",
+    403,
+  ],
+  [
+    "GET /api/organizations",
+    200,
+  ],
+  [
+    "POST /api/organizations",
+    400,
+  ],
+  [
+    "PATCH /api/organizations/:id",
+    404,
+  ],
+  [
+    "DELETE /api/organizations/:id",
+    403,
+  ],
+  [
+    "PUT /api/organizations/:id/members",
+    403,
+  ],
+  [
+    "POST /api/organizations/:id/approve",
+    404,
+  ],
+  [
+    "POST /api/organizations/:id/reject",
+    400,
+  ],
+  [
+    "POST /api/recurring-requests/:id/stop",
+    404,
+  ],
+  [
+    "GET /api/request-types",
+    200,
+  ],
+  [
+    "POST /api/request-types",
+    403,
+  ],
+  [
+    "PATCH /api/request-types/:id",
+    403,
+  ],
+  [
+    "GET /api/requests/assignees",
+    200,
+  ],
+  [
+    "GET /api/requests",
+    200,
+  ],
+  [
+    "GET /api/requests/stats",
+    200,
+  ],
+  [
+    "GET /api/requests/procurement",
+    200,
+  ],
+  [
+    "POST /api/requests",
+    400,
+  ],
+  [
+    "PATCH /api/requests/:id",
+    404,
+  ],
+  [
+    "DELETE /api/requests/:id",
+    403,
+  ],
+  [
+    "POST /api/requests/:id/assignees/self",
+    404,
+  ],
+  [
+    "DELETE /api/requests/:id/assignees/self",
+    204,
+  ],
+  [
+    "POST /api/requests/:id/comments",
+    404,
+  ],
+  [
+    "GET /api/staff",
+    403,
+  ],
+  [
+    "POST /api/staff",
+    403,
+  ],
+  [
+    "PATCH /api/staff/:id",
+    403,
+  ],
+  [
+    "PUT /api/staff/:id/access",
+    403,
+  ],
+  [
+    "PATCH /api/staff/:id/password",
+    403,
+  ],
+  [
+    "POST /api/staff/:id/telegram-link",
+    403,
+  ],
+  [
+    "GET /api/stores",
+    200,
+  ],
+  [
+    "POST /api/stores",
+    400,
+  ],
+  [
+    "PATCH /api/stores/:id",
+    404,
+  ],
+  [
+    "DELETE /api/stores/:id",
+    403,
+  ],
+  [
+    "GET /api/stores/:id/access",
+    404,
+  ],
+  [
+    "PUT /api/stores/:id/access",
+    404,
+  ],
+  [
+    "POST /api/stores/:id/approve",
+    404,
+  ],
+  [
+    "POST /api/stores/:id/reject",
+    400,
+  ],
+  [
+    "GET /api/telegram/integrations",
+    200,
+  ],
+  [
+    "GET /api/telegram/chats",
+    200,
+  ],
+  [
+    "GET /api/telegram/chats/:id/messages",
+    200,
+  ],
+  [
+    "PATCH /api/telegram/chats/:id/link",
+    404,
+  ],
+  [
+    "PUT /api/telegram/chats/:id/links",
+    404,
+  ],
+  [
+    "POST /api/telegram/chats/:id/messages",
+    400,
+  ],
+  [
+    "GET /api/users",
+    403,
+  ],
+  [
+    "POST /api/users",
+    403,
+  ],
+  [
+    "PATCH /api/users/:id/status",
+    403,
+  ],
+  [
+    "PATCH /api/users/:id/password",
+    403,
+  ],
+]
+`;

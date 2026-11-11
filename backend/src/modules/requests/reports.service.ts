@@ -1,6 +1,6 @@
 import { RequestStatus, Role, Urgency, type Prisma } from "@prisma/client";
 import { prisma } from "../../db.js";
-import { type UserAccess } from "../../utils/permissions.js";
+import { type UserAccess } from "../../shared/middleware/authorization.js";
 import { requestVisibilityWhere } from "./request-policy.js";
 
 export function parseReportPeriod(fromValue: unknown, toValue: unknown) {

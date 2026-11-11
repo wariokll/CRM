@@ -1,21 +1,22 @@
+import { BookOpen, FileText, FolderPlus } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft,
-  BookOpen,
-  Download,
-  FileText,
-  FileUp,
-  FolderPlus,
-  FolderOpen,
-  Image as ImageIcon,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-  Upload,
-  X,
-} from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { api, apiFile } from "../../api";
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import { useSearchParams } from "react-router-dom";
+import { downloadKnowledgeFile, knowledgeRequest } from "./queries";
+import { queryKeys } from "../../shared/queryKeys";
+import { KnowledgeImportDialog } from "./KnowledgeImportDialog";
+import { KnowledgeEditDialogs } from "./KnowledgeEditDialogs";
+import { KnowledgeArticleView } from "./KnowledgeArticleView";
+import { KnowledgeArticleList } from "./KnowledgeArticleList";
+import type { KnowledgeImportResult } from "./KnowledgeImportDialog";
 import type {
   KnowledgeArticle,
   KnowledgeArticleSummary,
@@ -24,14 +25,10 @@ import type {
 } from "../../types";
 
 function errorText(reason: unknown) {
-  return reason instanceof Error ? reason.message : "Не удалось выполнить действие";
+  return reason instanceof Error
+    ? reason.message
+    : "Не удалось выполнить действие";
 }
-
-type KnowledgeImportResult = {
-  imported: number;
-  skipped: number;
-  failed: { fileName: string; reason: string }[];
-};
 
 function formatSize(size: number) {
   return size < 1024 * 1024
@@ -40,10 +37,15 @@ function formatSize(size: number) {
 }
 
 async function loadKnowledgeSections() {
-  const sections = await api<KnowledgeSection[]>("/knowledge/sections");
-  if (sections.every((section) => Array.isArray(section.articles))) return sections;
+  const sections = await knowledgeRequest<KnowledgeSection[]>(
+    "/knowledge/sections",
+  );
+  if (sections.every((section) => Array.isArray(section.articles)))
+    return sections;
 
-  const articles = await api<KnowledgeArticleSummary[]>("/knowledge/articles");
+  const articles = await knowledgeRequest<KnowledgeArticleSummary[]>(
+    "/knowledge/articles",
+  );
   const articlesBySection = new Map<number, { id: number; title: string }[]>();
   for (const article of articles) {
     const sectionArticles = articlesBySection.get(article.sectionId) ?? [];
@@ -55,24 +57,36 @@ async function loadKnowledgeSections() {
     ...section,
     articles: Array.isArray(section.articles)
       ? section.articles
-      : articlesBySection.get(section.id) ?? [],
+      : (articlesBySection.get(section.id) ?? []),
   }));
 }
 
 export function KnowledgePage() {
-  const [sections, setSections] = useState<KnowledgeSection[]>([]);
-  const [activeSectionId, setActiveSectionId] = useState<number | null>(null);
-  const [articles, setArticles] = useState<KnowledgeArticleSummary[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sectionParam = searchParams.get("sectionId");
+  const sectionFromUrl =
+    sectionParam && sectionParam !== "all"
+      ? Number(sectionParam) || null
+      : null;
+  const searchFromUrl = searchParams.get("search") ?? "";
+  const articleIdFromUrl = Number(searchParams.get("articleId")) || null;
+  const [activeSectionId, setActiveSectionLocal] = useState<number | null>(
+    sectionFromUrl,
+  );
   const [article, setArticle] = useState<KnowledgeArticle | null>(null);
-  const [search, setSearch] = useState("");
-  const [sectionDialog, setSectionDialog] = useState<KnowledgeSection | "new" | null>(null);
-  const [articleDialog, setArticleDialog] = useState<KnowledgeArticle | "new" | null>(null);
+  const [search, setSearchLocal] = useState(searchFromUrl);
+  const [sectionDialog, setSectionDialog] = useState<
+    KnowledgeSection | "new" | null
+  >(null);
+  const [articleDialog, setArticleDialog] = useState<
+    KnowledgeArticle | "new" | null
+  >(null);
   const [importDialog, setImportDialog] = useState(false);
   const [importFiles, setImportFiles] = useState<File[]>([]);
   const [importSectionId, setImportSectionId] = useState<number | null>(null);
-  const [importResult, setImportResult] = useState<KnowledgeImportResult | null>(null);
+  const [importResult, setImportResult] =
+    useState<KnowledgeImportResult | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-  const [refreshList, setRefreshList] = useState(0);
   const [imageUrls, setImageUrls] = useState<Record<number, string>>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -80,32 +94,86 @@ export function KnowledgePage() {
   const importFilesRef = useRef<HTMLInputElement>(null);
   const importFolderRef = useRef<HTMLInputElement>(null);
 
+  const queryClient = useQueryClient();
+  const requestedArticleRef = useRef<number | null>(null);
+  const setActiveSectionId = useCallback(
+    (id: number | null) => {
+      setActiveSectionLocal(id);
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.set("sectionId", id === null ? "all" : String(id));
+          next.delete("articleId");
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+  const setSearch = (value: string) => {
+    setSearchLocal(value);
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (value) next.set("search", value);
+        else next.delete("search");
+        next.delete("articleId");
+        return next;
+      },
+      { replace: true },
+    );
+  };
+  const goToArticleList = () => {
+    setArticle(null);
+    requestedArticleRef.current = null;
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("articleId");
+        return next;
+      },
+      { replace: true },
+    );
+  };
   useEffect(() => {
-    void loadKnowledgeSections()
-      .then((items) => {
-        setSections(items);
-        if (items.length) setActiveSectionId(items[0].id);
-      })
-      .catch((reason) => setError(errorText(reason)));
-  }, []);
-
+    setActiveSectionLocal(sectionFromUrl);
+    setSearchLocal(searchFromUrl);
+  }, [sectionFromUrl, searchFromUrl]);
+  const sectionsQuery = useQuery({
+    queryKey: queryKeys.knowledge.sections,
+    queryFn: loadKnowledgeSections,
+  });
+  const sections = useMemo(
+    () => sectionsQuery.data ?? [],
+    [sectionsQuery.data],
+  );
+  const articlesQuery = useQuery({
+    queryKey: queryKeys.knowledge.articleList(activeSectionId, search.trim()),
+    queryFn: async () => {
+      const query = new URLSearchParams();
+      if (search.trim()) query.set("search", search.trim());
+      else if (activeSectionId) query.set("sectionId", String(activeSectionId));
+      const suffix = query.size ? `?${query.toString()}` : "";
+      return knowledgeRequest<KnowledgeArticleSummary[]>(
+        `/knowledge/articles${suffix}`,
+      );
+    },
+  });
+  const articles = articlesQuery.data ?? [];
   useEffect(() => {
-    let cancelled = false;
-    const query = new URLSearchParams();
-    if (search.trim()) query.set("search", search.trim());
-    else if (activeSectionId) query.set("sectionId", String(activeSectionId));
-    const suffix = query.size ? `?${query.toString()}` : "";
-    void api<KnowledgeArticleSummary[]>(`/knowledge/articles${suffix}`)
-      .then((items) => {
-        if (!cancelled) setArticles(items);
-      })
-      .catch((reason) => {
-        if (!cancelled) setError(errorText(reason));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeSectionId, search, refreshList]);
+    if (activeSectionId === null && sectionParam !== "all" && sections.length)
+      setActiveSectionId(sections[0].id);
+    if (
+      activeSectionId !== null &&
+      !sections.some((section) => section.id === activeSectionId)
+    )
+      setActiveSectionId(sections[0]?.id ?? null);
+  }, [activeSectionId, sectionParam, sections, setActiveSectionId]);
+  useEffect(() => {
+    if (sectionsQuery.error) setError(errorText(sectionsQuery.error));
+    if (articlesQuery.error) setError(errorText(articlesQuery.error));
+  }, [sectionsQuery.error, articlesQuery.error]);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,7 +182,9 @@ export function KnowledgePage() {
     if (!article) return;
     for (const attachment of article.attachments) {
       if (!attachment.mimeType.startsWith("image/")) continue;
-      void apiFile(`/knowledge/attachments/${attachment.id}/download`)
+      void downloadKnowledgeFile(
+        `/knowledge/attachments/${attachment.id}/download`,
+      )
         .then((blob) => {
           const url = URL.createObjectURL(blob);
           if (cancelled) URL.revokeObjectURL(url);
@@ -132,26 +202,78 @@ export function KnowledgePage() {
   }, [article]);
 
   const reloadSections = async (selectId?: number | null) => {
-    const items = await loadKnowledgeSections();
-    setSections(items);
+    const items = await queryClient.fetchQuery({
+      queryKey: queryKeys.knowledge.sections,
+      queryFn: loadKnowledgeSections,
+      staleTime: 0,
+    });
     if (selectId !== undefined) setActiveSectionId(selectId);
-    else if (activeSectionId && !items.some((item) => item.id === activeSectionId))
+    else if (
+      activeSectionId &&
+      !items.some((item) => item.id === activeSectionId)
+    )
       setActiveSectionId(items[0]?.id ?? null);
   };
 
-  const openArticle = async (id: number) => {
+  const openImport = () => {
+    setImportFiles([]);
+    setImportSectionId(activeSectionId ?? sections[0]?.id ?? null);
+    setImportResult(null);
     setError("");
-    try {
-      setArticle(await api<KnowledgeArticle>(`/knowledge/articles/${id}`));
-    } catch (reason) {
-      setError(errorText(reason));
-    }
+    setImportDialog(true);
   };
+  const openArticle = useCallback(
+    async (id: number) => {
+      setError("");
+      requestedArticleRef.current = id;
+      const sectionId =
+        sections.find((section) =>
+          section.articles.some((item) => item.id === id),
+        )?.id ?? activeSectionId;
+      if (searchParams.get("articleId") !== String(id))
+        setSearchParams(
+          (current) => {
+            const next = new URLSearchParams(current);
+            next.set("articleId", String(id));
+            if (sectionId !== null) next.set("sectionId", String(sectionId));
+            next.delete("search");
+            return next;
+          },
+          { replace: false },
+        );
+      setSearchLocal("");
+      if (sectionId !== null) setActiveSectionLocal(sectionId);
+      try {
+        setArticle(
+          await queryClient.fetchQuery({
+            queryKey: queryKeys.knowledge.article(id),
+            queryFn: () =>
+              knowledgeRequest<KnowledgeArticle>(`/knowledge/articles/${id}`),
+          }),
+        );
+      } catch (reason) {
+        setError(errorText(reason));
+      }
+    },
+    [activeSectionId, queryClient, searchParams, sections, setSearchParams],
+  );
+
+  useEffect(() => {
+    if (articleIdFromUrl && requestedArticleRef.current !== articleIdFromUrl) {
+      requestedArticleRef.current = articleIdFromUrl;
+      void openArticle(articleIdFromUrl);
+    } else if (!articleIdFromUrl) {
+      requestedArticleRef.current = null;
+      if (article) setArticle(null);
+    }
+  }, [article, articleIdFromUrl, openArticle]);
 
   const downloadAttachment = async (attachment: KnowledgeAttachment) => {
     setError("");
     try {
-      const blob = await apiFile(`/knowledge/attachments/${attachment.id}/download`);
+      const blob = await downloadKnowledgeFile(
+        `/knowledge/attachments/${attachment.id}/download`,
+      );
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -199,8 +321,10 @@ export function KnowledgePage() {
     const body = { name, parentId: parent ? Number(parent) : null };
     try {
       const isNew = sectionDialog === "new";
-      const saved = await api<KnowledgeSection>(
-        isNew ? "/knowledge/sections" : `/knowledge/sections/${sectionDialog!.id}`,
+      const saved = await knowledgeRequest<KnowledgeSection>(
+        isNew
+          ? "/knowledge/sections"
+          : `/knowledge/sections/${sectionDialog!.id}`,
         {
           method: isNew ? "POST" : "PATCH",
           body: JSON.stringify(body),
@@ -219,8 +343,12 @@ export function KnowledgePage() {
     if (!window.confirm(`Удалить раздел «${section.name}»?`)) return;
     setError("");
     try {
-      await api<void>(`/knowledge/sections/${section.id}`, { method: "DELETE" });
-      await reloadSections(activeSectionId === section.id ? null : activeSectionId);
+      await knowledgeRequest<void>(`/knowledge/sections/${section.id}`, {
+        method: "DELETE",
+      });
+      await reloadSections(
+        activeSectionId === section.id ? null : activeSectionId,
+      );
     } catch (reason) {
       setError(errorText(reason));
     }
@@ -239,8 +367,10 @@ export function KnowledgePage() {
     };
     const files = pendingFiles;
     try {
-      const saved = await api<{ id: number; sectionId: number }>(
-        isNew ? "/knowledge/articles" : `/knowledge/articles/${articleDialog!.id}`,
+      const saved = await knowledgeRequest<{ id: number; sectionId: number }>(
+        isNew
+          ? "/knowledge/articles"
+          : `/knowledge/articles/${articleDialog!.id}`,
         {
           method: isNew ? "POST" : "PATCH",
           body: JSON.stringify({
@@ -253,10 +383,13 @@ export function KnowledgePage() {
       if (files.length) {
         const upload = new FormData();
         files.forEach((file) => upload.append("files", file));
-        const uploaded = await api<KnowledgeAttachment[]>(`/knowledge/articles/${saved.id}/attachments`, {
-          method: "POST",
-          body: upload,
-        });
+        const uploaded = await knowledgeRequest<KnowledgeAttachment[]>(
+          `/knowledge/articles/${saved.id}/attachments`,
+          {
+            method: "POST",
+            body: upload,
+          },
+        );
         files.forEach((file, index) => {
           if (file.type.startsWith("image/"))
             finalBody = finalBody.replaceAll(
@@ -265,7 +398,7 @@ export function KnowledgePage() {
             );
         });
         if (finalBody !== body.body.replace(/\[\[image:pending:\d+\]\]/g, ""))
-          await api(`/knowledge/articles/${saved.id}`, {
+          await knowledgeRequest(`/knowledge/articles/${saved.id}`, {
             method: "PATCH",
             body: JSON.stringify({ body: finalBody }),
           });
@@ -273,7 +406,9 @@ export function KnowledgePage() {
       setArticleDialog(null);
       setActiveSectionId(saved.sectionId);
       await reloadSections(saved.sectionId);
-      setRefreshList((value) => value + 1);
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.knowledge.articles,
+      });
       await openArticle(saved.id);
     } catch (reason) {
       setError(errorText(reason));
@@ -283,21 +418,29 @@ export function KnowledgePage() {
   };
 
   const deleteArticle = async (item: KnowledgeArticle) => {
-    if (!window.confirm(`Удалить статью «${item.title}» и её вложения?`)) return;
+    if (!window.confirm(`Удалить статью «${item.title}» и её вложения?`))
+      return;
     try {
-      await api<void>(`/knowledge/articles/${item.id}`, { method: "DELETE" });
-      setArticle(null);
+      await knowledgeRequest<void>(`/knowledge/articles/${item.id}`, {
+        method: "DELETE",
+      });
+      goToArticleList();
       await reloadSections(activeSectionId);
-      setRefreshList((value) => value + 1);
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.knowledge.articles,
+      });
     } catch (reason) {
       setError(errorText(reason));
     }
   };
 
   const deleteAttachment = async (attachment: KnowledgeAttachment) => {
-    if (!article || !window.confirm(`Удалить файл «${attachment.fileName}»?`)) return;
+    if (!article || !window.confirm(`Удалить файл «${attachment.fileName}»?`))
+      return;
     try {
-      await api<void>(`/knowledge/attachments/${attachment.id}`, { method: "DELETE" });
+      await knowledgeRequest<void>(`/knowledge/attachments/${attachment.id}`, {
+        method: "DELETE",
+      });
       await openArticle(article.id);
     } catch (reason) {
       setError(errorText(reason));
@@ -335,15 +478,20 @@ export function KnowledgePage() {
       form.append("fileNames", file.name);
     });
     try {
-      const result = await api<KnowledgeImportResult>("/knowledge/import", {
-        method: "POST",
-        body: form,
-      });
+      const result = await knowledgeRequest<KnowledgeImportResult>(
+        "/knowledge/import",
+        {
+          method: "POST",
+          body: form,
+        },
+      );
       setImportResult(result);
       setArticle(null);
       setSearch("");
       await reloadSections(importSectionId);
-      setRefreshList((value) => value + 1);
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.knowledge.articles,
+      });
     } catch (reason) {
       setError(errorText(reason));
     } finally {
@@ -351,12 +499,18 @@ export function KnowledgePage() {
     }
   };
 
-  const articleCounts = new Map(sections.map((section) => [section.id, section.articles.length]));
+  const articleCounts = new Map(
+    sections.map((section) => [section.id, section.articles.length]),
+  );
   for (const section of sections) {
     let parentId = section.parentId;
     while (parentId !== null) {
-      articleCounts.set(parentId, (articleCounts.get(parentId) ?? 0) + section.articles.length);
-      parentId = sections.find((item) => item.id === parentId)?.parentId ?? null;
+      articleCounts.set(
+        parentId,
+        (articleCounts.get(parentId) ?? 0) + section.articles.length,
+      );
+      parentId =
+        sections.find((item) => item.id === parentId)?.parentId ?? null;
     }
   }
 
@@ -423,418 +577,84 @@ export function KnowledgePage() {
           >
             <BookOpen size={14} />
             <span>Все статьи</span>
-            <small>{sections.reduce((sum, item) => sum + item.articles.length, 0)}</small>
+            <small>
+              {sections.reduce((sum, item) => sum + item.articles.length, 0)}
+            </small>
           </button>
-          {sections.filter((item) => item.parentId === null).map((item) => renderSection(item))}
+          {sections
+            .filter((item) => item.parentId === null)
+            .map((item) => renderSection(item))}
         </div>
       </aside>
 
       <section className="knowledge-content">
         {error && <div className="page-error">{error}</div>}
         {article ? (
-          <article className="panel table-panel">
-            <div className="knowledge-article-head">
-              <div>
-                <button className="link-button" onClick={() => setArticle(null)}>
-                  <ArrowLeft size={15} /> К списку
-                </button>
-                <h2>{article.title}</h2>
-                <small>{article.section.name} · обновлено {new Date(article.updatedAt).toLocaleDateString("ru-RU")}</small>
-              </div>
-              <div className="knowledge-article-actions">
-                <button
-                  className="button secondary"
-                  onClick={() => editArticle(article)}
-                >
-                  <Pencil size={15} /> Изменить
-                </button>
-                <button
-                  className="button danger"
-                  onClick={() => void deleteArticle(article)}
-                >
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            </div>
-            <div className="knowledge-article-body">
-              {article.body
-                ? article.body.split(/(\[\[image:\d+\]\])/g).map((part, index) => {
-                    const match = /^\[\[image:(\d+)\]\]$/.exec(part);
-                    if (!match) return <span key={index}>{part}</span>;
-                    const imageId = Number(match[1]);
-                    const attachment = article.attachments.find((item) => item.id === imageId);
-                    return imageUrls[imageId] ? (
-                      <img key={index} src={imageUrls[imageId]} alt={attachment?.fileName ?? "Иллюстрация"} />
-                    ) : (
-                      <span key={index} className="knowledge-image-pending">Загрузка изображения…</span>
-                    );
-                  })
-                : "В статье пока нет текста."}
-            </div>
-            <div className="knowledge-files">
-              <div className="knowledge-sidebar-head">
-                <h3>Вложения</h3>
-                <label className="button secondary">
-                  <Upload size={15} /> Добавить файлы
-                  <input
-                    type="file"
-                    hidden
-                    multiple
-                    accept=".txt,.doc,.docx,.rtf,.pdf,.png,.jpg,.jpeg,.webp,.gif"
-                    onChange={async (event) => {
-                      const selected = Array.from(event.currentTarget.files ?? []);
-                      if (!selected.length) return;
-                      setError("");
-                      const data = new FormData();
-                      selected.forEach((file) => data.append("files", file));
-                      try {
-                        await api(`/knowledge/articles/${article.id}/attachments`, {
-                          method: "POST",
-                          body: data,
-                        });
-                        await openArticle(article.id);
-                      } catch (reason) {
-                        setError(errorText(reason));
-                      } finally {
-                        event.currentTarget.value = "";
-                      }
-                    }}
-                  />
-                </label>
-              </div>
-              {article.attachments
-                .filter((attachment) => !article.body.includes(`[[image:${attachment.id}]]`))
-                .map((attachment) => (
-                <div className="knowledge-file" key={attachment.id}>
-                  {imageUrls[attachment.id] ? (
-                    <img src={imageUrls[attachment.id]} alt={attachment.fileName} />
-                  ) : attachment.mimeType.startsWith("image/") ? (
-                    <ImageIcon size={18} />
-                  ) : (
-                    <FileText size={18} />
-                  )}
-                  <span>{attachment.fileName} · {formatSize(attachment.size)}</span>
-                  <button
-                    title="Скачать файл"
-                    aria-label={`Скачать ${attachment.fileName}`}
-                    onClick={() => void downloadAttachment(attachment)}
-                  >
-                    <Download />
-                  </button>
-                  <button
-                    title="Удалить файл"
-                    aria-label={`Удалить ${attachment.fileName}`}
-                    onClick={() => void deleteAttachment(attachment)}
-                  >
-                    <X />
-                  </button>
-                </div>
-              ))}
-              {!article.attachments.length && <small>В статье пока нет вложений.</small>}
-            </div>
-          </article>
+          <KnowledgeArticleView
+            article={article}
+            imageUrls={imageUrls}
+            setArticle={goToArticleList}
+            setError={setError}
+            openArticle={openArticle}
+            editArticle={editArticle}
+            deleteArticle={deleteArticle}
+            downloadAttachment={downloadAttachment}
+            deleteAttachment={deleteAttachment}
+            formatSize={formatSize}
+            errorText={errorText}
+          />
         ) : (
-          <section className="panel table-panel">
-            <div className="knowledge-toolbar">
-              <div className="knowledge-search">
-                <Search />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Поиск по статьям"
-                  aria-label="Поиск по статьям"
-                />
-              </div>
-              <div className="inline-actions">
-                <button
-                  className="button secondary"
-                  onClick={() => {
-                    setImportFiles([]);
-                    setImportSectionId(activeSectionId ?? sections[0]?.id ?? null);
-                    setImportResult(null);
-                    setError("");
-                    setImportDialog(true);
-                  }}
-                >
-                  <FileUp size={15} /> Импорт
-                </button>
-                {currentSection && (
-                  <>
-                    <button
-                      className="button secondary"
-                      onClick={() => setSectionDialog(currentSection)}
-                    >
-                      <Pencil size={15} /> Раздел
-                    </button>
-                    <button
-                      className="button ghost"
-                      title="Удалить пустой раздел"
-                      aria-label="Удалить раздел"
-                      disabled={currentSection._count.children > 0 || currentSection._count.articles > 0}
-                      onClick={() => void deleteSection(currentSection)}
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </>
-                )}
-                <button
-                  className="button primary"
-                  disabled={!activeSectionId}
-                  onClick={() => editArticle("new")}
-                >
-                  <Plus size={15} /> Статья
-                </button>
-              </div>
-            </div>
-            {search && <p className="request-filter-summary">Результаты поиска по всем статьям</p>}
-            {articles.length ? (
-              <div className="knowledge-article-list">
-                {articles.map((item) => (
-                  <button
-                    className="knowledge-article-row"
-                    key={item.id}
-                    onClick={() => void openArticle(item.id)}
-                  >
-                    <FileText size={17} />
-                    <div>
-                      <b>{item.title}</b>
-                      {search && <small className="knowledge-article-section">{item.section.name}</small>}
-                      {item.excerpt && <small className="knowledge-excerpt">{item.excerpt}</small>}
-                    </div>
-                    <small className="knowledge-date">{new Date(item.updatedAt).toLocaleDateString("ru-RU")}</small>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="empty">
-                <BookOpen />
-                <b>{search ? "Ничего не найдено" : "В этом разделе пока нет статей"}</b>
-                <span>{search ? "Попробуйте изменить запрос." : "Создайте статью или выберите другой раздел."}</span>
-              </div>
-            )}
-          </section>
+          <KnowledgeArticleList
+            search={search}
+            setSearch={setSearch}
+            onImport={openImport}
+            currentSection={currentSection}
+            editSection={setSectionDialog}
+            deleteSection={(section) => void deleteSection(section)}
+            editArticle={editArticle}
+            activeSectionId={activeSectionId}
+            articles={articles}
+            openArticle={openArticle}
+          />
         )}
       </section>
 
-      {sectionDialog && (
-        <div className="modal-backdrop" onMouseDown={() => setSectionDialog(null)}>
-          <section className="modal knowledge-modal" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head">
-              <div>
-                <span className="eyebrow">БАЗА ЗНАНИЙ</span>
-                <h2>{sectionDialog === "new" ? "Новый раздел" : "Изменить раздел"}</h2>
-              </div>
-              <button className="icon-button" onClick={() => setSectionDialog(null)} aria-label="Закрыть"><X /></button>
-            </div>
-            <form onSubmit={saveSection}>
-              <label className="field">
-                <span>Название раздела</span>
-                <input name="name" required minLength={2} maxLength={160} defaultValue={sectionDialog === "new" ? "" : sectionDialog.name} />
-              </label>
-              <label className="field">
-                <span>Родительский раздел</span>
-                <select name="parentId" defaultValue={sectionDialog === "new" ? "" : sectionDialog.parentId ?? ""}>
-                  <option value="">Верхний уровень</option>
-                  {sections.filter((item) => item.id !== (sectionDialog === "new" ? null : sectionDialog.id)).map((item) => (
-                    <option value={item.id} key={item.id}>{item.name}</option>
-                  ))}
-                </select>
-              </label>
-              {error && <div className="knowledge-error">{error}</div>}
-              <div className="modal-actions">
-                <button type="button" className="button secondary" onClick={() => setSectionDialog(null)}>Отмена</button>
-                <button className="button primary" disabled={busy}>Сохранить</button>
-              </div>
-            </form>
-          </section>
-        </div>
-      )}
-
-      {articleDialog && (
-        <div className="modal-backdrop" onMouseDown={() => setArticleDialog(null)}>
-          <section className="modal knowledge-modal" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head">
-              <div>
-                <span className="eyebrow">БАЗА ЗНАНИЙ</span>
-                <h2>{articleDialog === "new" ? "Новая статья" : "Изменить статью"}</h2>
-              </div>
-              <button className="icon-button" onClick={() => setArticleDialog(null)} aria-label="Закрыть"><X /></button>
-            </div>
-            <form onSubmit={saveArticle}>
-              <label className="field">
-                <span>Раздел</span>
-                <select name="sectionId" required defaultValue={articleDialog === "new" ? activeSectionId ?? "" : articleDialog.sectionId}>
-                  {sections.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
-                </select>
-              </label>
-              <label className="field">
-                <span>Название статьи</span>
-                <input name="title" required minLength={2} maxLength={240} defaultValue={articleDialog === "new" ? "" : articleDialog.title} />
-              </label>
-              <label className="field">
-                <span>Текст</span>
-                <textarea ref={bodyEditorRef} name="body" rows={10} defaultValue={articleDialog === "new" ? "" : articleDialog.body} />
-              </label>
-              <label className="field">
-                <span>Документы и изображения</span>
-                <input
-                  type="file"
-                  multiple
-                  accept=".txt,.doc,.docx,.rtf,.pdf,.png,.jpg,.jpeg,.webp,.gif"
-                  onChange={(event) => {
-                    addArticleFiles(Array.from(event.currentTarget.files ?? []));
-                    event.currentTarget.value = "";
-                  }}
-                />
-              </label>
-              {pendingFiles.map((file, index) => (
-                <div className="knowledge-pending-file" key={`${file.name}-${index}`}>
-                  {file.type.startsWith("image/") ? <ImageIcon size={16} /> : <FileText size={16} />}
-                  <span>{file.name} · {formatSize(file.size)}</span>
-                  {file.type.startsWith("image/") && (
-                    <button
-                      type="button"
-                      className="button secondary"
-                      onClick={() => insertImageMarker(`[[image:pending:${index}]]`)}
-                    >
-                      Вставить в текст
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="button ghost"
-                    aria-label={`Убрать ${file.name}`}
-                    onClick={() => setPendingFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}
-                  >
-                    <X size={15} />
-                  </button>
-                </div>
-              ))}
-              {articleDialog !== "new" && articleDialog.attachments
-                .filter((attachment) => attachment.mimeType.startsWith("image/"))
-                .map((attachment) => (
-                  <div className="knowledge-pending-file" key={`existing-${attachment.id}`}>
-                    <ImageIcon size={16} />
-                    <span>{attachment.fileName}</span>
-                    <button
-                      type="button"
-                      className="button secondary"
-                      onClick={() => insertImageMarker(`[[image:${attachment.id}]]`)}
-                    >
-                      Вставить в текст
-                    </button>
-                  </div>
-                ))}
-              {error && <div className="knowledge-error">{error}</div>}
-              <div className="modal-actions">
-                <button type="button" className="button secondary" onClick={() => setArticleDialog(null)}>Отмена</button>
-                <button className="button primary" disabled={busy || !sections.length}>{busy ? "Сохранение…" : "Сохранить"}</button>
-              </div>
-            </form>
-          </section>
-        </div>
-      )}
+      <KnowledgeEditDialogs
+        sectionDialog={sectionDialog}
+        setSectionDialog={setSectionDialog}
+        articleDialog={articleDialog}
+        setArticleDialog={setArticleDialog}
+        sections={sections}
+        error={error}
+        busy={busy}
+        saveSection={saveSection}
+        saveArticle={saveArticle}
+        activeSectionId={activeSectionId}
+        bodyEditorRef={bodyEditorRef}
+        addArticleFiles={addArticleFiles}
+        pendingFiles={pendingFiles}
+        setPendingFiles={setPendingFiles}
+        insertImageMarker={insertImageMarker}
+        formatSize={formatSize}
+      />
 
       {importDialog && (
-        <div className="modal-backdrop" onMouseDown={() => setImportDialog(false)}>
-          <section className="modal knowledge-modal" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head">
-              <div>
-                <span className="eyebrow">БАЗА ЗНАНИЙ</span>
-                <h2>Импорт статей</h2>
-              </div>
-              <button className="icon-button" onClick={() => setImportDialog(false)} aria-label="Закрыть"><X /></button>
-            </div>
-            <form onSubmit={importKnowledgeFiles}>
-              <label className="field">
-                <span>Раздел</span>
-                <select
-                  required
-                  value={importSectionId ?? ""}
-                  onChange={(event) => setImportSectionId(Number(event.target.value) || null)}
-                >
-                  <option value="">Выберите раздел</option>
-                  {sections.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
-                </select>
-              </label>
-              <input
-                ref={importFilesRef}
-                type="file"
-                hidden
-                multiple
-                accept=".txt,.docx"
-                onChange={(event) => {
-                  selectImportFiles(Array.from(event.currentTarget.files ?? []));
-                  event.currentTarget.value = "";
-                }}
-              />
-              <input
-                ref={importFolderRef}
-                type="file"
-                hidden
-                multiple
-                accept=".txt,.docx"
-                onChange={(event) => {
-                  selectImportFiles(Array.from(event.currentTarget.files ?? []));
-                  event.currentTarget.value = "";
-                }}
-              />
-              <div className="knowledge-import-actions">
-                <button type="button" className="button secondary" onClick={() => importFilesRef.current?.click()}>
-                  <FileUp size={15} /> Выбрать файлы
-                </button>
-                <button
-                  type="button"
-                  className="button secondary"
-                  onClick={() => {
-                    importFolderRef.current?.setAttribute("webkitdirectory", "");
-                    importFolderRef.current?.click();
-                  }}
-                >
-                  <FolderOpen size={15} /> Выбрать папку
-                </button>
-              </div>
-              {importFiles.length > 0 && (
-                <div className="knowledge-import-files">
-                  <div className="knowledge-sidebar-head">
-                    <b>Выбрано: {importFiles.length}</b>
-                    <button
-                      type="button"
-                      className="button ghost"
-                      onClick={() => {
-                        setImportFiles([]);
-                        setImportResult(null);
-                      }}
-                    >
-                      Очистить
-                    </button>
-                  </div>
-                  {importFiles.slice(0, 5).map((file, index) => (
-                    <small key={`${(file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name}-${index}`}>
-                      {(file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name}
-                    </small>
-                  ))}
-                  {importFiles.length > 5 && <small>И ещё {importFiles.length - 5}</small>}
-                </div>
-              )}
-              {importResult && (
-                <div className="knowledge-import-result">
-                  <b>Добавлено: {importResult.imported} · пропущено: {importResult.skipped} · ошибок: {importResult.failed.length}</b>
-                  {importResult.failed.map((item, index) => (
-                    <small key={`${item.fileName}-${index}`}>{item.fileName}: {item.reason}</small>
-                  ))}
-                </div>
-              )}
-              {error && <div className="knowledge-error">{error}</div>}
-              <div className="modal-actions">
-                <button type="button" className="button secondary" onClick={() => setImportDialog(false)}>Закрыть</button>
-                <button className="button primary" disabled={busy || !importFiles.length || !importSectionId}>
-                  {busy ? "Импорт…" : "Импортировать"}
-                </button>
-              </div>
-            </form>
-          </section>
-        </div>
+        <KnowledgeImportDialog
+          sections={sections}
+          importSectionId={importSectionId}
+          setImportSectionId={setImportSectionId}
+          importFilesRef={importFilesRef}
+          importFolderRef={importFolderRef}
+          selectImportFiles={selectImportFiles}
+          importFiles={importFiles}
+          setImportFiles={setImportFiles}
+          setImportResult={setImportResult}
+          importResult={importResult}
+          error={error}
+          busy={busy}
+          importKnowledgeFiles={importKnowledgeFiles}
+          setImportDialog={setImportDialog}
+        />
       )}
     </div>
   );

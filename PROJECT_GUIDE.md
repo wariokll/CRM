@@ -16,32 +16,33 @@
 
 | Зона | Назначение | Где менять |
 | --- | --- | --- |
-| Интерфейс | React + TypeScript | [src/App.tsx](./src/App.tsx) |
+| Interface entry and browser routes | `src/main.tsx`, `src/router.tsx` |
 | Оформление | Глобальные CSS-стили, адаптивность | [src/styles.css](./src/styles.css) |
-| Запросы из интерфейса | API-клиент, сессия, обработка ошибок | [src/api.ts](./src/api.ts) |
-| Типы интерфейса | TypeScript-описания данных API | [src/types.ts](./src/types.ts) |
+| Запросы из интерфейса | API-клиент, сессия, обработка ошибок | [src/shared/http.ts](./src/shared/http.ts) |
+| Frontend domain types | `src/types/`; `src/types.ts` re-exports them for compatibility |
 | Сервер | Express API | [backend/src](./backend/src) |
 | База | Prisma-модель и миграции MariaDB | [backend/prisma](./backend/prisma) |
 | Telegram-бот | Приём сообщений и создание заявок | [backend/src/telegram/bot.ts](./backend/src/telegram/bot.ts) |
 
-## Где менять UI
+## Where to change the UI
 
-Весь основной пользовательский интерфейс пока расположен в одном файле: [src/App.tsx](./src/App.tsx). В нём удобно искать название кнопки, заголовок или компонент через поиск редактора.
+The shell, route definitions, feature pages, and reusable views live in separate modules. Use these locations when changing the interface:
 
-| Что нужно изменить | Компонент / участок | Файл |
-| --- | --- | --- |
-| Левое меню, названия вкладок и иконки | `nav` внутри `App` | [src/App.tsx](./src/App.tsx) |
-| Главная страница и карточки показателей | ветка `dashboard` внутри `App` | [src/App.tsx](./src/App.tsx) |
-| Карточка заявки в списке | `RequestCard` | [src/App.tsx](./src/App.tsx) |
-| Окно заявки, статусы, комментарии, история | `RequestModal` | [src/App.tsx](./src/App.tsx) |
-| Форма новой заявки | `CreateRequest` | [src/App.tsx](./src/App.tsx) |
-| Фильтры, «Мои на сегодня», выполненные и просроченные | `RequestsList` | [src/App.tsx](./src/App.tsx) |
-| Месячный календарь и клик по дню | `Calendar` | [src/App.tsx](./src/App.tsx) |
-| Организации | `Organizations` | [src/App.tsx](./src/App.tsx) |
-| Торговые точки | `Stores` | [src/App.tsx](./src/App.tsx) |
-| Шаблоны заявок | `Templates` | [src/App.tsx](./src/App.tsx) |
-| Сотрудники, права и ссылка на Telegram | `Staff` | [src/App.tsx](./src/App.tsx) |
-| Экран Telegram-диалогов | `Telegram` | [src/App.tsx](./src/App.tsx) |
+| Area | Source |
+| --- | --- |
+| Browser routes and not-found page | `src/router.tsx`, `src/features/layout/NotFoundPage.tsx` |
+| Application shell and role guard | `src/App.tsx`, `src/features/layout/navigation.ts` |
+| Sidebar and page header | `src/features/layout/AppSidebar.tsx`, `AppPageHeader.tsx` |
+| Dashboard | `src/features/dashboard/DashboardPage.tsx` |
+| Requests, card, editor, and create form | `src/features/requests/` |
+| Calendar | `src/features/requests/CalendarPage.tsx` |
+| Organizations and stores | `src/features/organizations/`, `src/features/stores/` |
+| Request templates and staff | `src/features/templates/`, `src/features/staff/` |
+| Telegram | `src/features/telegram/` |
+| Boards | `src/features/boards/` |
+| Reports | `src/features/reports/` |
+| Knowledge base | `src/features/knowledge/` |
+| Shared HTTP and query keys | `src/shared/http.ts`, `src/shared/queryKeys.ts` |
 
 ### Стили
 
@@ -75,13 +76,13 @@
 
 - Окно архива: [BoardArchiveDialog.tsx](./src/features/boards/BoardArchiveDialog.tsx).
 - Настройки вида: [BoardLayoutDialog.tsx](./src/features/boards/BoardLayoutDialog.tsx).
-- API: [backend/src/routes/boards.ts](./backend/src/routes/boards.ts) — `GET /api/boards/:boardId/archive`, `POST /api/boards/cards/:cardId/restore` и `PATCH /api/boards/:boardId/layout`.
+- API: [backend/src/modules/boards/board.routes.ts](./backend/src/modules/boards/board.routes.ts) — `GET /api/boards/:boardId/archive`, `POST /api/boards/cards/:cardId/restore` и `PATCH /api/boards/:boardId/layout`.
 - Проверка доступа, восстановление и атомарное сохранение настроек: [board.service.ts](./backend/src/modules/boards/board.service.ts). Изменения защищены версиями; при конфликте обновление всех выбранных столбцов откатывается целиком.
 - Миграция `20261030120000_board_column_layout` добавляет ширину и сетку, сохраняя прежний вид существующих столбцов.
 
 ## Функциональность заявок
 
-Главный серверный модуль заявок: [backend/src/routes/requests.ts](./backend/src/routes/requests.ts).
+Главный серверный модуль заявок: [backend/src/modules/requests/request.routes.ts](./backend/src/modules/requests/request.routes.ts).
 
 Он отвечает за:
 
@@ -92,20 +93,20 @@
 - `POST /api/requests/:id/comments` — внутренние и клиентские комментарии;
 - запись истории создания, статусов, приоритета, отдела, исполнителей и комментариев.
 
-Допустимые переходы статусов находятся в [backend/src/utils/request-status.ts](./backend/src/utils/request-status.ts). Если нужно разрешить новый переход, менять следует этот файл и список `transitions` в [src/App.tsx](./src/App.tsx), чтобы сервер и интерфейс работали одинаково.
+Request status transitions are shared from `src/features/requests/requestDisplay.ts` and `backend/src/utils/request-status.ts`.
 
 ### Выполненные, отменённые и просроченные
 
 - Кнопка «Показать выполненные» в `RequestsList` показывает только `DONE`.
 - Активный список скрывает `DONE` и `CANCELLED`.
 - Просроченной считается плановая заявка с прошедшим `scheduledAt`, если её статус не `DONE` и не `CANCELLED`.
-- Логика визуальной просрочки: `isOverdue` в [src/App.tsx](./src/App.tsx). Серверная логика при необходимости расширяется в [backend/src/routes/requests.ts](./backend/src/routes/requests.ts).
+- Overdue display logic: `src/features/requests/requestDisplay.ts`; request API behavior: `backend/src/modules/requests/request.routes.ts`.
 
 ## Календарь и планирование
 
-Интерфейс календаря находится в компоненте `Calendar` в [src/App.tsx](./src/App.tsx). Он показывает заявки с `urgency = SCHEDULED` и датой `scheduledAt`.
+The calendar UI is in `src/features/requests/CalendarPage.tsx`; it displays scheduled requests with `urgency = SCHEDULED` and `scheduledAt`.
 
-При нажатии на день открывается `CreateRequest` с уже выбранными датой и типом «Плановая». Ограничения даты (не раньше текущего времени и не более года вперёд) проверяются сервером в [backend/src/routes/requests.ts](./backend/src/routes/requests.ts).
+При нажатии на день открывается `CreateRequest` с уже выбранными датой и типом «Плановая». Ограничения даты (не раньше текущего времени и не более года вперёд) проверяются сервером в [backend/src/modules/requests/request.routes.ts](./backend/src/modules/requests/request.routes.ts).
 
 Автоматические напоминания выполняются в [backend/src/utils/scheduled-reminders.ts](./backend/src/utils/scheduled-reminders.ts):
 
@@ -120,21 +121,21 @@
 
 | Функция | API-логика | UI |
 | --- | --- | --- |
-| Организации | [backend/src/routes/organizations.ts](./backend/src/routes/organizations.ts) | `Organizations` в [src/App.tsx](./src/App.tsx) |
-| Торговые точки и доступы | [backend/src/routes/stores.ts](./backend/src/routes/stores.ts) | `Stores` в [src/App.tsx](./src/App.tsx) |
-| Отделы | [backend/src/routes/departments.ts](./backend/src/routes/departments.ts) | используются в формах заявок и сотрудников |
-| Шаблоны заявок и дополнительные поля | [backend/src/routes/request-types.ts](./backend/src/routes/request-types.ts) | `Templates` в [src/App.tsx](./src/App.tsx) |
+| Organizations | `backend/src/modules/organizations/organizations.routes.ts` | `src/features/organizations/OrganizationsPage.tsx` |
+| Stores and access details | `backend/src/modules/stores/stores.routes.ts` | `src/features/stores/StoresPage.tsx` |
+| Отделы | [backend/src/modules/departments/departments.routes.ts](./backend/src/modules/departments/departments.routes.ts) | используются в формах заявок и сотрудников |
+| Request templates and extra fields | `backend/src/modules/request-types/request-types.routes.ts` | `src/features/templates/TemplatesPage.tsx` |
 
-Новые поля шаблона добавляются через UI в JSON-поле «Дополнительные поля». Сервер проверяет обязательные поля при создании заявки в `validateTemplateData` внутри [backend/src/routes/requests.ts](./backend/src/routes/requests.ts). Заполненные значения отображаются в карточке заявки блоком «Дополнительные данные» (`TemplateData` в [src/App.tsx](./src/App.tsx)).
+Template validation is in `backend/src/modules/requests/request.routes.ts`; request template data is rendered by `src/features/requests/RequestTemplateData.tsx`.
 
 ## Сотрудники, роли и права
 
 | Зона | Файл |
 | --- | --- |
-| Список сотрудников, создание и доступы | [backend/src/routes/staff.ts](./backend/src/routes/staff.ts) |
+| Список сотрудников, создание и доступы | [backend/src/modules/staff/staff.routes.ts](./backend/src/modules/staff/staff.routes.ts) |
 | Проверка прав | [backend/src/utils/permissions.ts](./backend/src/utils/permissions.ts) |
-| Авторизация и JWT | [backend/src/routes/auth.ts](./backend/src/routes/auth.ts), [backend/src/middleware/auth.ts](./backend/src/middleware/auth.ts) |
-| UI сотрудников | `Staff` в [src/App.tsx](./src/App.tsx) |
+| Авторизация и JWT | [backend/src/modules/auth/auth.routes.ts](./backend/src/modules/auth/auth.routes.ts), [backend/src/shared/middleware/auth.ts](./backend/src/shared/middleware/auth.ts) |
+| Staff UI | `src/features/staff/StaffPage.tsx` |
 
 Роли: `CLIENT`, `MASTER`, `DEPARTMENT_HEAD`, `DIRECTOR`. Базовые клиентские ограничения и права сотрудников определяются сервером; интерфейс дополнительно скрывает недоступные действия, но не заменяет серверную проверку.
 
@@ -146,7 +147,7 @@
 4. Мастер открывает ссылку и запускает бота.
 5. Бот связывает личный чат с учётной записью сотрудника.
 
-Ссылку генерирует [backend/src/routes/staff.ts](./backend/src/routes/staff.ts), а бот проверяет и активирует её в [backend/src/telegram/bot.ts](./backend/src/telegram/bot.ts). Одноразовые коды хранятся в `telegram_link_codes`.
+Ссылку генерирует [backend/src/modules/staff/staff.routes.ts](./backend/src/modules/staff/staff.routes.ts), а бот проверяет и активирует её в [backend/src/telegram/bot.ts](./backend/src/telegram/bot.ts). Одноразовые коды хранятся в `telegram_link_codes`.
 
 После привязки мастер получает сообщения о назначении заявки и напоминания о плановых работах.
 
@@ -157,7 +158,7 @@
 | Получение команд и создание заявки из бота | [backend/src/telegram/bot.ts](./backend/src/telegram/bot.ts) |
 | Отправка клиенту статусов и комментариев | [backend/src/utils/telegram-notifications.ts](./backend/src/utils/telegram-notifications.ts) |
 | Отправка уведомлений назначенным сотрудникам | [backend/src/utils/telegram-notifications.ts](./backend/src/utils/telegram-notifications.ts) |
-| API просмотра интеграций и диалогов | [backend/src/routes/telegram.ts](./backend/src/routes/telegram.ts) |
+| API просмотра интеграций и диалогов | [backend/src/modules/telegram/telegram.routes.ts](./backend/src/modules/telegram/telegram.routes.ts) |
 | Настройки имени бота и токена | [backend/src/config.ts](./backend/src/config.ts), `backend/.env` |
 
 Клиент не получает номер заявки в сообщении о создании. Клиентские уведомления отправляются только в бот-чат, явно связанный с конкретной заявкой. Ошибка Telegram не отменяет изменение заявки в CRM.
@@ -166,7 +167,7 @@
 
 Пользователь сначала пишет боту, после чего его аккаунт появляется в разделе «Telegram». Нажмите «Настроить привязки» у нужного аккаунта и выберите любое число организаций и торговых точек. Связи хранятся отдельно, поэтому один аккаунт может относиться к нескольким организациям и точкам, а каждая организация или точка — к нескольким аккаунтам.
 
-При создании заявки ботом точка, привязанная напрямую, имеет приоритет. Если напрямую выбрана ровно одна точка, она подставляется автоматически. Если у аккаунта указана только организация, бот получает её активные точки: единственную подставляет сам, при нескольких показывает кнопки выбора. Логика находится в [backend/src/telegram/bot.ts](./backend/src/telegram/bot.ts), API сохранения связей — в [backend/src/routes/telegram.ts](./backend/src/routes/telegram.ts).
+При создании заявки ботом точка, привязанная напрямую, имеет приоритет. Если напрямую выбрана ровно одна точка, она подставляется автоматически. Если у аккаунта указана только организация, бот получает её активные точки: единственную подставляет сам, при нескольких показывает кнопки выбора. Логика находится в [backend/src/telegram/bot.ts](./backend/src/telegram/bot.ts), API сохранения связей — в [backend/src/modules/telegram/telegram.routes.ts](./backend/src/modules/telegram/telegram.routes.ts).
 
 ## База и миграции
 
@@ -211,7 +212,7 @@ npm test
 - Подробные сообщения ошибок полей: [backend/src/middleware/errors.ts](./backend/src/middleware/errors.ts).
 - Шифрование чувствительных реквизитов торговых точек: [backend/src/utils/crypto.ts](./backend/src/utils/crypto.ts).
 
-Если добавляется новое поле формы, нужно синхронно проверить четыре места: UI в `src/App.tsx`, тип в [src/types.ts](./src/types.ts), Zod-схему в нужном серверном route-файле и Prisma-схему/миграцию, если поле хранится в базе.
+Если добавляется новое поле формы, нужно синхронно проверить четыре места: UI in the matching `src/features/<feature>/` module, its type under `src/types/`, backend validation in the corresponding feature module, and Prisma schema/migration only when storage changes are separately approved.
 
 ## Сборка и проверка после изменений
 
@@ -238,9 +239,9 @@ npm test
 
 - [backend/src/telegram/bot.ts](./backend/src/telegram/bot.ts): после выбора шаблона бот задаёт дополнительные поля по очереди, затем просит описание. Поле `FILE` в боте принимает ссылку или текстовое описание; загрузка бинарных файлов потребует отдельного файлового хранилища.
 - [backend/src/utils/telegram-notifications.ts](./backend/src/utils/telegram-notifications.ts): клиент получает статусы и публичные комментарии в чат создания заявки либо в чаты, привязанные к клиенту, организации или точке. Исполнитель получает уведомление при назначении и самостоятельном взятии заявки.
-- [backend/src/routes/requests.ts](./backend/src/routes/requests.ts): `GET /api/requests/stats?from=YYYY-MM-DD&to=YYYY-MM-DD` отдаёт отчёт по клиентам, сотрудникам, точкам и заявкам. Экран «Отчёты» находится в [src/App.tsx](./src/App.tsx), его начальный период — текущий календарный месяц.
-- Интерфейс автоматически обновляет данные каждые 5 секунд и при возвращении во вкладку. Это реализовано в [src/App.tsx](./src/App.tsx).
-- При регистрации достаточно принять организацию: ожидающая учётная запись клиента и её ожидающие точки активируются автоматически. Обработчик: [backend/src/routes/organizations.ts](./backend/src/routes/organizations.ts).
+- Reports API and aggregation: `backend/src/modules/requests/request.routes.ts` and `reports.service.ts`; reports UI and date filters: `src/features/reports/ReportsPage.tsx`.
+Общие списки и карточки используют TanStack Query; мутации инвалидируют связанные ключи, а возврат к вкладке обновляет устаревшие данные.
+- При регистрации достаточно принять организацию: ожидающая учётная запись клиента и её ожидающие точки активируются автоматически. Обработчик: [backend/src/modules/organizations/organizations.routes.ts](./backend/src/modules/organizations/organizations.routes.ts).
 
 ## Проверка пользовательских сценариев
 
@@ -253,4 +254,4 @@ npm test
 3. Подключить Telegram сотрудника одноразовой ссылкой; назначить его на заявку, сменить статус и взять заявку в работу. Убедиться в уведомлениях.
 4. Зарегистрировать нового клиента с первой точкой; принять организацию и проверить автоматическую активацию клиента и точки.
 5. Проверить отчёты за текущий месяц и произвольный период: клиент, сотрудник, точка и каждая заявка должны учитывать права текущего пользователя.
-6. Открыть CRM в двух вкладках, изменить заявку в одной и убедиться, что во второй данные появятся в течение 5 секунд либо сразу при возврате на вкладку.
+6. Открыть CRM в двух вкладках, изменить заявку в одной и убедиться, что во второй данные обновляются примерно через 5 секунд либо при возвращении на вкладку.

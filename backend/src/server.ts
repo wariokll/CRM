@@ -1,9 +1,10 @@
-import { app } from "./app.js";
+import { createApp } from "./app.js";
 import { config } from "./config.js";
 import { prisma } from "./db.js";
 import { sendScheduledRequestReminders } from "./utils/scheduled-reminders.js";
 import { generateRecurringRequests } from "./utils/recurring-requests.js";
 
+const app = createApp();
 const server = app.listen(config.port, () =>
   console.log(`БАЗИС CRM API listening on port ${config.port}`),
 );

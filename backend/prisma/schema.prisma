@@ -337,8 +337,8 @@ model Organization {
 model OrganizationContact {
   id             Int          @id @default(autoincrement())
   organizationId Int          @map("organization_id")
-  fullName       String       @map("full_name")
-  phone          String?
+  fullName       String       @map("full_name") @db.VarChar(200)
+  phone          String?      @db.VarChar(50)
   note           String?      @db.Text
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt      DateTime     @default(now()) @map("created_at")

@@ -5,7 +5,6 @@ import {
   closestCorners,
   pointerWithin,
   type CollisionDetection,
-  useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -13,31 +12,29 @@ import {
 import {
   SortableContext,
   horizontalListSortingStrategy,
-  useSortable,
-  rectSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import {
   AlertTriangle,
-  Archive,
   Calendar,
   GripVertical,
-  LockKeyhole,
-  Pencil,
   Plus,
-  Search,
-  Settings2,
-  Trash2,
   Users,
   X,
 } from "lucide-react";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { api, ApiError } from "../../api";
-import { Dialog, errorText } from "./BoardDialog";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { ApiError } from "../../api";
+import { boardRequest } from "./queries";
+import { queryKeys } from "../../shared/queryKeys";
+import { errorText } from "./BoardDialog";
+import { CardDialog, NameDialog } from "./BoardDialogs";
+import { AccessDialog } from "./BoardAccessDialog";
 import { BoardArchiveDialog } from "./BoardArchiveDialog";
+import { SortableColumn, localToday } from "./BoardCanvas";
+import { BoardToolbar } from "./BoardToolbar";
 import { BoardLayoutDialog } from "./BoardLayoutDialog";
 import type {
-  BoardAccessUser,
   BoardCard,
   BoardColumn,
   BoardDetails,
@@ -73,434 +70,6 @@ const boardCollisions: CollisionDetection = (args) => {
   });
 };
 
-function localToday() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-}
-
-function SortableCard({ card, open }: { card: BoardCard; open: () => void }) {
-  const sortable = useSortable({
-    id: `card-${card.id}`,
-    data: { type: "card", cardId: card.id, columnId: card.columnId },
-  });
-  const wasDragged = useRef(false);
-  useEffect(() => {
-    if (sortable.isDragging) wasDragged.current = true;
-  }, [sortable.isDragging]);
-  const overdue = Boolean(
-    card.deadline && card.deadline.slice(0, 10) < localToday(),
-  );
-  return (
-    <article
-      ref={sortable.setNodeRef}
-      style={{
-        transform: sortable.isDragging
-          ? undefined
-          : CSS.Transform.toString(sortable.transform),
-        transition: sortable.isDragging ? undefined : sortable.transition,
-      }}
-      className={`board-card ${overdue ? "overdue-card" : ""} ${sortable.isDragging ? "dragging" : ""}`}
-      {...sortable.attributes}
-      {...sortable.listeners}
-      onClick={() => {
-        if (wasDragged.current) {
-          wasDragged.current = false;
-          return;
-        }
-        open();
-      }}
-    >
-      <div className="board-card-title">
-        <b>{card.title}</b>
-        <GripVertical className="card-grip" />
-      </div>
-      {card.deadline && (
-        <span className="card-deadline">
-          <Calendar /> До{" "}
-          {new Intl.DateTimeFormat("ru-RU").format(
-            new Date(`${card.deadline.slice(0, 10)}T00:00:00`),
-          )}
-        </span>
-      )}
-    </article>
-  );
-}
-
-function SortableColumn({
-  column,
-  rename,
-  remove,
-  addCard,
-  openCard,
-  configure,
-}: {
-  column: BoardColumn;
-  rename: () => void;
-  remove: () => void;
-  addCard: () => void;
-  openCard: (card: BoardCard) => void;
-  configure: () => void;
-}) {
-  const sortable = useSortable({
-    id: `column-${column.id}`,
-    data: { type: "column", columnId: column.id },
-  });
-  return (
-    <section
-      ref={sortable.setNodeRef}
-      style={{
-        width: column.width,
-        flexBasis: column.width,
-        transform: CSS.Transform.toString(sortable.transform),
-        transition: sortable.transition,
-      }}
-      className={`board-column ${sortable.isDragging ? "dragging" : ""}`}
-    >
-      <div className="board-column-head">
-        <button
-          className="drag-handle"
-          {...sortable.attributes}
-          {...sortable.listeners}
-          aria-label="Переместить столбец"
-        >
-          <GripVertical />
-        </button>
-        <b>{column.name}</b>
-        <span>{column.cards.length}</span>
-        <button
-          onClick={configure}
-          aria-label={"Настроить вид столбца «" + column.name + "»"}
-          title="Ширина и сетка карточек"
-        >
-          <Settings2 />
-        </button>
-        <button onClick={rename} aria-label="Переименовать">
-          <Pencil />
-        </button>
-        <button onClick={remove} aria-label="Удалить">
-          <Trash2 />
-        </button>
-      </div>
-      <SortableContext
-        items={column.cards.map((card) => `card-${card.id}`)}
-        strategy={rectSortingStrategy}
-      >
-        <div
-          className="board-card-list"
-          style={{
-            gridTemplateColumns:
-              "repeat(" + column.cardsPerRow + ", minmax(0, 1fr))",
-          }}
-        >
-          {column.cards.map((card) => (
-            <SortableCard
-              key={card.id}
-              card={card}
-              open={() => openCard(card)}
-            />
-          ))}
-          {!column.cards.length && (
-            <div className="column-empty">Перетащите карточку сюда</div>
-          )}
-        </div>
-      </SortableContext>
-      <button className="add-card" onClick={addCard}>
-        <Plus /> Добавить карточку
-      </button>
-    </section>
-  );
-}
-
-function ArchiveDropzone({ active }: { active: boolean }) {
-  const droppable = useDroppable({
-    id: "card-archive",
-    data: { type: "archive" },
-  });
-  return (
-    <div
-      ref={droppable.setNodeRef}
-      className={`archive-dropzone ${active ? "ready" : ""} ${droppable.isOver ? "over" : ""}`}
-    >
-      <Archive />
-      <span>
-        {droppable.isOver
-          ? "Отпустите, чтобы архивировать"
-          : "Перетащите карточку в архив"}
-      </span>
-    </div>
-  );
-}
-
-function CardDialog({
-  card,
-  columnId,
-  close,
-  save,
-  remove,
-}: {
-  card: BoardCard | null;
-  columnId: number;
-  close: () => void;
-  save: (data: {
-    title: string;
-    description: string;
-    deadline: string | null;
-  }) => Promise<void>;
-  remove?: () => Promise<void>;
-}) {
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
-    const values = Object.fromEntries(
-      new FormData(event.currentTarget),
-    ) as Record<string, string>;
-    try {
-      await save({
-        title: values.title,
-        description: values.description,
-        deadline: values.deadline || null,
-      });
-      close();
-    } catch (reason) {
-      setError(errorText(reason));
-    } finally {
-      setBusy(false);
-    }
-  };
-  const deleteCard = async () => {
-    if (!remove || !window.confirm("Удалить карточку?")) return;
-    setBusy(true);
-    setError("");
-    try {
-      await remove();
-      close();
-    } catch (reason) {
-      setError(errorText(reason));
-      setBusy(false);
-    }
-  };
-  return (
-    <Dialog title={card ? "Карточка" : "Новая карточка"} close={close}>
-      <form onSubmit={submit}>
-        <label className="field">
-          <span>Название</span>
-          <input
-            name="title"
-            required
-            maxLength={200}
-            defaultValue={card?.title ?? ""}
-            autoFocus
-          />
-        </label>
-        <label className="field">
-          <span>Срок</span>
-          <input
-            name="deadline"
-            type="date"
-            defaultValue={card?.deadline?.slice(0, 10) ?? ""}
-          />
-        </label>
-        <label className="field">
-          <span>Описание</span>
-          <textarea
-            name="description"
-            rows={7}
-            maxLength={5000}
-            defaultValue={card?.description ?? ""}
-          />
-        </label>
-        {error && (
-          <div className="form-error">
-            <AlertTriangle />
-            {error}
-          </div>
-        )}
-        <div className="modal-actions">
-          {remove && (
-            <button
-              type="button"
-              className="button danger"
-              disabled={busy}
-              onClick={() => void deleteCard()}
-            >
-              <Trash2 /> Удалить
-            </button>
-          )}
-          <button type="button" className="button secondary" onClick={close}>
-            Отмена
-          </button>
-          <button className="button" disabled={busy}>
-            {card ? "Сохранить" : "Создать"}
-          </button>
-        </div>
-      </form>
-    </Dialog>
-  );
-}
-
-function NameDialog({
-  title,
-  label,
-  initialValue = "",
-  close,
-  save,
-}: {
-  title: string;
-  label: string;
-  initialValue?: string;
-  close: () => void;
-  save: (name: string) => Promise<void>;
-}) {
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
-    const name = String(
-      new FormData(event.currentTarget).get("name") ?? "",
-    ).trim();
-    try {
-      await save(name);
-      close();
-    } catch (reason) {
-      setError(errorText(reason));
-      setBusy(false);
-    }
-  };
-  return (
-    <Dialog title={title} close={close}>
-      <form onSubmit={submit}>
-        <label className="field">
-          <span>{label}</span>
-          <input
-            name="name"
-            required
-            minLength={1}
-            maxLength={120}
-            defaultValue={initialValue}
-            autoFocus
-          />
-        </label>
-        {error && (
-          <div className="form-error">
-            <AlertTriangle />
-            {error}
-          </div>
-        )}
-        <div className="modal-actions">
-          <button type="button" className="button secondary" onClick={close}>
-            Отмена
-          </button>
-          <button className="button" disabled={busy}>
-            Сохранить
-          </button>
-        </div>
-      </form>
-    </Dialog>
-  );
-}
-
-function AccessDialog({
-  board,
-  close,
-}: {
-  board: BoardDetails;
-  close: () => void;
-}) {
-  const [users, setUsers] = useState<BoardAccessUser[]>([]),
-    [search, setSearch] = useState(""),
-    [error, setError] = useState(""),
-    [busyId, setBusyId] = useState<number | null>(null);
-  const load = async () => {
-    try {
-      setUsers(await api<BoardAccessUser[]>(`/boards/${board.id}/access`));
-    } catch (reason) {
-      setError(errorText(reason));
-    }
-  };
-  useEffect(() => {
-    void load();
-  }, [board.id]);
-  const visible = useMemo(
-    () =>
-      users.filter((user) =>
-        `${user.ipName} ${user.email}`
-          .toLowerCase()
-          .includes(search.toLowerCase()),
-      ),
-    [users, search],
-  );
-  const toggle = async (user: BoardAccessUser) => {
-    if (user.isOwner) return;
-    setBusyId(user.id);
-    setError("");
-    try {
-      await api(
-        `/boards/${board.id}/access${user.hasAccess ? `/${user.id}` : ""}`,
-        {
-          method: user.hasAccess ? "DELETE" : "POST",
-          ...(user.hasAccess
-            ? {}
-            : { body: JSON.stringify({ userId: user.id }) }),
-        },
-      );
-      await load();
-    } catch (reason) {
-      setError(errorText(reason));
-    } finally {
-      setBusyId(null);
-    }
-  };
-  return (
-    <Dialog title="Доступ к доске" close={close} wide>
-      <div className="board-access-search">
-        <Search />
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Поиск сотрудника"
-        />
-      </div>
-      {error && (
-        <div className="form-error">
-          <AlertTriangle />
-          {error}
-        </div>
-      )}
-      <div className="board-access-list">
-        {visible.map((user) => (
-          <div key={user.id}>
-            <span className="avatar">
-              {user.ipName.slice(0, 2).toUpperCase()}
-            </span>
-            <div>
-              <b>{user.ipName}</b>
-              <small>{user.email}</small>
-            </div>
-            {user.isOwner ? (
-              <span className="owner-badge">
-                <LockKeyhole /> Создатель
-              </span>
-            ) : (
-              <button
-                disabled={busyId === user.id}
-                className={`button compact ${user.hasAccess ? "secondary" : ""}`}
-                onClick={() => void toggle(user)}
-              >
-                {user.hasAccess ? "Убрать доступ" : "Выдать доступ"}
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-    </Dialog>
-  );
-}
-
 export function BoardsPage({
   user,
   type,
@@ -510,8 +79,9 @@ export function BoardsPage({
   type: BoardType;
   refreshKey?: number;
 }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedId = Number(searchParams.get("boardId")) || null;
   const [boards, setBoards] = useState<BoardSummary[]>([]),
-    [selectedId, setSelectedId] = useState<number | null>(null),
     [board, setBoard] = useState<BoardDetails | null>(null);
   const [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
@@ -530,6 +100,23 @@ export function BoardsPage({
     column?: BoardColumn;
   } | null>(null);
   const [activeCard, setActiveCard] = useState<BoardCard | null>(null);
+  const queryClient = useQueryClient();
+  const selectBoard = useCallback(
+    (id: number | null, replace = false) => {
+      const value = id === null ? null : String(id);
+      if (searchParams.get("boardId") === value) return;
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          if (id === null) next.delete("boardId");
+          else next.set("boardId", String(id));
+          return next;
+        },
+        { replace },
+      );
+    },
+    [searchParams, setSearchParams],
+  );
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
   );
@@ -539,47 +126,62 @@ export function BoardsPage({
     user.role === "DEPARTMENT_HEAD";
   const isOwner = board?.ownerId === user.id;
 
-  const loadBoards = async (preferredId?: number) => {
-    setLoading(true);
-    setError("");
-    try {
-      const list = await api<BoardSummary[]>(`/boards?type=${type}`);
-      setBoards(list);
-      setSelectedId((previous) => {
-        const wanted = preferredId ?? previous;
-        return wanted && list.some((item) => item.id === wanted)
-          ? wanted
-          : (list[0]?.id ?? null);
-      });
-      if (!list.length) setBoard(null);
-    } catch (reason) {
-      setError(errorText(reason));
-    } finally {
-      setLoading(false);
-    }
-  };
-  const loadBoard = async (id = selectedId) => {
-    if (!id) return;
-    try {
+  const loadBoards = useCallback(
+    async (preferredId?: number) => {
+      setLoading(true);
       setError("");
-      setBoard(await api<BoardDetails>(`/boards/${id}`));
-    } catch (reason) {
-      setError(errorText(reason));
-      if (reason instanceof ApiError && [403, 404].includes(reason.status))
-        await loadBoards();
-    }
-  };
+      try {
+        const list = await queryClient.fetchQuery({
+          queryKey: queryKeys.boards.all(type),
+          queryFn: () => boardRequest<BoardSummary[]>(`/boards?type=${type}`),
+          staleTime: 0,
+        });
+        setBoards(list);
+        const wanted = preferredId ?? selectedId;
+        const nextId =
+          wanted && list.some((item) => item.id === wanted)
+            ? wanted
+            : (list[0]?.id ?? null);
+        selectBoard(nextId, true);
+        if (!list.length) setBoard(null);
+      } catch (reason) {
+        setError(errorText(reason));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [queryClient, selectBoard, selectedId, type],
+  );
+  const loadBoard = useCallback(
+    async (id = selectedId) => {
+      if (!id) return;
+      try {
+        setError("");
+        setBoard(
+          await queryClient.fetchQuery({
+            queryKey: queryKeys.boards.detail(type, id),
+            queryFn: () => boardRequest<BoardDetails>(`/boards/${id}`),
+            staleTime: 0,
+          }),
+        );
+      } catch (reason) {
+        setError(errorText(reason));
+        if (reason instanceof ApiError && [403, 404].includes(reason.status))
+          await loadBoards();
+      }
+    },
+    [loadBoards, queryClient, selectedId, type],
+  );
   useEffect(() => {
     setBoard(null);
-    setSelectedId(null);
     void loadBoards();
-  }, [type]);
+  }, [loadBoards, type]);
   useEffect(() => {
     if (refreshKey) {
       void loadBoards();
       void loadBoard();
     }
-  }, [refreshKey]);
+  }, [loadBoard, loadBoards, refreshKey]);
   useEffect(() => {
     setArchiveOpen(false);
     setLayoutEditor(null);
@@ -587,7 +189,7 @@ export function BoardsPage({
     setNameEditor(null);
     setAccessOpen(false);
     if (selectedId) void loadBoard(selectedId);
-  }, [selectedId]);
+  }, [loadBoard, selectedId]);
 
   const onConflict = async (reason: unknown) => {
     if (reason instanceof ApiError && reason.status === 409) {
@@ -601,7 +203,7 @@ export function BoardsPage({
   const saveName = async (name: string) => {
     if (!nameEditor) return;
     if (nameEditor.kind === "create-board") {
-      const created = await api<BoardSummary>("/boards", {
+      const created = await boardRequest<BoardSummary>("/boards", {
         method: "POST",
         body: JSON.stringify({ name, type }),
       });
@@ -610,7 +212,7 @@ export function BoardsPage({
     }
     if (!board) return;
     if (nameEditor.kind === "rename-board") {
-      await api(`/boards/${board.id}`, {
+      await boardRequest(`/boards/${board.id}`, {
         method: "PATCH",
         body: JSON.stringify({ name }),
       });
@@ -619,7 +221,7 @@ export function BoardsPage({
       return;
     }
     if (nameEditor.kind === "create-column") {
-      await api(`/boards/${board.id}/columns`, {
+      await boardRequest(`/boards/${board.id}/columns`, {
         method: "POST",
         body: JSON.stringify({ name }),
       });
@@ -628,7 +230,7 @@ export function BoardsPage({
     }
     const column = nameEditor.column!;
     try {
-      await api(`/boards/columns/${column.id}`, {
+      await boardRequest(`/boards/columns/${column.id}`, {
         method: "PATCH",
         body: JSON.stringify({ name, version: column.version }),
       });
@@ -640,7 +242,7 @@ export function BoardsPage({
   const deleteBoard = async () => {
     if (!board || !window.confirm(`Удалить доску «${board.name}»?`)) return;
     try {
-      await api(`/boards/${board.id}`, { method: "DELETE" });
+      await boardRequest(`/boards/${board.id}`, { method: "DELETE" });
       setBoard(null);
       await loadBoards();
     } catch (reason) {
@@ -653,7 +255,7 @@ export function BoardsPage({
       : `Удалить столбец «${column.name}»?`;
     if (!window.confirm(warning)) return;
     try {
-      await api(`/boards/columns/${column.id}`, {
+      await boardRequest(`/boards/columns/${column.id}`, {
         method: "DELETE",
         body: JSON.stringify({ version: column.version }),
       });
@@ -674,12 +276,12 @@ export function BoardsPage({
     if (!cardEditor) return;
     try {
       if (cardEditor.card)
-        await api(`/boards/cards/${cardEditor.card.id}`, {
+        await boardRequest(`/boards/cards/${cardEditor.card.id}`, {
           method: "PATCH",
           body: JSON.stringify({ ...data, version: cardEditor.card.version }),
         });
       else
-        await api(`/boards/columns/${cardEditor.columnId}/cards`, {
+        await boardRequest(`/boards/columns/${cardEditor.columnId}/cards`, {
           method: "POST",
           body: JSON.stringify(data),
         });
@@ -691,7 +293,7 @@ export function BoardsPage({
   const deleteCard = async () => {
     if (!cardEditor?.card) return;
     try {
-      await api(`/boards/cards/${cardEditor.card.id}`, {
+      await boardRequest(`/boards/cards/${cardEditor.card.id}`, {
         method: "DELETE",
         body: JSON.stringify({ version: cardEditor.card.version }),
       });
@@ -718,7 +320,7 @@ export function BoardsPage({
       setBoard({ ...board, columns });
       try {
         setBoard(
-          await api<BoardDetails>(`/boards/columns/${moved.id}/move`, {
+          await boardRequest<BoardDetails>(`/boards/columns/${moved.id}/move`, {
             method: "POST",
             body: JSON.stringify({ position: to, version: moved.version }),
           }),
@@ -752,7 +354,7 @@ export function BoardsPage({
         })),
       });
       try {
-        await api(`/boards/cards/${movedCard.id}/archive`, {
+        await boardRequest(`/boards/cards/${movedCard.id}/archive`, {
           method: "POST",
           body: JSON.stringify({ version: movedCard.version }),
         });
@@ -796,7 +398,7 @@ export function BoardsPage({
     setBoard({ ...board, columns });
     try {
       setBoard(
-        await api<BoardDetails>(`/boards/cards/${movedCard.id}/move`, {
+        await boardRequest<BoardDetails>(`/boards/cards/${movedCard.id}/move`, {
           method: "POST",
           body: JSON.stringify({
             targetColumnId: targetColumn.id,
@@ -823,7 +425,7 @@ export function BoardsPage({
             <button
               key={item.id}
               className={selectedId === item.id ? "active" : ""}
-              onClick={() => setSelectedId(item.id)}
+              onClick={() => selectBoard(item.id)}
             >
               {item.name}
             </button>
@@ -883,63 +485,18 @@ export function BoardsPage({
             onDragCancel={() => setActiveCard(null)}
             onDragEnd={(event) => void dragEnd(event)}
           >
-            <div className="board-toolbar">
-              <div>
-                <b>{board.name}</b>
-                {type === "TEAM" && (
-                  <span>Создатель: {board.owner.ipName}</span>
-                )}
-              </div>
-              <ArchiveDropzone active={Boolean(activeCard)} />
-              <div>
-                <button
-                  className="button secondary compact"
-                  onClick={() => setArchiveOpen(true)}
-                >
-                  <Archive /> Архив{" "}
-                  <span className="board-archive-count">
-                    {board.archivedCardCount}
-                  </span>
-                </button>
-                <button
-                  className="button secondary compact"
-                  disabled={!board.columns.length}
-                  onClick={() => setLayoutEditor({ columnId: null })}
-                >
-                  <Settings2 /> Вид доски
-                </button>
-                {isOwner && type === "TEAM" && (
-                  <button
-                    className="button secondary compact"
-                    onClick={() => setAccessOpen(true)}
-                  >
-                    <Users /> Доступ
-                  </button>
-                )}
-                {isOwner && (
-                  <button
-                    className="button ghost compact"
-                    onClick={() => setNameEditor({ kind: "rename-board" })}
-                  >
-                    <Pencil /> Переименовать
-                  </button>
-                )}
-                {isOwner && (
-                  <button
-                    className="button ghost compact danger-text"
-                    onClick={() => void deleteBoard()}
-                  >
-                    <Trash2 /> Удалить
-                  </button>
-                )}
-                <button
-                  className="button compact"
-                  onClick={() => setNameEditor({ kind: "create-column" })}
-                >
-                  <Plus /> Столбец
-                </button>
-              </div>
-            </div>
+            <BoardToolbar
+              board={board}
+              type={type}
+              isOwner={isOwner}
+              active={Boolean(activeCard)}
+              onArchive={() => setArchiveOpen(true)}
+              onLayout={() => setLayoutEditor({ columnId: null })}
+              onAccess={() => setAccessOpen(true)}
+              onRename={() => setNameEditor({ kind: "rename-board" })}
+              onDelete={() => void deleteBoard()}
+              onAddColumn={() => setNameEditor({ kind: "create-column" })}
+            />
             <SortableContext
               items={board.columns.map((column) => `column-${column.id}`)}
               strategy={horizontalListSortingStrategy}
@@ -1030,7 +587,6 @@ export function BoardsPage({
       {cardEditor && (
         <CardDialog
           card={cardEditor.card}
-          columnId={cardEditor.columnId}
           close={() => setCardEditor(null)}
           save={saveCard}
           remove={cardEditor.card ? deleteCard : undefined}

@@ -6,7 +6,8 @@ import {
   RotateCcw,
   Search,
 } from "lucide-react";
-import { api, ApiError } from "../../api";
+import { ApiError } from "../../api";
+import { boardRequest } from "./queries";
 import type { ArchivedBoardCard, BoardDetails } from "../../types";
 import { Dialog, errorText } from "./BoardDialog";
 
@@ -37,7 +38,7 @@ export function BoardArchiveDialog({
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    api<ArchivedBoardCard[]>(`/boards/${board.id}/archive`, {
+    boardRequest<ArchivedBoardCard[]>(`/boards/${board.id}/archive`, {
       signal: controller.signal,
     })
       .then((result) => {
@@ -73,7 +74,7 @@ export function BoardArchiveDialog({
     setError("");
     setNotice("");
     try {
-      const result = await api<BoardDetails>(
+      const result = await boardRequest<BoardDetails>(
         `/boards/cards/${card.id}/restore`,
         {
           method: "POST",

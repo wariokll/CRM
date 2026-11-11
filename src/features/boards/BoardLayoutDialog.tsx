@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
-import { api, ApiError } from "../../api";
+import { ApiError } from "../../api";
+import { boardRequest } from "./queries";
 import type { BoardDetails } from "../../types";
 import { Dialog, errorText } from "./BoardDialog";
+import { BoardLayoutPreview } from "./BoardLayoutPreview";
 
 const DEFAULT_WIDTH = 294;
 const MAX_WIDTH = 1800;
@@ -68,17 +70,20 @@ export function BoardLayoutDialog({
     setBusy(true);
     setError("");
     try {
-      const result = await api<BoardDetails>(`/boards/${board.id}/layout`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          columns: selected.map((column) => ({
-            id: column.id,
-            version: versions.get(column.id) ?? column.version,
-            width,
-            cardsPerRow,
-          })),
-        }),
-      });
+      const result = await boardRequest<BoardDetails>(
+        `/boards/${board.id}/layout`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            columns: selected.map((column) => ({
+              id: column.id,
+              version: versions.get(column.id) ?? column.version,
+              width,
+              cardsPerRow,
+            })),
+          }),
+        },
+      );
       updated(result);
       close();
     } catch (reason) {
@@ -194,29 +199,13 @@ export function BoardLayoutDialog({
             px. При увеличении сетки столбец расширится, чтобы текст оставался
             читаемым.
           </p>
-          <div className="layout-preview-label">
-            Предпросмотр · {previewWidth} px
-          </div>
-          <div className="layout-preview-viewport">
-            <div
-              className="layout-preview-column"
-              style={{ width: previewWidth }}
-            >
-              <b>{scope === "all" ? "Пример столбца" : selected[0]?.name}</b>
-              <div
-                className="layout-preview-grid"
-                style={{
-                  gridTemplateColumns: `repeat(${cardsPerRow}, minmax(0, 1fr))`,
-                }}
-              >
-                {Array.from({ length: cardsPerRow * 2 }, (_, index) => (
-                  <div key={index}>
-                    {previewCards[index]?.title ?? `Карточка ${index + 1}`}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <BoardLayoutPreview
+            previewWidth={previewWidth}
+            cardsPerRow={cardsPerRow}
+            scope={scope}
+            selectedColumnName={selected[0]?.name}
+            previewCards={previewCards}
+          />
           <button
             type="button"
             className="button ghost compact layout-reset"
