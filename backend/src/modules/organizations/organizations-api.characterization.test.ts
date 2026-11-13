@@ -79,6 +79,28 @@ describe("organization API characterization", () => {
       .send({ legalName: "Missing" });
     expect(missing.status).toBe(404);
 
+    const missingDelete = await request(app)
+      .delete("/api/organizations/999999999")
+      .set(auth);
+    expect(missingDelete.status).toBe(404);
+
+    const missingApproval = await request(app)
+      .post("/api/organizations/999999999/approve")
+      .set(auth);
+    expect(missingApproval.status).toBe(404);
+
+    const missingRejection = await request(app)
+      .post("/api/organizations/999999999/reject")
+      .set(auth)
+      .send({ rejectionReason: "Missing organization" });
+    expect(missingRejection.status).toBe(404);
+
+    const missingMembershipUpdate = await request(app)
+      .put("/api/organizations/999999999/members")
+      .set(auth)
+      .send({ userIds: [director.user.id] });
+    expect(missingMembershipUpdate.status).toBe(500);
+
     const denied = await request(app)
       .put("/api/organizations/999999999/members")
       .set(

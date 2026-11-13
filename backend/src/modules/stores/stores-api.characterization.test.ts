@@ -101,6 +101,33 @@ describe("store API characterization", () => {
       .send({ name: "Missing store" });
     expect(missing.status).toBe(404);
 
+    const missingDelete = await request(app)
+      .delete("/api/stores/999999999")
+      .set(auth);
+    expect(missingDelete.status).toBe(404);
+
+    const missingAccess = await request(app)
+      .get("/api/stores/999999999/access")
+      .set(auth);
+    expect(missingAccess.status).toBe(404);
+
+    const missingAccessWrite = await request(app)
+      .put("/api/stores/999999999/access")
+      .set(auth)
+      .send({ anydeskId: "missing-store" });
+    expect(missingAccessWrite.status).toBe(404);
+
+    const missingApproval = await request(app)
+      .post("/api/stores/999999999/approve")
+      .set(auth);
+    expect(missingApproval.status).toBe(404);
+
+    const missingRejection = await request(app)
+      .post("/api/stores/999999999/reject")
+      .set(auth)
+      .send({ rejectionReason: "Missing store" });
+    expect(missingRejection.status).toBe(404);
+
     const denied = await request(app)
       .put("/api/stores/999999999/access")
       .set("Authorization", `Bearer ${client.token}`)
