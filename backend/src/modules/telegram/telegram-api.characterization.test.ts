@@ -91,10 +91,35 @@ describe("Telegram API characterization", () => {
   it("rejects invalid chat IDs and denies clients", async () => {
     const director = await createApiUser(Role.DIRECTOR);
     const client = await createApiUser(Role.CLIENT);
+    const auth = { Authorization: `Bearer ${director.token}` };
     const invalidId = await request(app)
       .get("/api/telegram/chats/not-an-id/messages")
-      .set("Authorization", `Bearer ${director.token}`);
+      .set(auth);
     expect(invalidId.status).toBe(500);
+
+    const missingMessages = await request(app)
+      .get("/api/telegram/chats/999999999/messages")
+      .set(auth);
+    expect(missingMessages.status).toBe(200);
+    expect(missingMessages.body).toEqual([]);
+
+    const missingUpdate = await request(app)
+      .patch("/api/telegram/chats/999999999/link")
+      .set(auth)
+      .send({});
+    expect(missingUpdate.status).toBe(404);
+
+    const missingLinkReplacement = await request(app)
+      .put("/api/telegram/chats/999999999/links")
+      .set(auth)
+      .send({ organizationIds: [], storeIds: [] });
+    expect(missingLinkReplacement.status).toBe(404);
+
+    const invalidMessageBody = await request(app)
+      .post("/api/telegram/chats/999999999/messages")
+      .set(auth)
+      .send({ body: " " });
+    expect(invalidMessageBody.status).toBe(400);
 
     const denied = await request(app)
       .get("/api/telegram/integrations")
