@@ -72,7 +72,7 @@
 
 ## 3. Карта API endpoints и текущего покрытия
 
-Таблица получена из router registrations и mounts в `backend/src/app.ts`. Сценарии и ограничения текущего HTTP-characterization покрытия этапа 8.3 описаны в [отчёте этапа 8.3](stage-8-3-api-characterization.md). Общая матрица проверяет отсутствие авторизации и статусные ответы по ролям; явные успешные и негативные потоки добавлены только для указанных там доменов. Наличие матрицы не означает, что каждый из 97 endpoint’ов проверен успешным сценарием.
+Таблица получена из router registrations и mounts в `backend/src/app.ts`. Сценарии и ограничения текущего HTTP-characterization покрытия этапа 8.3 описаны в [отчёте этапа 8.3](stage-8-3-api-characterization.md) и его [97-строчной матрице endpoint-сценариев](stage-8-3-endpoint-matrix.md). Наличие общей auth/role матрицы не означает, что каждый endpoint имеет отдельные успешные, невалидные и missing-object сценарии.
 
 | Метод и путь | Доступ по действующей схеме | Вход → выход (категория) | Characterization |
 |---|---|---|---|
@@ -142,7 +142,7 @@
 | GET `/api/requests/assignees` | access token + role/access filtering | фильтры → исполнители | см. отчёт 8.3 |
 | GET `/api/requests` | access token + role/object scope | фильтры/поиск → заявки | см. отчёт 8.3 |
 | GET `/api/requests/stats` | `VIEW_REPORTS` | период → статистика | см. отчёт 8.3 |
-| GET `/api/requests/calendar` | `VIEW_REPORTS` | период/фильтры → календарные данные | см. отчёт 8.3 |
+| GET `/api/requests/procurement` | `VIEW_REPORTS` | период/componentId → плановая потребность в компонентах | см. отчёт 8.3 |
 | POST `/api/requests` | access token + роль, организация/отдел и template checks | заявка → созданная заявка | см. отчёт 8.3 |
 | PATCH `/api/requests/:id` | access token + объектные права/permissions | статус/приоритет/отдел/исполнители/комментарий → заявка | см. отчёт 8.3 |
 | DELETE `/api/requests/:id` | access token + `DELETE_REQUESTS`/объектные права | id → удаление заявки | см. отчёт 8.3 |

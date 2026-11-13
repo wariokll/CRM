@@ -2,7 +2,7 @@
 
 ## Объём проверки
 
-В каталоге `backend/src/test/api.characterization.test.ts` перечислены 97 endpoint’ов. Общий набор для каждого защищённого маршрута проверяет запрос без авторизации (401) и фиксирует ответ с пустыми/default входными данными для каждой из четырёх ролей; для параметров пути подставляется отсутствующий числовой ID. Результат этой проверки — status snapshots, а не доказательство корректности успешного сценария.
+В каталоге `backend/src/test/api.characterization.test.ts` перечислены 97 endpoint’ов. По каждому endpoint сценарии и ограничения сведены в [endpoint matrix](stage-8-3-endpoint-matrix.md). Общий набор для каждого защищённого маршрута проверяет запрос без авторизации (401) и фиксирует ответ с пустыми/default входными данными для каждой из четырёх ролей; для параметров пути подставляется отсутствующий числовой ID. Результат этой проверки — status snapshots, а не доказательство корректности успешного сценария.
 
 Добавлены отдельные наборы по доменам в `backend/src/modules/*/*-api.characterization.test.ts`. Они проходят реальные HTTP-потоки и проверки отрицательных сценариев для request, board, knowledge, organization, store и Telegram API. Список успешных/ошибочных потоков описан прямо в тестах; тесты используют общие фабрики и очистку тестовой БД из `backend/src/test/api-test-app.ts`.
 
@@ -15,7 +15,14 @@
 | Organizations | 401 для защищённых endpoint’ов | Четыре роли; неизвестные ID/default input | Создание, список, обновление, участники и удаление; неверный ввод, отсутствующий ID и отказ по роли |
 | Stores | 401 для защищённых endpoint’ов | Четыре роли; неизвестные ID/default input | CRUD, настройки доступа и проверка сохранения/чтения секретов; неверный ввод, отсутствующий ID и отказ по роли |
 | Telegram | 401 для защищённых endpoint’ов | Четыре роли; неизвестные ID/default input | Интеграции, чаты, сообщения и привязки; неверный ID и запрет CLIENT |
-| Components, departments, moderation, recurring requests, request types, staff, users | 401 для защищённых endpoint’ов | Четыре роли; неизвестные ID/default input | Полные успешные HTTP-сценарии этим этапом не добавлены |
+| Components, departments, moderation, recurring requests, request types, staff, users | 401 для защищённых endpoint’ов | Четыре роли; неизвестные ID/default input | Existing module suites cover CRUD/status flows; this stage adds staff edge cases and fills remaining list/report/moderation routes |
+
+## Дополнительные проверки этапа 8.3
+
+- Staff API покрыт отдельными HTTP-сценариями: список, создание, изменение данных и статуса, смена роли/прав, пароля и создание Telegram-ссылки; также проверены невалидный ввод, отсутствующая запись и отказ CLIENT.
+- Общий error middleware проверен на AppError, одиночную и множественную Zod validation errors, коды Prisma P2002/P2025 и неизвестную server error.
+- Knowledge import покрыт маршрутными тестами UTF-8 BOM, UTF-16LE/BE, Windows-1251 и DOCX преобразования текста/абзацев. Одинаковые 12 тестов staff/error/import прошли на baseline и текущей версии.
+- Дополнительная endpoint-сверка нашла 11 путей без явного HTTP-вызова. Для них добавлены сценарии: `GET /api/components`; moderation pending lists и store decision; organization approve/reject; store approve/reject; request stats/procurement. Позитивные и ключевые validation/missing-ID результаты проверены.
 
 ## Зафиксированные ограничения и наблюдения
 
@@ -29,5 +36,8 @@
 
 - Текущая версия: 6 файлов, 14 тестов доменной характеристики прошли.
 - Baseline `D:\crm-original` (исходный HEAD): те же 6 файлов и 14 тестов прошли последовательно без параллельного запуска.
-- Полный `npm run verify` прошёл: frontend 2 файла/4 теста; backend 28 файлов/98 тестов; production build фронтенда и backend, SPA fallback smoke и Playwright 11/11.
-- Итоговое backend coverage: lines 80.91%, statements 79.14%, functions 80.13%, branches 59.25%. Frontend coverage без изменений с этапа 8.2: lines 39.79%, statements 39.40%, functions 24.79%, branches 29.74%.
+- После расширения этапа: backend 32 файла/111 тестов; backend coverage — lines 84.45%, statements 82.62%, functions 84.10%, branches 62.78%; aggregate `src/modules/**` lines 85.86% (1026/1195).
+- Все новые тесты этапа 8.3 (27 тестов) прошли на baseline worktree и на текущем коде.
+- Финальный `npm run verify` после follow-up suite и повышения thresholds прошёл: frontend 2 файла/4 теста; backend 32 файла/111 тестов; frontend/backend production builds, SPA fallback smoke и Playwright 11/11.
+- Один Playwright knowledge smoke упал при первом полном прогоне после расширения набора; повторный изолированный запуск и повторный полный `verify` прошли. Зафиксировано как нестабильное срабатывание, код продукта не менялся.
+- Frontend coverage без изменений с этапа 8.2: lines 39.79%, statements 39.40%, functions 24.79%, branches 29.74%.
