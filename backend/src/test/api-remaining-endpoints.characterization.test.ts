@@ -67,6 +67,12 @@ describe("remaining API endpoint scenarios", () => {
       .get("/api/requests/procurement?from=invalid&to=invalid")
       .set(auth);
     expect(invalidPeriod.status).toBe(400);
+    expect(invalidPeriod.body.message).toBe("Некорректный период отчёта");
+    const invalidStatsPeriod = await request(app)
+      .get("/api/requests/stats?from=invalid&to=invalid")
+      .set(auth);
+    expect(invalidStatsPeriod.status).toBe(400);
+    expect(invalidStatsPeriod.body.message).toBe("Некорректный период отчёта");
 
     const pending = await Promise.all(
       Array.from({ length: 5 }, () => createPendingOrganizationStore()),

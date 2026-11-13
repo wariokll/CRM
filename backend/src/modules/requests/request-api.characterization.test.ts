@@ -91,11 +91,31 @@ describe("request API characterization", () => {
     expect(list.status).toBe(200);
     expect(list.body.map((row: { id: number }) => row.id)).toContain(id);
 
+    const ignoredInvalidFilters = await request(app)
+      .get("/api/requests")
+      .query({
+        status: "NOT_A_STATUS",
+        urgency: "NOT_AN_URGENCY",
+        priority: "NOT_A_PRIORITY",
+        storeId: "not-a-number",
+      })
+      .set(auth);
+    expect(ignoredInvalidFilters.status).toBe(200);
+    expect(
+      ignoredInvalidFilters.body.map((row: { id: number }) => row.id),
+    ).toContain(id);
+
     const assignees = await request(app)
       .get("/api/requests/assignees")
       .set(auth);
     expect(assignees.status).toBe(200);
     expect(assignees.body).toEqual(expect.any(Array));
+
+    const invalidDepartmentFilter = await request(app)
+      .get("/api/requests/assignees")
+      .query({ departmentId: "not-a-number" })
+      .set(auth);
+    expect(invalidDepartmentFilter.status).toBe(200);
 
     const updated = await request(app)
       .patch(`/api/requests/${id}`)
@@ -110,6 +130,12 @@ describe("request API characterization", () => {
       status: RequestStatus.ACCEPTED,
       adminComment: "We will inspect it",
     });
+
+    const invalidComment = await request(app)
+      .post(`/api/requests/${id}/comments`)
+      .set(auth)
+      .send({ body: " " });
+    expect(invalidComment.status).toBe(400);
 
     const comment = await request(app)
       .post(`/api/requests/${id}/comments`)
