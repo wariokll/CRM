@@ -35,6 +35,18 @@ describe("store API characterization", () => {
     expect(created.body.status).toBe("ACTIVE");
     const storeId = created.body.id as number;
 
+    const invalidUpdate = await request(app)
+      .patch(`/api/stores/${storeId}`)
+      .set(auth)
+      .send({ name: 12 });
+    expect(invalidUpdate.status).toBe(400);
+
+    const invalidAccessWrite = await request(app)
+      .put(`/api/stores/${storeId}/access`)
+      .set(auth)
+      .send({ ofdUrl: "not-a-url" });
+    expect(invalidAccessWrite.status).toBe(400);
+
     const listed = await request(app).get("/api/stores").set(auth);
     expect(listed.status).toBe(200);
     expect(listed.body.map((store: { id: number }) => store.id)).toContain(

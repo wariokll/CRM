@@ -35,6 +35,18 @@ describe("organization API characterization", () => {
     expect(created.body.status).toBe("ACTIVE");
 
     const organizationId = created.body.id as number;
+    const invalidUpdate = await request(app)
+      .patch(`/api/organizations/${organizationId}`)
+      .set(auth)
+      .send({ email: "not-an-email" });
+    expect(invalidUpdate.status).toBe(400);
+
+    const invalidMembershipUpdate = await request(app)
+      .put(`/api/organizations/${organizationId}/members`)
+      .set(auth)
+      .send({ userIds: [] });
+    expect(invalidMembershipUpdate.status).toBe(400);
+
     const replaced = await request(app)
       .put(`/api/organizations/${organizationId}/members`)
       .set(auth)
