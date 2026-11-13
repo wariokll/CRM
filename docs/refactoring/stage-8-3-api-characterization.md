@@ -30,7 +30,7 @@
 - `POST /api/knowledge/import`, `GET /api/requests/procurement`, а также некоторые вторичные операции целевых доменов нужно сверить с перечнем вызовов в соответствующих тестах: их успешный контракт не заявляется как покрытый, если тест явно его не проверяет.
 - Telegram `GET /api/telegram/chats/:id/messages` при нечисловом ID отвечает 500. Тест оставляет это поведение точным characterization-ожиданием; исправление ошибки не входит в этап, чтобы не менять наблюдаемое поведение без отдельного решения.
 - При проверке кириллицы найдены и исправлены остаточные повреждения `С‚ип` и `С‚олько` в сообщениях knowledge/request API. Проверка `node scripts/check-text-encoding.mjs` проходит.
-- Старый общий тест со status snapshots сохранён без структурных изменений, чтобы не нарушить доказанное прохождение на baseline. Доменные сценарии вынесены в отдельные тестовые файлы; перенос/разделение исходного snapshot-файла потребует отдельного сравнения snapshots с baseline.
+- `api.characterization.test.ts` разделён: в нём оставлены no-auth и 4-role status snapshots для всего каталога; auth, catalogs, permission gates и reports вынесены в отдельные файлы. Тела assertions и snapshot содержимое сохранены; новые файлы прошли на baseline.
 
 ## Проверки
 
@@ -38,6 +38,7 @@
 - Baseline `D:\crm-original` (исходный HEAD): те же 6 файлов и 14 тестов прошли последовательно без параллельного запуска.
 - После расширения этапа: backend 32 файла/111 тестов; backend coverage — lines 84.45%, statements 82.62%, functions 84.10%, branches 62.78%; aggregate `src/modules/**` lines 85.86% (1026/1195).
 - Все новые тесты этапа 8.3 (27 тестов) прошли на baseline worktree и на текущем коде.
-- Финальный `npm run verify` после follow-up suite и повышения thresholds прошёл: frontend 2 файла/4 теста; backend 32 файла/111 тестов; frontend/backend production builds, SPA fallback smoke и Playwright 11/11.
+- Финальный `npm run verify` до разделения общего characterization файла прошёл: frontend 2 файла/4 теста; backend 32 файла/111 тестов; frontend/backend production builds, SPA fallback smoke и Playwright 11/11. После переноса suites требуется повторный `verify`.
 - Один Playwright knowledge smoke упал при первом полном прогоне после расширения набора; повторный изолированный запуск и повторный полный `verify` прошли. Зафиксировано как нестабильное срабатывание, код продукта не менялся.
+- ????? ????????? characterization-?????? ????????? ?????? `npm run verify` ??????: ????????? ?????????, TypeScript, ESLint, Prettier, frontend 2 ?????/4 ?????, backend 36 ??????/111 ??????, ??????, SPA fallback ? Playwright 11/11. ???????? backend: statements 82.77%, branches 63.61%, functions 84.36%, lines 84.57%; frontend: lines 39.79%, statements 39.40%, functions 24.79%, branches 29.74%. ???? ?????????????? ?????? ?????? ???? ?? ???????? ???????? ?????? ?????; ????????????? ?????? ? ????????? ?????? ?????? ??????.
 - Frontend coverage без изменений с этапа 8.2: lines 39.79%, statements 39.40%, functions 24.79%, branches 29.74%.
