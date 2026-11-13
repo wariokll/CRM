@@ -71,4 +71,64 @@ describe("catalog API characterization", () => {
       templateFields: [],
     });
   });
+
+  it("records invalid bodies and missing IDs for catalog mutations", async () => {
+    const director = (await createApiUser(Role.DIRECTOR)).token;
+    const invalidComponent = await send(
+      ["POST", "/api/components"],
+      director,
+    ).send({});
+    expect(invalidComponent.status).toBe(400);
+    const invalidComponentUpdate = await send(
+      ["PATCH", "/api/components/999999999"],
+      director,
+    ).send({ name: 12 });
+    expect(invalidComponentUpdate.status).toBe(400);
+    const missingComponent = await send(
+      ["PATCH", "/api/components/999999999"],
+      director,
+    ).send({ name: "Missing component" });
+    expect(missingComponent.status).toBe(404);
+
+    const invalidDepartment = await send(
+      ["POST", "/api/departments"],
+      director,
+    ).send({});
+    expect(invalidDepartment.status).toBe(400);
+    const invalidDepartmentUpdate = await send(
+      ["PATCH", "/api/departments/999999999"],
+      director,
+    ).send({ name: 12 });
+    expect(invalidDepartmentUpdate.status).toBe(400);
+    const missingDepartment = await send(
+      ["PATCH", "/api/departments/999999999"],
+      director,
+    ).send({ name: "Missing department" });
+    expect(missingDepartment.status).toBe(404);
+
+    const invalidRequestType = await send(
+      ["POST", "/api/request-types"],
+      director,
+    ).send({});
+    expect(invalidRequestType.status).toBe(400);
+    const department = await createApiDepartment(
+      "Request type validation",
+      "request-type-validation",
+    );
+    const requestType = await send(
+      ["POST", "/api/request-types"],
+      director,
+    ).send({ name: "Valid request type", departmentId: department.id });
+    expect(requestType.status).toBe(201);
+    const invalidRequestTypeUpdate = await send(
+      ["PATCH", "/api/request-types/" + requestType.body.id],
+      director,
+    ).send({ name: 12 });
+    expect(invalidRequestTypeUpdate.status).toBe(400);
+    const missingRequestType = await send(
+      ["PATCH", "/api/request-types/999999999"],
+      director,
+    ).send({ name: "Missing request type" });
+    expect(missingRequestType.status).toBe(404);
+  });
 });

@@ -173,7 +173,7 @@ export const permissionGates: Array<{
   },
 ];
 
-export function send(endpoint: Endpoint, token?: string) {
+export function send(endpoint: readonly [Endpoint[0], string], token?: string) {
   const [method, route] = endpoint;
   const path = route.replace(/:[A-Za-z]+/g, "999999999");
   const target = path === "/api/boards" ? `${path}?type=PERSONAL` : path;
