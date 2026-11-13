@@ -128,6 +128,48 @@ describe("knowledge API characterization", () => {
     expect(invalidId.status).toBe(400);
     expect(invalidId.body.issues).toEqual(expect.any(Array));
 
+    const invalidSectionQuery = await request(app)
+      .get("/api/knowledge/articles")
+      .query({ sectionId: "not-an-id" })
+      .set(auth);
+    expect(invalidSectionQuery.status).toBe(400);
+
+    const invalidSectionCreate = await request(app)
+      .post("/api/knowledge/sections")
+      .set(auth)
+      .send({});
+    expect(invalidSectionCreate.status).toBe(400);
+
+    const invalidSectionUpdate = await request(app)
+      .patch("/api/knowledge/sections/999999999")
+      .set(auth)
+      .send({ name: 12 });
+    expect(invalidSectionUpdate.status).toBe(400);
+
+    const invalidImport = await request(app)
+      .post("/api/knowledge/import")
+      .set(auth)
+      .field("sectionId", "not-an-id");
+    expect(invalidImport.status).toBe(400);
+
+    const invalidArticleCreate = await request(app)
+      .post("/api/knowledge/articles")
+      .set(auth)
+      .send({});
+    expect(invalidArticleCreate.status).toBe(400);
+
+    const invalidArticleUpdate = await request(app)
+      .patch("/api/knowledge/articles/999999999")
+      .set(auth)
+      .send({ title: 12 });
+    expect(invalidArticleUpdate.status).toBe(400);
+
+    const invalidAttachment = await request(app)
+      .post("/api/knowledge/articles/999999999/attachments")
+      .set(auth)
+      .attach("files", Buffer.from("invalid file"), "invalid.exe");
+    expect(invalidAttachment.status).toBe(400);
+
     const missingArticle = await request(app)
       .get("/api/knowledge/articles/999999999")
       .set(auth);
