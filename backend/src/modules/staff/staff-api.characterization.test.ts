@@ -108,4 +108,51 @@ describe("staff API characterization", () => {
       .set("Authorization", `Bearer ${client.token}`);
     expect(denied.status).toBe(403);
   });
+
+  it("validates every staff mutation and reports missing staff IDs", async () => {
+    const director = await createApiUser(Role.DIRECTOR);
+    const staff = await createApiUser(Role.MASTER);
+    const auth = { Authorization: `Bearer ${director.token}` };
+
+    const invalidUpdate = await request(app)
+      .patch(`/api/staff/${staff.user.id}`)
+      .set(auth)
+      .send({ name: 12 });
+    expect(invalidUpdate.status).toBe(400);
+
+    const invalidAccess = await request(app)
+      .put(`/api/staff/${staff.user.id}/access`)
+      .set(auth)
+      .send({});
+    expect(invalidAccess.status).toBe(400);
+
+    const invalidPassword = await request(app)
+      .patch(`/api/staff/${staff.user.id}/password`)
+      .set(auth)
+      .send({ password: "short" });
+    expect(invalidPassword.status).toBe(400);
+
+    const missingUpdate = await request(app)
+      .patch("/api/staff/999999999")
+      .set(auth)
+      .send({ name: "Missing staff" });
+    expect(missingUpdate.status).toBe(404);
+
+    const missingAccess = await request(app)
+      .put("/api/staff/999999999/access")
+      .set(auth)
+      .send({ role: Role.MASTER, departments: [], permissions: [] });
+    expect(missingAccess.status).toBe(404);
+
+    const missingPassword = await request(app)
+      .patch("/api/staff/999999999/password")
+      .set(auth)
+      .send({ password: "LongEnoughPassword" });
+    expect(missingPassword.status).toBe(404);
+
+    const missingTelegramLink = await request(app)
+      .post("/api/staff/999999999/telegram-link")
+      .set(auth);
+    expect(missingTelegramLink.status).toBe(404);
+  });
 });

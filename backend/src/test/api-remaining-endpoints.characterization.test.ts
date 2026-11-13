@@ -113,6 +113,12 @@ describe("remaining API endpoint scenarios", () => {
       ]),
     );
 
+    const invalidUserModeration = await request(app)
+      .patch(`/api/moderation/users/${approvedOrg.user.id}`)
+      .set(auth)
+      .send({ status: "NOT_A_STATUS" });
+    expect(invalidUserModeration.status).toBe(400);
+
     const invalidOrganizationRejection = await request(app)
       .post(`/api/organizations/${rejectedOrg.organization.id}/reject`)
       .set(auth)
@@ -171,5 +177,17 @@ describe("remaining API endpoint scenarios", () => {
       .set(auth)
       .send({ status: StoreStatus.ACTIVE });
     expect(missingStoreModeration.status).toBe(404);
+
+    const missingUserModeration = await request(app)
+      .patch("/api/moderation/users/999999999")
+      .set(auth)
+      .send({ status: UserStatus.ACTIVE });
+    expect(missingUserModeration.status).toBe(404);
+
+    const missingOrganizationModeration = await request(app)
+      .patch("/api/moderation/organizations/999999999")
+      .set(auth)
+      .send({ status: OrganizationStatus.ACTIVE });
+    expect(missingOrganizationModeration.status).toBe(404);
   });
 });
