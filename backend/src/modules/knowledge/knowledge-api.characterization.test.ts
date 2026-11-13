@@ -139,6 +139,43 @@ describe("knowledge API characterization", () => {
       .send({ sectionId: 999999999, title: "Missing section", body: "Body" });
     expect(missingSection.status).toBe(404);
 
+    const updateMissingSection = await request(app)
+      .patch("/api/knowledge/sections/999999999")
+      .set(auth)
+      .send({ name: "Missing section" });
+    expect(updateMissingSection.status).toBe(404);
+
+    const deleteMissingSection = await request(app)
+      .delete("/api/knowledge/sections/999999999")
+      .set(auth);
+    expect(deleteMissingSection.status).toBe(404);
+
+    const updateMissingArticle = await request(app)
+      .patch("/api/knowledge/articles/999999999")
+      .set(auth)
+      .send({ title: "Missing article" });
+    expect(updateMissingArticle.status).toBe(404);
+
+    const deleteMissingArticle = await request(app)
+      .delete("/api/knowledge/articles/999999999")
+      .set(auth);
+    expect(deleteMissingArticle.status).toBe(404);
+
+    const uploadToMissingArticle = await request(app)
+      .post("/api/knowledge/articles/999999999/attachments")
+      .set(auth);
+    expect(uploadToMissingArticle.status).toBe(404);
+
+    const downloadMissingAttachment = await request(app)
+      .get("/api/knowledge/attachments/999999999/download")
+      .set(auth);
+    expect(downloadMissingAttachment.status).toBe(404);
+
+    const deleteMissingAttachment = await request(app)
+      .delete("/api/knowledge/attachments/999999999")
+      .set(auth);
+    expect(deleteMissingAttachment.status).toBe(404);
+
     const denied = await request(app)
       .get("/api/knowledge/sections")
       .set("Authorization", `Bearer ${client.token}`);
