@@ -68,6 +68,7 @@ execFileSync(
     "run",
     "--config",
     resolve(backendRoot, "vitest.backend.config.ts"),
+    "--coverage",
   ],
   {
     cwd: backendRoot,

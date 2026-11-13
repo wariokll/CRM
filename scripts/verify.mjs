@@ -75,6 +75,7 @@ run("Frontend unit tests", node, [
   "run",
   "--config",
   "vitest.config.ts",
+  "--coverage",
 ]);
 run("Isolated test database", node, [
   resolve(root, "scripts/ensure-test-db.mjs"),

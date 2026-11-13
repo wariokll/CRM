@@ -9,5 +9,16 @@ export default defineConfig({
     setupFiles: ["./src/test/setup.ts"],
     restoreMocks: true,
     clearMocks: true,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json-summary"],
+      reportsDirectory: "coverage/frontend",
+      thresholds: {
+        statements: 39.4,
+        branches: 29.74,
+        functions: 24.79,
+        lines: 39.79,
+      },
+    },
   },
 });
