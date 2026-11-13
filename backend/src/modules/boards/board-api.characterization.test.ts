@@ -290,4 +290,52 @@ describe("board API characterization", () => {
       expect(response.status).toBe(404);
     }
   });
+
+  it("rejects invalid inputs on board routes that accept bodies or queries", async () => {
+    const director = await createApiUser(Role.DIRECTOR);
+    const auth = { Authorization: `Bearer ${director.token}` };
+    const created = await request(app)
+      .post("/api/boards")
+      .set(auth)
+      .send({ name: "Invalid-input board", type: BoardType.TEAM });
+    expect(created.status).toBe(201);
+    const boardId = created.body.id as number;
+    const invalidCases = [
+      request(app).get("/api/boards").query({ type: "UNKNOWN" }).set(auth),
+      request(app).post("/api/boards").set(auth).send({}),
+      request(app).patch(`/api/boards/${boardId}`).set(auth).send({ name: 42 }),
+      request(app)
+        .patch(`/api/boards/${boardId}/layout`)
+        .set(auth)
+        .send({ columns: "invalid" }),
+      request(app)
+        .post("/api/boards/cards/999999999/restore")
+        .set(auth)
+        .send({}),
+      request(app).post(`/api/boards/${boardId}/access`).set(auth).send({}),
+      request(app).post(`/api/boards/${boardId}/columns`).set(auth).send({}),
+      request(app).patch("/api/boards/columns/999999999").set(auth).send({}),
+      request(app).delete("/api/boards/columns/999999999").set(auth).send({}),
+      request(app)
+        .post("/api/boards/columns/999999999/move")
+        .set(auth)
+        .send({}),
+      request(app)
+        .post("/api/boards/columns/999999999/cards")
+        .set(auth)
+        .send({}),
+      request(app).patch("/api/boards/cards/999999999").set(auth).send({}),
+      request(app).delete("/api/boards/cards/999999999").set(auth).send({}),
+      request(app)
+        .post("/api/boards/cards/999999999/archive")
+        .set(auth)
+        .send({}),
+      request(app).post("/api/boards/cards/999999999/move").set(auth).send({}),
+    ];
+
+    for (const scenario of invalidCases) {
+      const response = await scenario;
+      expect(response.status).toBe(400);
+    }
+  });
 });
