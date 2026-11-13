@@ -187,5 +187,20 @@ describe("request API characterization", () => {
       .set("Authorization", `Bearer ${director.token}`)
       .send({ body: "No request" });
     expect(missingComment.status).toBe(404);
+
+    const missingAssignment = await request(app)
+      .post("/api/requests/999999999/assignees/self")
+      .set("Authorization", `Bearer ${director.token}`);
+    expect(missingAssignment.status).toBe(404);
+
+    const missingUnassignment = await request(app)
+      .delete("/api/requests/999999999/assignees/self")
+      .set("Authorization", `Bearer ${director.token}`);
+    expect(missingUnassignment.status).toBe(204);
+
+    const missingDelete = await request(app)
+      .delete("/api/requests/999999999")
+      .set("Authorization", `Bearer ${director.token}`);
+    expect(missingDelete.status).toBe(404);
   });
 });

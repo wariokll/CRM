@@ -222,4 +222,72 @@ describe("board API characterization", () => {
       .set("Authorization", `Bearer ${client.token}`);
     expect(denied.status).toBe(403);
   });
+
+  it("records missing-entity responses for every board child operation", async () => {
+    const director = await createApiUser(Role.DIRECTOR);
+    const auth = { Authorization: `Bearer ${director.token}` };
+    const cases = [
+      request(app).get("/api/boards/999999999/archive").set(auth),
+      request(app)
+        .patch("/api/boards/999999999/layout")
+        .set(auth)
+        .send({
+          columns: [{ id: 1, version: 1, width: 240, cardsPerRow: 1 }],
+        }),
+      request(app)
+        .patch("/api/boards/999999999")
+        .set(auth)
+        .send({ name: "Missing board" }),
+      request(app).delete("/api/boards/999999999").set(auth),
+      request(app).get("/api/boards/999999999/access").set(auth),
+      request(app)
+        .post("/api/boards/999999999/access")
+        .set(auth)
+        .send({ userId: director.user.id }),
+      request(app)
+        .delete(`/api/boards/999999999/access/${director.user.id}`)
+        .set(auth),
+      request(app)
+        .post("/api/boards/999999999/columns")
+        .set(auth)
+        .send({ name: "Missing board column" }),
+      request(app)
+        .patch("/api/boards/columns/999999999")
+        .set(auth)
+        .send({ name: "Missing column", version: 1 }),
+      request(app)
+        .delete("/api/boards/columns/999999999")
+        .set(auth)
+        .send({ version: 1 }),
+      request(app)
+        .post("/api/boards/columns/999999999/move")
+        .set(auth)
+        .send({ position: 0, version: 1 }),
+      request(app)
+        .post("/api/boards/columns/999999999/cards")
+        .set(auth)
+        .send({ title: "Card in missing column" }),
+      request(app)
+        .patch("/api/boards/cards/999999999")
+        .set(auth)
+        .send({ title: "Missing card", version: 1 }),
+      request(app)
+        .delete("/api/boards/cards/999999999")
+        .set(auth)
+        .send({ version: 1 }),
+      request(app)
+        .post("/api/boards/cards/999999999/archive")
+        .set(auth)
+        .send({ version: 1 }),
+      request(app)
+        .post("/api/boards/cards/999999999/move")
+        .set(auth)
+        .send({ targetColumnId: 1, position: 0, version: 1 }),
+    ];
+
+    for (const scenario of cases) {
+      const response = await scenario;
+      expect(response.status).toBe(404);
+    }
+  });
 });
