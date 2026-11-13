@@ -132,7 +132,7 @@ storesRouter.post("/", async (req, res) => {
     !access ||
     !(await canUseOrganization(req.auth!.userId, body.organizationId))
   )
-    return res.status(403).json({ message: "Нет доступа Рє организации" });
+    return res.status(403).json({ message: "Нет доступа к организации" });
   const activeImmediately =
     access.role !== Role.CLIENT &&
     hasPermission(access, PermissionKey.MANAGE_STORES);
@@ -155,7 +155,7 @@ storesRouter.patch("/:id", async (req, res) => {
     body.organizationId &&
     !(await canUseOrganization(req.auth!.userId, body.organizationId))
   )
-    return res.status(403).json({ message: "Нет доступа Рє организации" });
+    return res.status(403).json({ message: "Нет доступа к организации" });
   const access = await getUserAccess(req.auth!.userId);
   const updated = await prisma.store.update({
     where: { id: store.id },
@@ -228,7 +228,7 @@ storesRouter.put("/:id/access", async (req, res) => {
     access.role === Role.CLIENT
   )
     return res.status(404).json({
-      message: "Точка РЅРµ найдена или доступна только сотрудникам",
+      message: "Точка не найдена или доступна только сотрудникам",
     });
   const body = accessSchema.parse(req.body);
   const data = {
@@ -274,7 +274,7 @@ storesRouter.post("/:id/approve", async (req, res) => {
   });
   if (!store)
     return res.status(404).json({
-      message: "Точка РЅР° модерации не найдена",
+      message: "Точка на модерации не найдена",
     });
   res.json(
     await prisma.store.update({
@@ -299,7 +299,7 @@ storesRouter.post("/:id/reject", async (req, res) => {
   });
   if (!store)
     return res.status(404).json({
-      message: "Точка РЅР° модерации не найдена",
+      message: "Точка на модерации не найдена",
     });
   res.json(
     await prisma.store.update({

@@ -216,7 +216,7 @@ organizationsRouter.post("/:id/approve", async (req, res) => {
   });
   if (!organization)
     return res.status(404).json({
-      message: "Организация РЅР° модерации не найдена",
+      message: "Организация на модерации не найдена",
     });
   await prisma.$transaction(async (transaction) => {
     await transaction.organization.update({
@@ -259,7 +259,7 @@ organizationsRouter.post("/:id/reject", async (req, res) => {
   });
   if (!organization)
     return res.status(404).json({
-      message: "Организация РЅР° модерации не найдена",
+      message: "Организация на модерации не найдена",
     });
   res.json(
     await prisma.organization.update({

@@ -174,7 +174,7 @@ requestsRouter.post("/", async (req, res) => {
   const body = createRequestSchema.parse(req.body);
   const access = await getUserAccess(req.auth!.userId);
   if (!access || access.status !== "ACTIVE")
-    return res.status(403).json({ message: "Аккаунт РµС‰ё не одобрен" });
+    return res.status(403).json({ message: "Аккаунт ещё не одобрен" });
   const type = await prisma.requestType.findFirst({
     where: { id: body.typeId, isActive: true },
     include: { department: true },
@@ -203,12 +203,12 @@ requestsRouter.post("/", async (req, res) => {
     if (!organization)
       return res.status(400).json({
         message:
-          "Выбранная организация РЅРµ найдена или ещё РЅРµ принята. Выберите активную организацию.",
+          "Выбранная организация не найдена или ещё не принята. Выберите активную организацию.",
       });
   }
   if (store && organizationId && store.organizationId !== organizationId)
     return res.status(400).json({
-      message: "Точка РЅРµ относится Рє выбранной организации",
+      message: "Точка не относится к выбранной организации",
     });
   if (access.role === Role.CLIENT && organizationId) {
     const membership = await prisma.organizationMember.findUnique({
@@ -217,7 +217,7 @@ requestsRouter.post("/", async (req, res) => {
       },
     });
     if (!membership)
-      return res.status(403).json({ message: "Нет доступа Рє организации" });
+      return res.status(403).json({ message: "Нет доступа к организации" });
   }
   if (body.urgency === Urgency.SCHEDULED && !body.scheduledAt)
     return res.status(400).json({
@@ -229,7 +229,7 @@ requestsRouter.post("/", async (req, res) => {
       body.scheduledAt.getTime() < Date.now())
   )
     return res.status(400).json({
-      message: "Дата должна быть РІ пределах следующего года",
+      message: "Дата должна быть в пределах следующего года",
     });
   if (body.recurrenceIntervalDays && body.urgency !== Urgency.SCHEDULED)
     return res.status(400).json({
@@ -252,14 +252,14 @@ requestsRouter.post("/", async (req, res) => {
   }
   if (type.requiresComponents && !body.components?.length)
     return res.status(400).json({
-      message: "Добавьте хотя Р±С‹ один необходимый компонент",
+      message: "Добавьте хотя бы один необходимый компонент",
     });
   const componentIds = [
     ...new Set(body.components?.map((item) => item.componentId) ?? []),
   ];
   if (componentIds.length !== (body.components?.length ?? 0))
     return res.status(400).json({
-      message: "Один компонент нельзя указать РІ заявке дважды",
+      message: "Один компонент нельзя указать в заявке дважды",
     });
   const catalogComponents = componentIds.length
     ? await prisma.component.findMany({
@@ -269,7 +269,7 @@ requestsRouter.post("/", async (req, res) => {
     : [];
   if (catalogComponents.length !== componentIds.length)
     return res.status(400).json({
-      message: "Один РёР· выбранных компонентов недоступен",
+      message: "Один из выбранных компонентов недоступен",
     });
   const componentNames = new Map(
     catalogComponents.map((component) => [component.id, component.name]),
@@ -288,7 +288,7 @@ requestsRouter.post("/", async (req, res) => {
   if (body.assigneeId) {
     if (access.role === Role.CLIENT)
       return res.status(403).json({
-        message: "Клиент РЅРµ может назначать исполнителя",
+        message: "Клиент не может назначать исполнителя",
       });
     if (access.role === Role.MASTER && body.assigneeId !== access.userId)
       return res.status(403).json({
@@ -304,8 +304,7 @@ requestsRouter.post("/", async (req, res) => {
     });
     if (!assignee)
       return res.status(400).json({
-        message:
-          "Выбранный исполнитель недоступен или РЅРµ является сотрудником",
+        message: "Выбранный исполнитель недоступен или не является сотрудником",
       });
   }
   const primaryMember = organizationId
@@ -386,7 +385,7 @@ requestsRouter.post("/", async (req, res) => {
         kind: "CREATED",
         message: recurrenceSchedule
           ? `Создана повторяющаяся заявка: каждые ${body.recurrenceIntervalDays} дн.`
-          : "Р—аявка создана",
+          : "Заявка создана",
       },
     });
     if (assignee) {
@@ -402,7 +401,7 @@ requestsRouter.post("/", async (req, res) => {
           requestId: created.id,
           authorUserId: access.userId,
           kind: "ASSIGNEES_CHANGED",
-          message: `РСЃРїРѕР»РЅРёС‚РµР»СЊ назначен при создании: ${assignee.ipName}`,
+          message: `Исполнитель назначен при создании: ${assignee.ipName}`,
         },
       });
     }
@@ -414,7 +413,7 @@ requestsRouter.post("/", async (req, res) => {
   if (assignee)
     void notifyRequestAssignees(
       request.id,
-      `Вам назначена новая заявка «${type.name}В». Откройте Р‘РђР—РРЎ CRM для деталей.`,
+      `Вам назначена новая заявка «${type.name}». Откройте БАЗИС CRM для деталей.`,
       [assignee.id],
     );
   res.status(201).json(request);
@@ -429,7 +428,7 @@ requestsRouter.patch("/:id", async (req, res) => {
     where: { id, AND: [requestVisibilityWhere(access)] },
     include: { assignees: true, type: { select: { name: true } } },
   });
-  if (!row) return res.status(404).json({ message: "Р—аявка не найдена" });
+  if (!row) return res.status(404).json({ message: "Заявка не найдена" });
   const update = updateRequestSchema.parse(req.body);
   const managesCurrent = canManageRequest(access, row.departmentId);
   const isAssignedMaster =
@@ -438,7 +437,7 @@ requestsRouter.patch("/:id", async (req, res) => {
   if (!managesCurrent && !isAssignedMaster)
     return res.status(403).json({
       message:
-        "Сначала возьмите заявку РІ работу: сейчас доступен просмотр Рё комментарии",
+        "Сначала возьмите заявку в работу: сейчас доступен просмотр и комментарии",
     });
   if (update.status) {
     if (
@@ -446,7 +445,7 @@ requestsRouter.patch("/:id", async (req, res) => {
       !hasPermission(access, PermissionKey.CANCEL_REQUESTS)
     )
       return res.status(403).json({
-        message: "Отменить заявку может руководитель или начальник РѕС‚дела",
+        message: "Отменить заявку может руководитель или начальник отдела",
       });
     if (!canChangeRequestStatus(row.status, update.status))
       return res.status(400).json({
@@ -511,7 +510,7 @@ requestsRouter.patch("/:id", async (req, res) => {
       });
       if (eligible.length !== ids.length)
         throw new Error(
-          "Выбранный сотрудник РЅРµ состоит РІ отделе заявки или недоступен",
+          "Выбранный сотрудник не состоит в отделе заявки или недоступен",
         );
       await transaction.requestAssignee.deleteMany({
         where: { requestId: row.id },
@@ -543,14 +542,14 @@ requestsRouter.patch("/:id", async (req, res) => {
     const statusLabels: Record<RequestStatus, string> = {
       NEW: "Новая",
       ACCEPTED: "Принята",
-      IN_PROGRESS: "Р’ работе",
-      DONE: "Р’С‹полнена",
-      CANCELLED: "РћС‚менена",
+      IN_PROGRESS: "В работе",
+      DONE: "Выполнена",
+      CANCELLED: "Отменена",
     };
     const priorityLabels: Record<Priority, string> = {
       LOW: "низкий",
       NORMAL: "обычный",
-      HIGH: "РІС‹сокий",
+      HIGH: "высокий",
       CRITICAL: "критический",
     };
     if (update.status && update.status !== row.status)
@@ -559,7 +558,7 @@ requestsRouter.patch("/:id", async (req, res) => {
           requestId: row.id,
           authorUserId: access.userId,
           kind: "STATUS_CHANGED",
-          message: `Статус изменён: «${statusLabels[row.status]}В» в†’ В«${statusLabels[update.status]}В»`,
+          message: `Статус изменён: «${statusLabels[row.status]}» → «${statusLabels[update.status]}»`,
         },
       });
     if (update.priority && update.priority !== row.priority)
@@ -568,7 +567,7 @@ requestsRouter.patch("/:id", async (req, res) => {
           requestId: row.id,
           authorUserId: access.userId,
           kind: "PRIORITY_CHANGED",
-          message: `Приоритет изменён: «${priorityLabels[row.priority]}В» в†’ В«${priorityLabels[update.priority]}В»`,
+          message: `Приоритет изменён: «${priorityLabels[row.priority]}» → «${priorityLabels[update.priority]}»`,
         },
       });
     if (update.departmentId && update.departmentId !== row.departmentId)
@@ -577,7 +576,7 @@ requestsRouter.patch("/:id", async (req, res) => {
           requestId: row.id,
           authorUserId: access.userId,
           kind: "DEPARTMENT_CHANGED",
-          message: "Заявка передана РІ другой РѕС‚дел",
+          message: "Заявка передана в другой отдел",
         },
       });
     if (update.assigneeIds)
@@ -587,8 +586,8 @@ requestsRouter.patch("/:id", async (req, res) => {
           authorUserId: access.userId,
           kind: "ASSIGNEES_CHANGED",
           message: update.assigneeIds.length
-            ? "РСЃРїРѕР»РЅРёС‚РµР»Рё обновлены"
-            : "РСЃРїРѕР»РЅРёС‚РµР»Рё сняты с заявки",
+            ? "Исполнители обновлены"
+            : "Исполнители сняты с заявки",
         },
       });
     if (update.adminComment?.trim())
@@ -605,17 +604,17 @@ requestsRouter.patch("/:id", async (req, res) => {
     const labels: Record<RequestStatus, string> = {
       NEW: "Новая",
       ACCEPTED: "Принята",
-      IN_PROGRESS: "Р’ работе",
-      DONE: "Р’С‹полнена",
-      CANCELLED: "РћС‚менена",
+      IN_PROGRESS: "В работе",
+      DONE: "Выполнена",
+      CANCELLED: "Отменена",
     };
     void notifyRequestClient(
       row.id,
-      `Р—аявка #${row.id}: статус изменён на «${labels[update.status]}В».`,
+      `Заявка #${row.id}: статус изменён на «${labels[update.status]}».`,
     );
     void notifyRequestAssignees(
       row.id,
-      `Р—аявка «${row.type.name}В»: статус изменён на «${labels[update.status]}В».`,
+      `Заявка «${row.type.name}»: статус изменён на «${labels[update.status]}».`,
     );
   }
   if (update.adminComment?.trim())
@@ -626,7 +625,7 @@ requestsRouter.patch("/:id", async (req, res) => {
   if (update.assigneeIds?.length)
     void notifyRequestAssignees(
       row.id,
-      `Вам назначена заявка «${row.type.name}В». Откройте Р‘РђР—РРЎ CRM для деталей.`,
+      `Вам назначена заявка «${row.type.name}». Откройте БАЗИС CRM для деталей.`,
     );
   res.json(
     await prisma.request.findUniqueOrThrow({
@@ -651,7 +650,7 @@ requestsRouter.delete("/:id", async (req, res) => {
     where: { id },
     select: { id: true },
   });
-  if (!request) return res.status(404).json({ message: "Р—аявка не найдена" });
+  if (!request) return res.status(404).json({ message: "Заявка не найдена" });
   await prisma.request.delete({ where: { id } });
   res.status(204).end();
 });
@@ -667,7 +666,7 @@ requestsRouter.post("/:id/assignees/self", async (req, res) => {
   });
   if (!row || !access.departmentIds.includes(row.departmentId))
     return res.status(404).json({
-      message: "Заявка вашего РѕС‚дела не найдена",
+      message: "Заявка вашего отдела не найдена",
     });
   await prisma.requestAssignee.upsert({
     where: { requestId_userId: { requestId: id, userId: access.userId } },
@@ -683,12 +682,12 @@ requestsRouter.post("/:id/assignees/self", async (req, res) => {
       requestId: id,
       authorUserId: access.userId,
       kind: "SELF_ASSIGNED",
-      message: "Мастер взял заявку РІ работу",
+      message: "Мастер взял заявку в работу",
     },
   });
   void notifyRequestAssignees(
     id,
-    `Р’С‹ взяли РІ работу заявку «${row.type.name}В».`,
+    `Вы взяли в работу заявку «${row.type.name}».`,
     [access.userId],
   );
   res.status(204).end();
@@ -709,7 +708,7 @@ requestsRouter.post("/:id/comments", async (req, res) => {
   const row = await prisma.request.findFirst({
     where: { id, AND: [requestVisibilityWhere(access)] },
   });
-  if (!row) return res.status(404).json({ message: "Р—аявка не найдена" });
+  if (!row) return res.status(404).json({ message: "Заявка не найдена" });
   const body = z
     .object({
       body: z.string().trim().min(1).max(5000),
@@ -749,7 +748,7 @@ requestsRouter.post("/:id/comments", async (req, res) => {
   )
     void notifyRequestClient(
       id,
-      `Новый комментарий по заявке #${id} РѕС‚ ${comment.author.ipName}:\n${comment.body}`,
+      `Новый комментарий по заявке #${id} от ${comment.author.ipName}:\n${comment.body}`,
     );
   res.status(201).json(comment);
 });

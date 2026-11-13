@@ -125,7 +125,7 @@ boardsRouter.post("/", async (req, res) => {
     .parse(req.body);
   if (body.type === BoardType.TEAM && !canCreateTeamBoard(req.auth!.role))
     throw new AppError(
-      "Создавать командные доски могут руководитель Рё начальники РѕС‚делов",
+      "Создавать командные доски могут руководитель и начальники отделов",
       403,
     );
   const board = await prisma.$transaction(async (transaction) => {
@@ -267,7 +267,7 @@ boardsRouter.delete("/:boardId/access/:userId", async (req, res) => {
   const board = await requireOwner(boardId, req.auth!.userId);
   const userId = idSchema.parse(req.params.userId);
   if (userId === board.ownerId)
-    throw new AppError("Создатель РЅРµ может отозвать собственный доступ", 400);
+    throw new AppError("Создатель не может отозвать собственный доступ", 400);
   await prisma.boardAccess.deleteMany({ where: { boardId, userId } });
   res.status(204).end();
 });

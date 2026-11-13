@@ -17,6 +17,9 @@ const run = (label, executable, args, cwd = root) => {
 const rootCli = (file) => resolve(root, "node_modules", file);
 const backendCli = (file) => resolve(root, "backend/node_modules", file);
 
+run("Text encoding check", node, [
+  resolve(root, "scripts/check-text-encoding.mjs"),
+]);
 run("Frontend TypeScript", node, [
   rootCli("typescript/bin/tsc"),
   "-b",

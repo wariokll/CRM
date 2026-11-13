@@ -41,13 +41,13 @@ const parseUploads: RequestHandler = (req, res, next) => {
     if (!error) return next();
     const message =
       error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE"
-        ? "Размер одного файла РЅРµ должен превышать 10 МБ"
+        ? "Размер одного файла не должен превышать 10 МБ"
         : error instanceof multer.MulterError &&
             error.code === "LIMIT_FILE_COUNT"
-          ? "Рљ статье можно прикрепить не более 5 файлов за раз"
+          ? "К статье можно прикрепить не более 5 файлов за раз"
           : error instanceof Error
             ? error.message
-            : "РќРµ удалось загрузить файлы";
+            : "Не удалось загрузить файлы";
     res.status(400).json({ message });
   });
 };
@@ -58,8 +58,7 @@ const importUpload = multer({
   fileFilter: (_req, file, callback) => {
     const extension = extname(file.originalname).toLowerCase();
     if (extension === ".txt" || extension === ".docx") callback(null, true);
-    else
-      callback(new Error("РРјРїРѕСЂС‚ поддерживает только файлы .txt и .docx"));
+    else callback(new Error("Импорт поддерживает только файлы .txt и .docx"));
   },
 });
 
@@ -68,13 +67,13 @@ const parseImportFiles: RequestHandler = (req, res, next) => {
     if (!error) return next();
     const message =
       error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE"
-        ? "Размер одного файла РЅРµ должен превышать 10 МБ"
+        ? "Размер одного файла не должен превышать 10 МБ"
         : error instanceof multer.MulterError &&
             error.code === "LIMIT_FILE_COUNT"
-          ? "Р—Р° один раз можно импортировать не более 20 файлов"
+          ? "За один раз можно импортировать не более 20 файлов"
           : error instanceof Error
             ? error.message
-            : "РќРµ удалось загрузить файлы для импорта";
+            : "Не удалось загрузить файлы для импорта";
     res.status(400).json({ message });
   });
 };
@@ -164,7 +163,7 @@ knowledgeRouter.delete("/sections/:id", async (req, res) => {
   if (!section) return res.status(404).json({ message: "Раздел не найден" });
   if (section._count.children || section._count.articles)
     return res.status(409).json({
-      message: "Сначала удалите или переместите статьи Рё подразделы",
+      message: "Сначала удалите или переместите статьи и подразделы",
     });
   await prisma.knowledgeSection.delete({ where: { id } });
   res.status(204).end();
@@ -198,9 +197,7 @@ knowledgeRouter.post("/import", parseImportFiles, async (req, res) => {
     const title = basename(fileName, extname(fileName)).trim();
     try {
       if (title.length < 2 || title.length > 240)
-        throw new Error(
-          "Название файла должно содержать РѕС‚ 2 до 240 символов",
-        );
+        throw new Error("Название файла должно содержать от 2 до 240 символов");
       const existing = await prisma.knowledgeArticle.findFirst({
         where: { sectionId, title },
         select: { id: true },
@@ -211,12 +208,9 @@ knowledgeRouter.post("/import", parseImportFiles, async (req, res) => {
       }
 
       const parsed = await parseImportFile(file);
-      if (!parsed.body.trim())
-        throw new Error("Р’ документе РЅРµ найден текст");
+      if (!parsed.body.trim()) throw new Error("В документе не найден текст");
       if (parsed.body.length > 900_000)
-        throw new Error(
-          "РР·РІР»РµС‡С‘РЅРЅС‹Р№ текст превышает допустимый размер статьи",
-        );
+        throw new Error("Извлечённый текст превышает допустимый размер статьи");
 
       await prisma.$transaction(async (transaction) => {
         const article = await transaction.knowledgeArticle.create({
@@ -262,7 +256,7 @@ knowledgeRouter.post("/import", parseImportFiles, async (req, res) => {
         reason:
           reason instanceof Error
             ? reason.message
-            : "РќРµ удалось обработать файл",
+            : "Не удалось обработать файл",
       });
     }
   }
