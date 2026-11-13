@@ -72,107 +72,107 @@
 
 ## 3. Карта API endpoints и текущего покрытия
 
-Таблица получена из router registrations и mounts в `backend/src/app.ts`. В колонке «Вход → выход» приведены категории текущего handler-контракта; детальные поля запросов/JSON ответов нужно зафиксировать characterization-тестами этапа 1 до перемещения каждого модуля. У endpoints нет интеграционных тестов маршрутов; «нет» означает отсутствие ссылки на тест endpoint. Проверки сервисов досок/политик и отдельные unit-тесты не считаются покрытием HTTP-контракта.
+Таблица получена из router registrations и mounts в `backend/src/app.ts`. Сценарии и ограничения текущего HTTP-characterization покрытия этапа 8.3 описаны в [отчёте этапа 8.3](stage-8-3-api-characterization.md). Общая матрица проверяет отсутствие авторизации и статусные ответы по ролям; явные успешные и негативные потоки добавлены только для указанных там доменов. Наличие матрицы не означает, что каждый из 97 endpoint’ов проверен успешным сценарием.
 
-| Метод и путь | Доступ по действующей схеме | Вход → выход (категория) | Тест маршрута |
+| Метод и путь | Доступ по действующей схеме | Вход → выход (категория) | Characterization |
 |---|---|---|---|
-| GET `/api/health` | публичный | без входа → health и состояние БД | нет |
-| GET `/api/health/telegram` | публичный | без входа → состояние интеграции Telegram | нет |
-| POST `/api/auth/register` | публичный | регистрационные поля → учётная запись/статус | нет |
-| POST `/api/auth/login` | публичный, rate limited | email/password → пользователь и auth cookies/tokens | нет |
-| POST `/api/auth/refresh` | refresh cookie/token | cookie → обновлённая сессия | нет |
-| POST `/api/auth/logout` | публичный | без входа → очистка auth cookies | нет |
-| GET `/api/auth/me` | access token | token → текущий пользователь/access | нет |
-| GET `/api/boards` | access token; доступ к персональным/общим доскам проверяется отдельно | фильтры/права → список доступных досок | нет |
-| POST `/api/boards` | access token; создание доски по роли/типу доски | данные доски → доска | нет |
-| GET `/api/boards/:boardId` | access token + доступ к доске | id → доска/колонки/карточки | нет |
-| GET `/api/boards/:boardId/archive` | access token + доступ к доске | id/параметры → архив карточек | нет |
-| PATCH `/api/boards/:boardId/layout` | access token + права на доску | конфигурация колонок → layout | нет |
-| POST `/api/boards/cards/:cardId/restore` | access token + доступ к доске | id карточки/целевая колонка/version → карточка | нет |
-| PATCH `/api/boards/:boardId` | access token + доступ/права на доску | поля доски → доска | нет |
-| DELETE `/api/boards/:boardId` | access token + доступ/права на доску | id → подтверждение удаления | нет |
-| GET `/api/boards/:boardId/access` | access token + доступ к доске | id → список доступа | нет |
-| POST `/api/boards/:boardId/access` | access token + право управления доской | пользователь/роль → список доступа | нет |
-| DELETE `/api/boards/:boardId/access/:userId` | access token + право управления доской | ids → подтверждение удаления доступа | нет |
-| POST `/api/boards/:boardId/columns` | access token + права на доску | данные колонки → колонка | нет |
-| PATCH `/api/boards/columns/:columnId` | access token + права на доску | данные колонки/version → колонка | нет |
-| DELETE `/api/boards/columns/:columnId` | access token + права на доску | id → подтверждение удаления | нет |
-| POST `/api/boards/columns/:columnId/move` | access token + права на доску | порядок/version → обновлённая колонка/доска | нет |
-| POST `/api/boards/columns/:columnId/cards` | access token + права на доску | данные карточки → карточка | нет |
-| PATCH `/api/boards/cards/:cardId` | access token + права на доску | поля карточки/version → карточка | нет |
-| DELETE `/api/boards/cards/:cardId` | access token + права на доску | id → подтверждение удаления | нет |
-| POST `/api/boards/cards/:cardId/archive` | access token + права на доску | id/version → архивная карточка | нет |
-| POST `/api/boards/cards/:cardId/move` | access token + права на доску | колонка/позиция/version → перемещённая карточка | нет |
-| GET `/api/components` | access token | без входа → каталог компонентов | нет |
-| POST `/api/components` | `MANAGE_TEMPLATES` | компонент → созданный компонент | нет |
-| PATCH `/api/components/:id` | `MANAGE_TEMPLATES` | поля компонента → компонент | нет |
-| GET `/api/departments` | access token | без входа → активные/доступные отделы | нет |
-| POST `/api/departments` | `MANAGE_STAFF` | поля отдела → отдел | нет |
-| PATCH `/api/departments/:id` | `MANAGE_STAFF` | поля отдела → отдел | нет |
-| GET `/api/knowledge/sections` | `MANAGE_KNOWLEDGE` | без входа → разделы базы знаний | нет |
-| POST `/api/knowledge/sections` | `MANAGE_KNOWLEDGE` | раздел → созданный раздел | нет |
-| PATCH `/api/knowledge/sections/:id` | `MANAGE_KNOWLEDGE` | поля раздела → раздел | нет |
-| DELETE `/api/knowledge/sections/:id` | `MANAGE_KNOWLEDGE` | id → подтверждение удаления | нет |
-| POST `/api/knowledge/import` | `MANAGE_KNOWLEDGE` | файлы импорта → результат импорта | нет |
-| GET `/api/knowledge/articles` | `MANAGE_KNOWLEDGE` | фильтры/поиск → список статей | нет |
-| POST `/api/knowledge/articles` | `MANAGE_KNOWLEDGE` | статья → созданная статья | нет |
-| GET `/api/knowledge/articles/:id` | `MANAGE_KNOWLEDGE` | id → статья | нет |
-| PATCH `/api/knowledge/articles/:id` | `MANAGE_KNOWLEDGE` | поля статьи → статья | нет |
-| DELETE `/api/knowledge/articles/:id` | `MANAGE_KNOWLEDGE` | id → подтверждение удаления | нет |
-| POST `/api/knowledge/articles/:id/attachments` | `MANAGE_KNOWLEDGE` | файл → вложение | нет |
-| GET `/api/knowledge/attachments/:id/download` | `MANAGE_KNOWLEDGE` | id → файл | нет |
-| DELETE `/api/knowledge/attachments/:id` | `MANAGE_KNOWLEDGE` | id → подтверждение удаления | нет |
-| GET `/api/moderation/users` | `MANAGE_CLIENTS` | без входа → ожидающие модерации пользователи | нет |
-| GET `/api/moderation/organizations` | `MANAGE_CLIENTS` | без входа → ожидающие организации | нет |
-| GET `/api/moderation/stores` | `MANAGE_CLIENTS` | без входа → ожидающие точки | нет |
-| PATCH `/api/moderation/users/:id` | `MANAGE_CLIENTS` | решение модерации → пользователь | нет |
-| PATCH `/api/moderation/organizations/:id` | `MANAGE_CLIENTS` | решение модерации → организация | нет |
-| PATCH `/api/moderation/stores/:id` | `MANAGE_CLIENTS` | решение модерации → точка | нет |
-| GET `/api/organizations` | access token; список ограничивается объектными правами | фильтры → организации | нет |
-| POST `/api/organizations` | access token; правила отличаются для клиента/сотрудника | поля организации → организация | нет |
-| PATCH `/api/organizations/:id` | access token + доступ к объекту/permission | поля → организация | нет |
-| DELETE `/api/organizations/:id` | `DELETE_ORGANIZATIONS` + объектная проверка | id → удаление организации | нет |
-| PUT `/api/organizations/:id/members` | access token + доступ/управление организацией | список участников → участники организации | нет |
-| POST `/api/organizations/:id/approve` | активный сотрудник; не CLIENT | id → организация | нет |
-| POST `/api/organizations/:id/reject` | активный сотрудник; не CLIENT | id/причина → организация | нет |
-| POST `/api/recurring-requests/:id/stop` | access token + проверка владельца/прав | id → остановленное расписание | нет |
-| GET `/api/request-types` | access token; выдача различается для CLIENT/staff | без входа → типы заявок | нет |
-| POST `/api/request-types` | `MANAGE_TEMPLATES` | тип/шаблон → созданный тип | нет |
-| PATCH `/api/request-types/:id` | `MANAGE_TEMPLATES` | поля типа → обновлённый тип | нет |
-| GET `/api/requests/assignees` | access token + role/access filtering | фильтры → исполнители | нет |
-| GET `/api/requests` | access token + role/object scope | фильтры/поиск → заявки | нет |
-| GET `/api/requests/stats` | `VIEW_REPORTS` | период → статистика | нет |
-| GET `/api/requests/calendar` | `VIEW_REPORTS` | период/фильтры → календарные данные | нет |
-| POST `/api/requests` | access token + роль, организация/отдел и template checks | заявка → созданная заявка | нет |
-| PATCH `/api/requests/:id` | access token + объектные права/permissions | статус/приоритет/отдел/исполнители/комментарий → заявка | нет |
-| DELETE `/api/requests/:id` | access token + `DELETE_REQUESTS`/объектные права | id → удаление заявки | нет |
-| POST `/api/requests/:id/assignees/self` | access token + роль/доступ к заявке | id → назначение текущего исполнителя | нет |
-| DELETE `/api/requests/:id/assignees/self` | access token + роль/доступ к заявке | id → снятие текущего исполнителя | нет |
-| POST `/api/requests/:id/comments` | access token + объектные права/видимость комментария | текст/visibility → комментарий | нет |
-| GET `/api/staff` | `MANAGE_STAFF` | без входа → сотрудники/отделы | нет |
-| POST `/api/staff` | `MANAGE_STAFF` | данные сотрудника → сотрудник | нет |
-| PATCH `/api/staff/:id` | `MANAGE_STAFF` | поля сотрудника → сотрудник | нет |
-| PUT `/api/staff/:id/access` | `MANAGE_STAFF` | permissions/departments → обновлённый доступ | нет |
-| PATCH `/api/staff/:id/password` | `MANAGE_STAFF` | пароль → результат смены | нет |
-| POST `/api/staff/:id/telegram-link` | `MANAGE_STAFF` | id → код/ссылка привязки Telegram | нет |
-| GET `/api/stores` | access token; выдача и секреты фильтруются по роли/permission | фильтры → торговые точки | нет |
-| POST `/api/stores` | access token; правила отличаются CLIENT/staff | данные точки → созданная точка | нет |
-| PATCH `/api/stores/:id` | access token + доступ к объекту/permission | поля точки → обновлённая точка | нет |
-| DELETE `/api/stores/:id` | `DELETE_STORES` + объектная проверка | id → удаление точки | нет |
-| GET `/api/stores/:id/access` | `VIEW_STORE_SECRETS` или `MANAGE_STORES` в зависимости от handler | id → доступы точки | нет |
-| PUT `/api/stores/:id/access` | `MANAGE_STORES` | доступы/секреты → обновлённые доступы | нет |
-| POST `/api/stores/:id/approve` | активный сотрудник; не CLIENT | id → одобренная точка | нет |
-| POST `/api/stores/:id/reject` | активный сотрудник; не CLIENT | id/причина → отклонённая точка | нет |
-| GET `/api/telegram/integrations` | `VIEW_TELEGRAM` | без входа → интеграции | нет |
-| GET `/api/telegram/chats` | `VIEW_TELEGRAM` | фильтры → чаты и связи | нет |
-| GET `/api/telegram/chats/:id/messages` | `VIEW_TELEGRAM` | id/пагинация → сообщения чата | нет |
-| PATCH `/api/telegram/chats/:id/link` | `VIEW_TELEGRAM` (router-level) | привязка → связь чата | нет |
-| PUT `/api/telegram/chats/:id/links` | `VIEW_TELEGRAM` (router-level) | organizations/stores links → связи чата | нет |
-| POST `/api/telegram/...` (строка 167 handler) | `VIEW_TELEGRAM` + `SEND_TELEGRAM` | сообщение → результат отправки | нет |
-| GET `/api/users` | `MANAGE_CLIENTS` | фильтры → клиенты | нет |
-| POST `/api/users` | `MANAGE_CLIENTS` | данные клиента → созданный клиент | нет |
-| PATCH `/api/users/:id/status` | `MANAGE_CLIENTS` | статус → клиент | нет |
-| PATCH `/api/users/:id/password` | `MANAGE_CLIENTS` | пароль → результат смены | нет |
+| GET `/api/health` | публичный | без входа → health и состояние БД | см. отчёт 8.3 |
+| GET `/api/health/telegram` | публичный | без входа → состояние интеграции Telegram | см. отчёт 8.3 |
+| POST `/api/auth/register` | публичный | регистрационные поля → учётная запись/статус | см. отчёт 8.3 |
+| POST `/api/auth/login` | публичный, rate limited | email/password → пользователь и auth cookies/tokens | см. отчёт 8.3 |
+| POST `/api/auth/refresh` | refresh cookie/token | cookie → обновлённая сессия | см. отчёт 8.3 |
+| POST `/api/auth/logout` | публичный | без входа → очистка auth cookies | см. отчёт 8.3 |
+| GET `/api/auth/me` | access token | token → текущий пользователь/access | см. отчёт 8.3 |
+| GET `/api/boards` | access token; доступ к персональным/общим доскам проверяется отдельно | фильтры/права → список доступных досок | см. отчёт 8.3 |
+| POST `/api/boards` | access token; создание доски по роли/типу доски | данные доски → доска | см. отчёт 8.3 |
+| GET `/api/boards/:boardId` | access token + доступ к доске | id → доска/колонки/карточки | см. отчёт 8.3 |
+| GET `/api/boards/:boardId/archive` | access token + доступ к доске | id/параметры → архив карточек | см. отчёт 8.3 |
+| PATCH `/api/boards/:boardId/layout` | access token + права на доску | конфигурация колонок → layout | см. отчёт 8.3 |
+| POST `/api/boards/cards/:cardId/restore` | access token + доступ к доске | id карточки/целевая колонка/version → карточка | см. отчёт 8.3 |
+| PATCH `/api/boards/:boardId` | access token + доступ/права на доску | поля доски → доска | см. отчёт 8.3 |
+| DELETE `/api/boards/:boardId` | access token + доступ/права на доску | id → подтверждение удаления | см. отчёт 8.3 |
+| GET `/api/boards/:boardId/access` | access token + доступ к доске | id → список доступа | см. отчёт 8.3 |
+| POST `/api/boards/:boardId/access` | access token + право управления доской | пользователь/роль → список доступа | см. отчёт 8.3 |
+| DELETE `/api/boards/:boardId/access/:userId` | access token + право управления доской | ids → подтверждение удаления доступа | см. отчёт 8.3 |
+| POST `/api/boards/:boardId/columns` | access token + права на доску | данные колонки → колонка | см. отчёт 8.3 |
+| PATCH `/api/boards/columns/:columnId` | access token + права на доску | данные колонки/version → колонка | см. отчёт 8.3 |
+| DELETE `/api/boards/columns/:columnId` | access token + права на доску | id → подтверждение удаления | см. отчёт 8.3 |
+| POST `/api/boards/columns/:columnId/move` | access token + права на доску | порядок/version → обновлённая колонка/доска | см. отчёт 8.3 |
+| POST `/api/boards/columns/:columnId/cards` | access token + права на доску | данные карточки → карточка | см. отчёт 8.3 |
+| PATCH `/api/boards/cards/:cardId` | access token + права на доску | поля карточки/version → карточка | см. отчёт 8.3 |
+| DELETE `/api/boards/cards/:cardId` | access token + права на доску | id → подтверждение удаления | см. отчёт 8.3 |
+| POST `/api/boards/cards/:cardId/archive` | access token + права на доску | id/version → архивная карточка | см. отчёт 8.3 |
+| POST `/api/boards/cards/:cardId/move` | access token + права на доску | колонка/позиция/version → перемещённая карточка | см. отчёт 8.3 |
+| GET `/api/components` | access token | без входа → каталог компонентов | см. отчёт 8.3 |
+| POST `/api/components` | `MANAGE_TEMPLATES` | компонент → созданный компонент | см. отчёт 8.3 |
+| PATCH `/api/components/:id` | `MANAGE_TEMPLATES` | поля компонента → компонент | см. отчёт 8.3 |
+| GET `/api/departments` | access token | без входа → активные/доступные отделы | см. отчёт 8.3 |
+| POST `/api/departments` | `MANAGE_STAFF` | поля отдела → отдел | см. отчёт 8.3 |
+| PATCH `/api/departments/:id` | `MANAGE_STAFF` | поля отдела → отдел | см. отчёт 8.3 |
+| GET `/api/knowledge/sections` | `MANAGE_KNOWLEDGE` | без входа → разделы базы знаний | см. отчёт 8.3 |
+| POST `/api/knowledge/sections` | `MANAGE_KNOWLEDGE` | раздел → созданный раздел | см. отчёт 8.3 |
+| PATCH `/api/knowledge/sections/:id` | `MANAGE_KNOWLEDGE` | поля раздела → раздел | см. отчёт 8.3 |
+| DELETE `/api/knowledge/sections/:id` | `MANAGE_KNOWLEDGE` | id → подтверждение удаления | см. отчёт 8.3 |
+| POST `/api/knowledge/import` | `MANAGE_KNOWLEDGE` | файлы импорта → результат импорта | см. отчёт 8.3 |
+| GET `/api/knowledge/articles` | `MANAGE_KNOWLEDGE` | фильтры/поиск → список статей | см. отчёт 8.3 |
+| POST `/api/knowledge/articles` | `MANAGE_KNOWLEDGE` | статья → созданная статья | см. отчёт 8.3 |
+| GET `/api/knowledge/articles/:id` | `MANAGE_KNOWLEDGE` | id → статья | см. отчёт 8.3 |
+| PATCH `/api/knowledge/articles/:id` | `MANAGE_KNOWLEDGE` | поля статьи → статья | см. отчёт 8.3 |
+| DELETE `/api/knowledge/articles/:id` | `MANAGE_KNOWLEDGE` | id → подтверждение удаления | см. отчёт 8.3 |
+| POST `/api/knowledge/articles/:id/attachments` | `MANAGE_KNOWLEDGE` | файл → вложение | см. отчёт 8.3 |
+| GET `/api/knowledge/attachments/:id/download` | `MANAGE_KNOWLEDGE` | id → файл | см. отчёт 8.3 |
+| DELETE `/api/knowledge/attachments/:id` | `MANAGE_KNOWLEDGE` | id → подтверждение удаления | см. отчёт 8.3 |
+| GET `/api/moderation/users` | `MANAGE_CLIENTS` | без входа → ожидающие модерации пользователи | см. отчёт 8.3 |
+| GET `/api/moderation/organizations` | `MANAGE_CLIENTS` | без входа → ожидающие организации | см. отчёт 8.3 |
+| GET `/api/moderation/stores` | `MANAGE_CLIENTS` | без входа → ожидающие точки | см. отчёт 8.3 |
+| PATCH `/api/moderation/users/:id` | `MANAGE_CLIENTS` | решение модерации → пользователь | см. отчёт 8.3 |
+| PATCH `/api/moderation/organizations/:id` | `MANAGE_CLIENTS` | решение модерации → организация | см. отчёт 8.3 |
+| PATCH `/api/moderation/stores/:id` | `MANAGE_CLIENTS` | решение модерации → точка | см. отчёт 8.3 |
+| GET `/api/organizations` | access token; список ограничивается объектными правами | фильтры → организации | см. отчёт 8.3 |
+| POST `/api/organizations` | access token; правила отличаются для клиента/сотрудника | поля организации → организация | см. отчёт 8.3 |
+| PATCH `/api/organizations/:id` | access token + доступ к объекту/permission | поля → организация | см. отчёт 8.3 |
+| DELETE `/api/organizations/:id` | `DELETE_ORGANIZATIONS` + объектная проверка | id → удаление организации | см. отчёт 8.3 |
+| PUT `/api/organizations/:id/members` | access token + доступ/управление организацией | список участников → участники организации | см. отчёт 8.3 |
+| POST `/api/organizations/:id/approve` | активный сотрудник; не CLIENT | id → организация | см. отчёт 8.3 |
+| POST `/api/organizations/:id/reject` | активный сотрудник; не CLIENT | id/причина → организация | см. отчёт 8.3 |
+| POST `/api/recurring-requests/:id/stop` | access token + проверка владельца/прав | id → остановленное расписание | см. отчёт 8.3 |
+| GET `/api/request-types` | access token; выдача различается для CLIENT/staff | без входа → типы заявок | см. отчёт 8.3 |
+| POST `/api/request-types` | `MANAGE_TEMPLATES` | тип/шаблон → созданный тип | см. отчёт 8.3 |
+| PATCH `/api/request-types/:id` | `MANAGE_TEMPLATES` | поля типа → обновлённый тип | см. отчёт 8.3 |
+| GET `/api/requests/assignees` | access token + role/access filtering | фильтры → исполнители | см. отчёт 8.3 |
+| GET `/api/requests` | access token + role/object scope | фильтры/поиск → заявки | см. отчёт 8.3 |
+| GET `/api/requests/stats` | `VIEW_REPORTS` | период → статистика | см. отчёт 8.3 |
+| GET `/api/requests/calendar` | `VIEW_REPORTS` | период/фильтры → календарные данные | см. отчёт 8.3 |
+| POST `/api/requests` | access token + роль, организация/отдел и template checks | заявка → созданная заявка | см. отчёт 8.3 |
+| PATCH `/api/requests/:id` | access token + объектные права/permissions | статус/приоритет/отдел/исполнители/комментарий → заявка | см. отчёт 8.3 |
+| DELETE `/api/requests/:id` | access token + `DELETE_REQUESTS`/объектные права | id → удаление заявки | см. отчёт 8.3 |
+| POST `/api/requests/:id/assignees/self` | access token + роль/доступ к заявке | id → назначение текущего исполнителя | см. отчёт 8.3 |
+| DELETE `/api/requests/:id/assignees/self` | access token + роль/доступ к заявке | id → снятие текущего исполнителя | см. отчёт 8.3 |
+| POST `/api/requests/:id/comments` | access token + объектные права/видимость комментария | текст/visibility → комментарий | см. отчёт 8.3 |
+| GET `/api/staff` | `MANAGE_STAFF` | без входа → сотрудники/отделы | см. отчёт 8.3 |
+| POST `/api/staff` | `MANAGE_STAFF` | данные сотрудника → сотрудник | см. отчёт 8.3 |
+| PATCH `/api/staff/:id` | `MANAGE_STAFF` | поля сотрудника → сотрудник | см. отчёт 8.3 |
+| PUT `/api/staff/:id/access` | `MANAGE_STAFF` | permissions/departments → обновлённый доступ | см. отчёт 8.3 |
+| PATCH `/api/staff/:id/password` | `MANAGE_STAFF` | пароль → результат смены | см. отчёт 8.3 |
+| POST `/api/staff/:id/telegram-link` | `MANAGE_STAFF` | id → код/ссылка привязки Telegram | см. отчёт 8.3 |
+| GET `/api/stores` | access token; выдача и секреты фильтруются по роли/permission | фильтры → торговые точки | см. отчёт 8.3 |
+| POST `/api/stores` | access token; правила отличаются CLIENT/staff | данные точки → созданная точка | см. отчёт 8.3 |
+| PATCH `/api/stores/:id` | access token + доступ к объекту/permission | поля точки → обновлённая точка | см. отчёт 8.3 |
+| DELETE `/api/stores/:id` | `DELETE_STORES` + объектная проверка | id → удаление точки | см. отчёт 8.3 |
+| GET `/api/stores/:id/access` | `VIEW_STORE_SECRETS` или `MANAGE_STORES` в зависимости от handler | id → доступы точки | см. отчёт 8.3 |
+| PUT `/api/stores/:id/access` | `MANAGE_STORES` | доступы/секреты → обновлённые доступы | см. отчёт 8.3 |
+| POST `/api/stores/:id/approve` | активный сотрудник; не CLIENT | id → одобренная точка | см. отчёт 8.3 |
+| POST `/api/stores/:id/reject` | активный сотрудник; не CLIENT | id/причина → отклонённая точка | см. отчёт 8.3 |
+| GET `/api/telegram/integrations` | `VIEW_TELEGRAM` | без входа → интеграции | см. отчёт 8.3 |
+| GET `/api/telegram/chats` | `VIEW_TELEGRAM` | фильтры → чаты и связи | см. отчёт 8.3 |
+| GET `/api/telegram/chats/:id/messages` | `VIEW_TELEGRAM` | id/пагинация → сообщения чата | см. отчёт 8.3 |
+| PATCH `/api/telegram/chats/:id/link` | `VIEW_TELEGRAM` (router-level) | привязка → связь чата | см. отчёт 8.3 |
+| PUT `/api/telegram/chats/:id/links` | `VIEW_TELEGRAM` (router-level) | organizations/stores links → связи чата | см. отчёт 8.3 |
+| POST `/api/telegram/...` (строка 167 handler) | `VIEW_TELEGRAM` + `SEND_TELEGRAM` | сообщение → результат отправки | см. отчёт 8.3 |
+| GET `/api/users` | `MANAGE_CLIENTS` | фильтры → клиенты | см. отчёт 8.3 |
+| POST `/api/users` | `MANAGE_CLIENTS` | данные клиента → созданный клиент | см. отчёт 8.3 |
+| PATCH `/api/users/:id/status` | `MANAGE_CLIENTS` | статус → клиент | см. отчёт 8.3 |
+| PATCH `/api/users/:id/password` | `MANAGE_CLIENTS` | пароль → результат смены | см. отчёт 8.3 |
 
 Примечания: таблица содержит 97 зарегистрированных путей: 95 router endpoints и два health endpoints. Точный URL Telegram POST — `/api/telegram/chats/:id/messages`; handler сейчас возвращает 501 после проверок настроенности интеграции, и это поведение должно быть зафиксировано тестом. У запросов на API нет общей OpenAPI-спецификации. Для нескольких маршрутов роль недостаточна как описание доступа: решение зависит от permission override, членства в отделе/доске, владения организацией/заявкой и статуса пользователя; сохранять эти правила следует буквально из текущих handlers/services.
 

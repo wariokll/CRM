@@ -233,7 +233,7 @@ requestsRouter.post("/", async (req, res) => {
     });
   if (body.recurrenceIntervalDays && body.urgency !== Urgency.SCHEDULED)
     return res.status(400).json({
-      message: "Повторение доступно С‚олько для плановой заявки",
+      message: "Повторение доступно только для плановой заявки",
     });
   if (body.recurrenceIntervalDays && access.role === Role.CLIENT)
     return res.status(403).json({
@@ -292,7 +292,7 @@ requestsRouter.post("/", async (req, res) => {
       });
     if (access.role === Role.MASTER && body.assigneeId !== access.userId)
       return res.status(403).json({
-        message: "Мастер может назначить исполнителем С‚олько себя",
+        message: "Мастер может назначить исполнителем только себя",
       });
     assignee = await prisma.user.findFirst({
       where: {

@@ -32,7 +32,7 @@ const upload = multer({
       ".gif",
     ]);
     if (allowed.has(extension)) callback(null, true);
-    else callback(new Error("Недопустимый С‚ип файла"));
+    else callback(new Error("Недопустимый тип файла"));
   },
 });
 
