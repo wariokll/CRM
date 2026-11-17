@@ -115,6 +115,12 @@ describe("Telegram API characterization", () => {
       .send({ organizationIds: [], storeIds: [] });
     expect(missingLinkReplacement.status).toBe(404);
 
+    const invalidLinkUpdate = await request(app)
+      .patch("/api/telegram/chats/999999999/link")
+      .set(auth)
+      .send({ linkedUserId: -1 });
+    expect(invalidLinkUpdate.status).toBe(400);
+
     const invalidMessageBody = await request(app)
       .post("/api/telegram/chats/999999999/messages")
       .set(auth)
