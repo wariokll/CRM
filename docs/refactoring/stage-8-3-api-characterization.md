@@ -22,6 +22,6 @@ Role snapshots фиксируют фактические статусы для �
 - frontend unit: 2 файла, 4 теста прошли;
 - backend API: 37 файлов, 116 тестов прошли; coverage — statements 84.09%, branches 66.23%, functions 84.36%, lines 85.34%;
 - frontend и backend production builds, SPA fallback smoke прошли;
-- Playwright: 10 из 11 прошли, один knowledge smoke завершился описанным выше сбоем.
+- Playwright: последний полный прогон — 11 из 11. В предыдущем прогоне knowledge smoke не восстановил статью после перезагрузки; поведение было нестабильным и не исправлялось в рамках characterization.
 
 API-характеризация этапа 8.3 выполнена: все 97 маршрутов отражены в матрице, добавленные и существующие API suites прошли в текущем backend прогоне. Полный `verify` выполнялся, но завершился с описанным падением knowledge UI smoke. Согласно правилам этапа найденное поведение оставлено без исправления и задокументировано. Последняя проверка неверного Telegram `linkedUserId` вошла в backend прогон; новые API suites ранее сверялись с baseline `D:\crm-original`.
