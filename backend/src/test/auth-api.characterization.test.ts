@@ -146,9 +146,13 @@ describe("auth API characterization", () => {
       role: Role.DIRECTOR,
     });
 
-    const cookie = String(login.headers["set-cookie"])
-      .split(",")[0]
-      .split(";")[0];
+    const cookieHeader = login.headers["set-cookie"];
+    const firstCookie = Array.isArray(cookieHeader)
+      ? cookieHeader[0]
+      : cookieHeader;
+    if (!firstCookie) throw new Error("Login response did not set a cookie");
+    const cookie = firstCookie.split(",")[0]?.split(";")[0];
+    if (!cookie) throw new Error("Login response set an empty cookie");
     const refresh = await request(app)
       .post("/api/auth/refresh")
       .set("Cookie", cookie);

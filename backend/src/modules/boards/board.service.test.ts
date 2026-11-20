@@ -190,12 +190,14 @@ describe("column layout", () => {
   });
 
   it("fails the transaction when any column has changed or is outside the board", async () => {
+    const firstColumn = columns[0];
+    if (!firstColumn) throw new Error("A board column fixture is required");
     db.boardColumn.updateMany
       .mockResolvedValueOnce({ count: 1 })
       .mockResolvedValueOnce({ count: 0 });
     await expect(
       updateBoardLayout(1, 10, {
-        columns: [...columns, { ...columns[0], id: 4 }],
+        columns: [...columns, { ...firstColumn, id: 4 }],
       }),
     ).rejects.toMatchObject({ status: 409 });
   });

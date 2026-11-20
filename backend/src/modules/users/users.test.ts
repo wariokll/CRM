@@ -63,9 +63,11 @@ describe("users endpoint behavior", () => {
       where: { email: created.email },
       include: { stores: true },
     });
+    const [store] = organization.stores;
+    if (!store) throw new Error("The created client store is missing");
     expect(organization.status).toBe("ACTIVE");
     expect(organization.stores).toHaveLength(1);
-    expect(organization.stores[0].status).toBe("ACTIVE");
+    expect(store.status).toBe("ACTIVE");
 
     const search = await request(app)
       .get(`/api/users?search=${encodeURIComponent(created.email)}`)
@@ -76,7 +78,7 @@ describe("users endpoint behavior", () => {
       id: created.id,
       email: created.email,
       role: Role.CLIENT,
-      stores: [{ id: organization.stores[0].id }],
+      stores: [{ id: store.id }],
     });
   });
 

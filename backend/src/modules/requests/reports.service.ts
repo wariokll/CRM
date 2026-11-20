@@ -63,12 +63,12 @@ export async function buildRequestReport(
   ) =>
     Object.values(
       items
-        .filter(Boolean)
+        .filter((item): item is T => item !== null && item !== undefined)
         .reduce<Record<number, { id: number; name: string; count: number }>>(
           (result, entry) => {
-            const item = entry!;
-            result[item.id] ??= { ...item, count: 0 };
-            result[item.id].count += 1;
+            const current = result[entry.id] ?? { ...entry, count: 0 };
+            current.count += 1;
+            result[entry.id] = current;
             return result;
           },
           {},

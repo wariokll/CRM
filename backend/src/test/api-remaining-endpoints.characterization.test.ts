@@ -40,7 +40,14 @@ async function createPendingOrganizationStore() {
     },
     include: { stores: true },
   });
-  return { user, organization, store: organization.stores[0] };
+  const [store] = organization.stores;
+  if (!store) throw new Error("A pending organization store is required");
+  return { user, organization, store };
+}
+
+function requireFixture<T>(value: T | undefined, name: string): T {
+  if (value === undefined) throw new Error(`Missing ${name} fixture`);
+  return value;
 }
 
 describe("remaining API endpoint scenarios", () => {
@@ -77,13 +84,11 @@ describe("remaining API endpoint scenarios", () => {
     const pending = await Promise.all(
       Array.from({ length: 5 }, () => createPendingOrganizationStore()),
     );
-    const [
-      approvedOrg,
-      rejectedOrg,
-      moderatedStore,
-      approvedStore,
-      rejectedStore,
-    ] = pending;
+    const approvedOrg = requireFixture(pending[0], "approved organization");
+    const rejectedOrg = requireFixture(pending[1], "rejected organization");
+    const moderatedStore = requireFixture(pending[2], "moderated store");
+    const approvedStore = requireFixture(pending[3], "approved store");
+    const rejectedStore = requireFixture(pending[4], "rejected store");
 
     const pendingUsers = await request(app)
       .get("/api/moderation/users")

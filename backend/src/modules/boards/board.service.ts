@@ -416,12 +416,11 @@ export async function moveBoardColumn(
           throw new AppError("Данные были изменены другим пользователем", 409);
         const ordered = moveItem(columns, columnId, position);
         for (let index = 0; index < ordered.length; index += 1) {
-          if (
-            ordered[index].position !== index ||
-            ordered[index].id === columnId
-          )
+          const item = ordered[index];
+          if (!item) continue;
+          if (item.position !== index || item.id === columnId)
             await transaction.boardColumn.update({
-              where: { id: ordered[index].id },
+              where: { id: item.id },
               data: { position: index, version: { increment: 1 } },
             });
         }
@@ -607,8 +606,10 @@ export async function moveBoardCard(
           index < sourceCards.length && current.columnId !== targetColumnId;
           index += 1
         ) {
+          const sourceCard = sourceCards[index];
+          if (!sourceCard) continue;
           await transaction.boardCard.update({
-            where: { id: sourceCards[index].id },
+            where: { id: sourceCard.id },
             data: { position: index, version: { increment: 1 } },
           });
         }
@@ -620,6 +621,7 @@ export async function moveBoardCard(
           index += 1
         ) {
           const item = affected[index];
+          if (!item) continue;
           const targetPosition =
             current.columnId === targetColumnId
               ? index

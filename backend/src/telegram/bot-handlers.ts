@@ -313,16 +313,22 @@ async function resolveTarget(
           orderBy: { name: "asc" },
         });
     if (!stores.length) return { kind: "missing" as const };
-    if (stores.length === 1)
+    if (stores.length === 1) {
+      const [store] = stores;
+      if (!store) return { kind: "missing" as const };
       return {
         kind: "ready" as const,
-        organizationId: stores[0].organizationId,
-        storeId: stores[0].id,
+        organizationId: store.organizationId,
+        storeId: store.id,
       };
+    }
     return { kind: "stores" as const, stores };
   }
-  if (organizations.length === 1)
-    return { kind: "ready" as const, organizationId: organizations[0].id };
+  if (organizations.length === 1) {
+    const [organization] = organizations;
+    if (!organization) return { kind: "missing" as const };
+    return { kind: "ready" as const, organizationId: organization.id };
+  }
   if (organizations.length > 1)
     return { kind: "organizations" as const, organizations };
   return { kind: "missing" as const };

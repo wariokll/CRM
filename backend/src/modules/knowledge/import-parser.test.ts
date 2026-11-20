@@ -55,10 +55,12 @@ describe("knowledge import parser", () => {
 
     const bigBytes = Buffer.from(littleBytes);
     for (let index = 0; index < bigBytes.length; index += 2) {
-      [bigBytes[index], bigBytes[index + 1]] = [
-        bigBytes[index + 1],
-        bigBytes[index],
-      ];
+      const currentByte = bigBytes[index];
+      const nextByte = bigBytes[index + 1];
+      if (currentByte === undefined || nextByte === undefined)
+        throw new Error("UTF-16 bytes must be paired");
+      bigBytes[index] = nextByte;
+      bigBytes[index + 1] = currentByte;
     }
     const big = Buffer.concat([Buffer.from([0xfe, 0xff]), bigBytes]);
     const bigArticle = await importFile("big.txt", big);

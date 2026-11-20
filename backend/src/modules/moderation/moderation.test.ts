@@ -65,7 +65,9 @@ async function createPendingClient() {
     include: { stores: true },
   });
   organizationIds.push(organization.id);
-  return { user, organization, store: organization.stores[0] };
+  const [store] = organization.stores;
+  if (!store) throw new Error("A pending moderation store is required");
+  return { user, organization, store };
 }
 
 afterAll(async () => {
