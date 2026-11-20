@@ -8,14 +8,14 @@ import { AuthProvider } from "../auth/AuthContext.js";
 import type { User } from "../types.js";
 import { server } from "./server.js";
 
-function renderApp() {
+function renderApp(initialEntries = ["/"]) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={initialEntries}>
           <AppContent />
         </MemoryRouter>
       </AuthProvider>
@@ -98,6 +98,23 @@ describe("current CRM shell", () => {
     expect(
       screen.queryByRole("button", { name: /Шаблоны/ }),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows the access denied page for a restricted direct URL", async () => {
+    const client = { ...director, role: "CLIENT" as const };
+    installAppHandlers(client);
+    renderApp(["/staff"]);
+    fireEvent.change(await screen.findByRole("textbox", { name: "Email" }), {
+      target: { value: client.email },
+    });
+    fireEvent.change(screen.getByLabelText("Пароль"), {
+      target: { value: "test-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Войти" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Нет доступа" }),
+    ).toBeVisible();
   });
 
   it("shows the existing authentication error when login is rejected", async () => {

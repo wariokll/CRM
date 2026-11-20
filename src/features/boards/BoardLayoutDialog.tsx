@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { ApiError } from "../../api";
-import { boardRequest } from "./queries";
 import type { BoardDetails } from "../../types";
 import { Dialog, errorText } from "./BoardDialog";
 import { BoardLayoutPreview } from "./BoardLayoutPreview";
@@ -17,12 +16,22 @@ export function BoardLayoutDialog({
   close,
   updated,
   refresh,
+  saveLayout,
 }: {
   board: BoardDetails;
   initialColumnId: number | null;
   close: () => void;
   updated: (board: BoardDetails) => void;
   refresh: () => Promise<void>;
+  saveLayout: (
+    boardId: number,
+    columns: {
+      id: number;
+      version: number;
+      width: number;
+      cardsPerRow: number;
+    }[],
+  ) => Promise<BoardDetails>;
 }) {
   const initial =
     board.columns.find((column) => column.id === initialColumnId) ??
@@ -70,19 +79,14 @@ export function BoardLayoutDialog({
     setBusy(true);
     setError("");
     try {
-      const result = await boardRequest<BoardDetails>(
-        `/boards/${board.id}/layout`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            columns: selected.map((column) => ({
-              id: column.id,
-              version: versions.get(column.id) ?? column.version,
-              width,
-              cardsPerRow,
-            })),
-          }),
-        },
+      const result = await saveLayout(
+        board.id,
+        selected.map((column) => ({
+          id: column.id,
+          version: versions.get(column.id) ?? column.version,
+          width,
+          cardsPerRow,
+        })),
       );
       updated(result);
       close();

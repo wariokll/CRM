@@ -7,7 +7,6 @@ import {
   Search,
 } from "lucide-react";
 import { ApiError } from "../../api";
-import { boardRequest } from "./queries";
 import type { ArchivedBoardCard, BoardDetails } from "../../types";
 import { Dialog, errorText } from "./BoardDialog";
 
@@ -19,12 +18,23 @@ export function BoardArchiveDialog({
   close,
   updated,
   refresh,
+  loadArchive,
+  restoreCard,
 }: {
   board: BoardDetails;
   refreshKey: number;
   close: () => void;
   updated: (board: BoardDetails) => void;
   refresh: () => Promise<void>;
+  loadArchive: (
+    boardId: number,
+    signal: AbortSignal,
+  ) => Promise<ArchivedBoardCard[]>;
+  restoreCard: (
+    cardId: number,
+    version: number,
+    targetColumnId: number,
+  ) => Promise<BoardDetails>;
 }) {
   const [cards, setCards] = useState<ArchivedBoardCard[]>([]);
   const [search, setSearch] = useState("");
@@ -38,9 +48,7 @@ export function BoardArchiveDialog({
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    boardRequest<ArchivedBoardCard[]>(`/boards/${board.id}/archive`, {
-      signal: controller.signal,
-    })
+    loadArchive(board.id, controller.signal)
       .then((result) => {
         if (!controller.signal.aborted) setCards(result);
       })
@@ -51,7 +59,7 @@ export function BoardArchiveDialog({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [board.id, refreshKey, reload]);
+  }, [board.id, refreshKey, reload, loadArchive]);
 
   const visible = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("ru-RU");
@@ -74,13 +82,7 @@ export function BoardArchiveDialog({
     setError("");
     setNotice("");
     try {
-      const result = await boardRequest<BoardDetails>(
-        `/boards/cards/${card.id}/restore`,
-        {
-          method: "POST",
-          body: JSON.stringify({ version: card.version, targetColumnId }),
-        },
-      );
+      const result = await restoreCard(card.id, card.version, targetColumnId);
       setCards((current) => current.filter((item) => item.id !== card.id));
       updated(result);
       setReload((value) => value + 1);

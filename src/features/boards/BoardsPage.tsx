@@ -25,7 +25,14 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../../api";
-import { boardRequest } from "./queries";
+import {
+  boardRequest,
+  getBoardAccess,
+  getBoardArchive,
+  restoreBoardCard,
+  updateBoardAccess,
+  updateBoardLayout,
+} from "./queries";
 import { queryKeys } from "../../shared/queryKeys";
 import { errorText } from "./BoardDialog";
 import { CardDialog, NameDialog } from "./BoardDialogs";
@@ -38,6 +45,7 @@ import type {
   BoardCard,
   BoardColumn,
   BoardDetails,
+  BoardAccessUser,
   BoardSummary,
   BoardType,
   User,
@@ -100,6 +108,9 @@ export function BoardsPage({
     column?: BoardColumn;
   } | null>(null);
   const [activeCard, setActiveCard] = useState<BoardCard | null>(null);
+  const [accessUsers, setAccessUsers] = useState<BoardAccessUser[]>([]);
+  const [accessError, setAccessError] = useState("");
+  const accessBoardId = board?.id;
   const queryClient = useQueryClient();
   const selectBoard = useCallback(
     (id: number | null, replace = false) => {
@@ -190,6 +201,21 @@ export function BoardsPage({
     setAccessOpen(false);
     if (selectedId) void loadBoard(selectedId);
   }, [loadBoard, selectedId]);
+  useEffect(() => {
+    if (!accessOpen || accessBoardId === undefined) return;
+    let active = true;
+    setAccessError("");
+    getBoardAccess(accessBoardId)
+      .then((users) => {
+        if (active) setAccessUsers(users);
+      })
+      .catch((reason) => {
+        if (active) setAccessError(errorText(reason));
+      });
+    return () => {
+      active = false;
+    };
+  }, [accessOpen, accessBoardId]);
 
   const onConflict = async (reason: unknown) => {
     if (reason instanceof ApiError && reason.status === 409) {
@@ -568,6 +594,8 @@ export function BoardsPage({
             )
           }
           refresh={() => loadBoard(board.id)}
+          loadArchive={getBoardArchive}
+          restoreCard={restoreBoardCard}
         />
       )}
       {layoutEditor && board && (
@@ -582,6 +610,7 @@ export function BoardsPage({
             )
           }
           refresh={() => loadBoard(board.id)}
+          saveLayout={updateBoardLayout}
         />
       )}
       {cardEditor && (
@@ -618,7 +647,15 @@ export function BoardsPage({
         />
       )}
       {accessOpen && board && (
-        <AccessDialog board={board} close={() => setAccessOpen(false)} />
+        <AccessDialog
+          users={accessUsers}
+          loadError={accessError}
+          close={() => setAccessOpen(false)}
+          updateAccess={async (targetUser) => {
+            await updateBoardAccess(board.id, targetUser);
+            setAccessUsers(await getBoardAccess(board.id));
+          }}
+        />
       )}
     </section>
   );

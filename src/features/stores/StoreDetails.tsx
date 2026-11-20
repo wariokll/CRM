@@ -1,5 +1,4 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { storeRequest } from "./queries";
 import { can } from "../../auth/permissions";
 import { Button, Field, Modal } from "../../components/ui";
 import { StoreAccessLinks } from "./StoreAccessLinks";
@@ -13,10 +12,17 @@ export function StoreDetails({
   store,
   user,
   close,
+  loadAccess,
+  saveAccessRequest,
 }: {
   store: Store;
   user: User;
   close: () => void;
+  loadAccess: (storeId: number) => Promise<StoreAccess | null>;
+  saveAccessRequest: (
+    storeId: number,
+    values: Record<string, string>,
+  ) => Promise<void>;
 }) {
   const canViewSecrets = can(user, "VIEW_STORE_SECRETS"),
     canEditAccess = user.role !== "CLIENT";
@@ -27,11 +33,11 @@ export function StoreDetails({
     [error, setError] = useState("");
   useEffect(() => {
     if (!canViewSecrets) return;
-    storeRequest<StoreAccess | null>("/stores/" + store.id + "/access")
+    loadAccess(store.id)
       .then(setAccess)
       .catch((reason) => setError(errorText(reason)))
       .finally(() => setLoading(false));
-  }, [store.id, canViewSecrets]);
+  }, [store.id, canViewSecrets, loadAccess]);
   const details = access ?? store.access;
   const saveAccess = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -44,10 +50,7 @@ export function StoreDetails({
       ),
     ) as Record<string, string>;
     try {
-      await storeRequest("/stores/" + store.id + "/access", {
-        method: "PUT",
-        body: JSON.stringify(values),
-      });
+      await saveAccessRequest(store.id, values);
       setAccess(
         (previous) => ({ ...(previous ?? {}), ...values }) as StoreAccess,
       );

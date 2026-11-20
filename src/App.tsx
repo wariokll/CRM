@@ -14,11 +14,26 @@ import { AppPageContent } from "./features/layout/AppPageContent";
 import { AppPageHeader } from "./features/layout/AppPageHeader";
 import { buildNavigation } from "./features/layout/navigation";
 import { AccountStatusPage } from "./features/layout/AccountStatusPage";
+import { AccessDeniedPage } from "./features/layout/AccessDeniedPage";
 import { RequestModal } from "./features/requests/RequestModal";
 import { CreateRequestForm } from "./features/requests/CreateRequestForm";
 import { useAppData } from "./features/layout/useAppData";
 import "./recurrence.css";
 import type { ServiceRequest } from "./types";
+
+const knownPages = new Set([
+  "requests",
+  "calendar",
+  "organizations",
+  "stores",
+  "my-boards",
+  "team-boards",
+  "reports",
+  "templates",
+  "staff",
+  "telegram",
+  "knowledge",
+]);
 
 export function AppContent() {
   const { user, setUser, booting } = useAuth();
@@ -98,8 +113,10 @@ export function AppContent() {
     return <AccountStatusPage user={user} exit={exit} />;
   const nav = buildNavigation(user);
 
-  if (page !== "dashboard" && !nav.some((item) => item.id === page))
+  if (page !== "dashboard" && !knownPages.has(page))
     return <Navigate to="/" replace />;
+  if (page !== "dashboard" && !nav.some((item) => item.id === page))
+    return <AccessDeniedPage />;
   const urgent = requests.filter(
     (r) =>
       r.priority === "CRITICAL" && !["DONE", "CANCELLED"].includes(r.status),

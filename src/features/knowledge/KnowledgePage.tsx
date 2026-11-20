@@ -10,7 +10,11 @@ import {
   type ReactNode,
 } from "react";
 import { useSearchParams } from "react-router-dom";
-import { downloadKnowledgeFile, knowledgeRequest } from "./queries";
+import {
+  downloadKnowledgeFile,
+  knowledgeRequest,
+  uploadKnowledgeAttachments,
+} from "./queries";
 import { queryKeys } from "../../shared/queryKeys";
 import { KnowledgeImportDialog } from "./KnowledgeImportDialog";
 import { KnowledgeEditDialogs } from "./KnowledgeEditDialogs";
@@ -283,6 +287,11 @@ export function KnowledgePage() {
     } catch (reason) {
       setError(errorText(reason));
     }
+  };
+
+  const uploadAttachments = async (articleId: number, files: File[]) => {
+    await uploadKnowledgeAttachments(articleId, files);
+    await openArticle(articleId);
   };
 
   const editArticle = (value: KnowledgeArticle | "new") => {
@@ -595,11 +604,11 @@ export function KnowledgePage() {
             imageUrls={imageUrls}
             setArticle={goToArticleList}
             setError={setError}
-            openArticle={openArticle}
             editArticle={editArticle}
             deleteArticle={deleteArticle}
             downloadAttachment={downloadAttachment}
             deleteAttachment={deleteAttachment}
+            uploadAttachments={uploadAttachments}
             formatSize={formatSize}
             errorText={errorText}
           />

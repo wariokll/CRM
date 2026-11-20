@@ -1,32 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, LockKeyhole, Search } from "lucide-react";
-import { boardRequest } from "./queries";
 import { Dialog, errorText } from "./BoardDialog";
-import type { BoardAccessUser, BoardDetails } from "../../types";
+import type { BoardAccessUser } from "../../types";
 
 export function AccessDialog({
-  board,
+  users,
+  loadError,
+  updateAccess,
   close,
 }: {
-  board: BoardDetails;
+  users: BoardAccessUser[];
+  loadError: string;
+  updateAccess: (user: BoardAccessUser) => Promise<void>;
   close: () => void;
 }) {
-  const [users, setUsers] = useState<BoardAccessUser[]>([]),
-    [search, setSearch] = useState(""),
+  const [search, setSearch] = useState(""),
     [error, setError] = useState(""),
     [busyId, setBusyId] = useState<number | null>(null);
-  const load = useCallback(async () => {
-    try {
-      setUsers(
-        await boardRequest<BoardAccessUser[]>(`/boards/${board.id}/access`),
-      );
-    } catch (reason) {
-      setError(errorText(reason));
-    }
-  }, [board.id]);
   useEffect(() => {
-    void load();
-  }, [load]);
+    setError(loadError);
+  }, [loadError]);
   const visible = useMemo(
     () =>
       users.filter((user) =>
@@ -41,16 +34,7 @@ export function AccessDialog({
     setBusyId(user.id);
     setError("");
     try {
-      await boardRequest(
-        `/boards/${board.id}/access${user.hasAccess ? `/${user.id}` : ""}`,
-        {
-          method: user.hasAccess ? "DELETE" : "POST",
-          ...(user.hasAccess
-            ? {}
-            : { body: JSON.stringify({ userId: user.id }) }),
-        },
-      );
-      await load();
+      await updateAccess(user);
     } catch (reason) {
       setError(errorText(reason));
     } finally {

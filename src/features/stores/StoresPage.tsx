@@ -6,7 +6,7 @@ import { Button, Empty } from "../../components/ui";
 import { StoreGroups } from "./StoreGroups";
 import { StoreDetails } from "./StoreDetails";
 import { StoreCreateDialog } from "./StoreCreateDialog";
-import { storeRequest } from "./queries";
+import { getStoreAccess, saveStoreAccess, storeRequest } from "./queries";
 import type { Organization, Store, User } from "../../types";
 
 function errorText(reason: unknown) {
@@ -205,6 +205,10 @@ export function StoresPage({
           store={selected}
           user={user}
           close={() => setSelected(null)}
+          loadAccess={getStoreAccess}
+          saveAccessRequest={async (storeId, values) => {
+            await saveStoreAccess(storeId, values);
+          }}
         />
       )}
     </>

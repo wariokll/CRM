@@ -8,7 +8,6 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { knowledgeRequest } from "./queries";
 import type { KnowledgeArticle, KnowledgeAttachment } from "../../types";
 
 export function KnowledgeArticleView({
@@ -16,11 +15,11 @@ export function KnowledgeArticleView({
   imageUrls,
   setArticle,
   setError,
-  openArticle,
   editArticle,
   deleteArticle,
   downloadAttachment,
   deleteAttachment,
+  uploadAttachments,
   formatSize,
   errorText,
 }: {
@@ -28,11 +27,11 @@ export function KnowledgeArticleView({
   imageUrls: Record<number, string>;
   setArticle: (article: KnowledgeArticle | null) => void;
   setError: (error: string) => void;
-  openArticle: (id: number) => Promise<void>;
   editArticle: (article: KnowledgeArticle) => void;
   deleteArticle: (article: KnowledgeArticle) => Promise<void>;
   downloadAttachment: (attachment: KnowledgeAttachment) => Promise<void>;
   deleteAttachment: (attachment: KnowledgeAttachment) => Promise<void>;
+  uploadAttachments: (articleId: number, files: File[]) => Promise<void>;
   formatSize: (size: number) => string;
   errorText: (reason: unknown) => string;
 }) {
@@ -101,17 +100,8 @@ export function KnowledgeArticleView({
                 const selected = Array.from(event.currentTarget.files ?? []);
                 if (!selected.length) return;
                 setError("");
-                const data = new FormData();
-                selected.forEach((file) => data.append("files", file));
                 try {
-                  await knowledgeRequest(
-                    `/knowledge/articles/${article.id}/attachments`,
-                    {
-                      method: "POST",
-                      body: data,
-                    },
-                  );
-                  await openArticle(article.id);
+                  await uploadAttachments(article.id, selected);
                 } catch (reason) {
                   setError(errorText(reason));
                 } finally {
