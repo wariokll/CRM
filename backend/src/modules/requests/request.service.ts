@@ -8,6 +8,7 @@ import {
   Urgency,
   type Prisma,
 } from "@prisma/client";
+import type { RequestAssigneeDTO } from "@crm/shared-types";
 import { z } from "zod";
 import { canChangeRequestStatus } from "../../utils/request-status.js";
 import {
@@ -42,7 +43,7 @@ export class RequestServiceError extends Error {
 }
 
 export async function listRequestAssignees(departmentId?: number) {
-  return prisma.user.findMany({
+  const assignees = await prisma.user.findMany({
     where: {
       status: "ACTIVE",
       OR: [
@@ -64,6 +65,7 @@ export async function listRequestAssignees(departmentId?: number) {
     },
     orderBy: { ipName: "asc" },
   });
+  return assignees satisfies RequestAssigneeDTO[];
 }
 
 export interface RequestListFilters {

@@ -1,5 +1,12 @@
-export type Role = "CLIENT" | "DIRECTOR" | "DEPARTMENT_HEAD" | "MASTER";
-export type UserStatus = "PENDING" | "ACTIVE" | "REJECTED" | "BLOCKED";
+import type {
+  OrganizationContactDTO,
+  OrganizationMemberDTO,
+  RoleDTO,
+  UserStatusDTO,
+} from "@crm/shared-types";
+
+export type Role = RoleDTO;
+export type UserStatus = UserStatusDTO;
 export type StoreStatus = "PENDING" | "ACTIVE" | "REJECTED";
 export type RequestStatus =
   "NEW" | "ACCEPTED" | "IN_PROGRESS" | "DONE" | "CANCELLED";
@@ -90,18 +97,10 @@ export interface Organization {
   contactName?: string | null;
   phone?: string | null;
   email?: string | null;
-  contacts?: Array<{
-    id: number;
-    fullName: string;
-    phone?: string | null;
-    note?: string | null;
-  }>;
+  contacts?: OrganizationContactDTO[];
   status: OrganizationStatus;
   rejectionReason?: string | null;
-  members?: Array<{
-    user: Pick<User, "id" | "ipName" | "email" | "phone" | "status">;
-    isPrimary: boolean;
-  }>;
+  members?: OrganizationMemberDTO[];
   stores?: Store[];
   _count?: { requests: number };
 }
@@ -230,4 +229,3 @@ export interface StaffMember extends User {
     username?: string | null;
   }>;
 }
-

@@ -1,4 +1,5 @@
 import { BoardType, Prisma, Role, UserStatus } from "@prisma/client";
+import type { BoardAccessUserDTO } from "@crm/shared-types";
 import { prisma } from "../../db.js";
 import { AppError } from "../../shared/errors.js";
 import {
@@ -291,7 +292,7 @@ export async function listBoardAccess(boardId: number, userId: number) {
     ...user,
     hasAccess: user.id === board.ownerId || boardAccesses.length > 0,
     isOwner: user.id === board.ownerId,
-  }));
+  })) satisfies BoardAccessUserDTO[];
 }
 
 export async function grantBoardAccess(

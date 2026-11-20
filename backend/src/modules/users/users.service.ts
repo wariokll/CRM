@@ -5,6 +5,7 @@ import {
   StoreStatus,
   UserStatus,
 } from "@prisma/client";
+import type { ClientSummaryDTO } from "@crm/shared-types";
 import bcrypt from "bcrypt";
 import { prisma } from "../../db.js";
 import type {
@@ -45,10 +46,13 @@ export async function listClients(search: string) {
     },
     orderBy: { createdAt: "desc" },
   });
-  return users.map((user) => ({
-    ...user,
-    stores: user.organizations.flatMap((item) => item.organization.stores),
-  }));
+  return users.map(
+    (user) =>
+      ({
+        ...user,
+        stores: user.organizations.flatMap((item) => item.organization.stores),
+      }) satisfies ClientSummaryDTO,
+  );
 }
 
 export async function createClient(body: CreateClientInput) {

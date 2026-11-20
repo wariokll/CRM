@@ -9,6 +9,7 @@
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
+    "paths": { "@crm/shared-types": ["./shared-types/index.d.ts"] },
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "resolveJsonModule": true,

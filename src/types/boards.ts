@@ -1,4 +1,5 @@
 import type { User } from "../types";
+import type { BoardAccessUserDTO } from "@crm/shared-types";
 
 export type BoardType = "PERSONAL" | "TEAM";
 
@@ -45,10 +46,4 @@ export interface ArchivedBoardCard extends BoardCard {
   archivedAt: string;
   column: Pick<BoardColumn, "id" | "name">;
 }
-export interface BoardAccessUser extends Pick<
-  User,
-  "id" | "ipName" | "email" | "role"
-> {
-  hasAccess: boolean;
-  isOwner: boolean;
-}
+export type BoardAccessUser = BoardAccessUserDTO;

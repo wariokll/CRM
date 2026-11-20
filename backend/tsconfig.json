@@ -5,6 +5,7 @@
     "moduleResolution": "NodeNext",
     "outDir": "dist",
     "rootDir": "src",
+    "paths": { "@crm/shared-types": ["../shared-types/index.d.ts"] },
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,

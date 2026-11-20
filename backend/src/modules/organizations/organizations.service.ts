@@ -1,4 +1,8 @@
 import { OrganizationStatus, PermissionKey, Role } from "@prisma/client";
+import type {
+  OrganizationContactDTO,
+  OrganizationMemberDTO,
+} from "@crm/shared-types";
 import { prisma } from "../../db.js";
 import {
   getUserAccess,
@@ -55,10 +59,20 @@ export async function listOrganizations(userId: number) {
     ctx.manages || ctx.access.role !== Role.CLIENT
       ? {}
       : { members: { some: { userId } } };
-  return prisma.organization.findMany({
+  const organizations = await prisma.organization.findMany({
     where,
     include,
     orderBy: { legalName: "asc" },
+  });
+  return organizations.map((organization) => {
+    const relations = {
+      contacts: organization.contacts,
+      members: organization.members,
+    } satisfies {
+      contacts: OrganizationContactDTO[];
+      members: OrganizationMemberDTO[];
+    };
+    return { ...organization, ...relations };
   });
 }
 

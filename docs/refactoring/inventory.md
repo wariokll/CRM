@@ -58,7 +58,7 @@
 - Последний полный прогон на этапе 8.6: frontend — 10 тестов; backend — 116 тестов; Playwright — 11 тестов. Все прошли.
 - Покрытие backend: statements 84.86%, branches 66.39%, functions 87.37%, lines 86.13%. Frontend: statements 45.56%, branches 38.69%, functions 32.97%, lines 46.12%.
 - В frontend и backend включён TypeScript `noUncheckedIndexedAccess`.
-- Совместные DTO пока не вынесены в `shared-types/`; синхронизация контрактов compile-time проверкой остаётся незавершённой частью ТЗ.
+- Общий каталог `shared-types/` содержит response DTO для board access, request assignees, organization contacts/members, store summaries и client summaries; он подключён через tsconfig path alias без workspaces и runtime-зависимости.
 - Схема БД и миграции этапом 8 не изменялись. Последние проверки Prisma не обнаружили ожидающих миграций или schema diff.
 
 ## 5. Эксплуатация

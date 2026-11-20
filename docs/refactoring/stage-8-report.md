@@ -9,14 +9,14 @@
 - **8.3 — HTTP characterization.** Описаны 97 API endpoints, общие проверки аутентификации и ролей, доменные HTTP-сценарии и реальные ограничения. Материалы: [описание](stage-8-3-api-characterization.md) и [матрица](stage-8-3-endpoint-matrix.md).
 - **8.4 — backend layers.** Request, boards, knowledge, stores, organizations и Telegram bot разделены на более узкие route/controller/service/handler файлы там, где это применимо.
 - **8.5 — frontend data access.** Вызовы из выбранных дочерних компонентов перемещены в feature query-файлы; компоненты получают данные и callbacks. Добавлена страница отказа доступа для существующих ограниченных разделов.
-- **8.6 — TypeScript indexing.** `noUncheckedIndexedAccess` включён сначала для backend, затем отдельным commit для frontend; потенциально отсутствующие индексированные значения обрабатываются явно.
+- **8.6 — TypeScript и контракты.** `noUncheckedIndexedAccess` включён сначала для backend, затем отдельным commit для frontend; потенциально отсутствующие индексированные значения обрабатываются явно. Добавлен `shared-types/` с пятью response DTO, подключённый через tsconfig path alias без workspaces и runtime-зависимостей.
 - **8.7 — документация.** Обновлена текущая инвентаризация, уточнён эксплуатационный статус этапа 7, создан этот сводный отчёт.
 
 ## 2. Результат финального `npm.cmd run verify`
 
 Финальный полный прогон завершился успешно: проверка UTF-8, frontend/backend TypeScript, ESLint, Prettier, frontend — 4 файла/10 тестов, backend — 37 файлов/116 тестов, обе production-сборки, SPA fallback и Playwright — 11/11. Prisma не обнаружил ожидающих миграций или отличий схемы.
 
-Coverage в финальном прогоне: frontend — statements 45.56%, branches 38.69%, functions 32.97%, lines 46.12%; backend — statements 84.86%, branches 66.39%, functions 87.37%, lines 86.13%.
+Coverage в финальном прогоне после интеграции общих DTO: frontend — statements 45.56%, branches 38.69%, functions 32.97%, lines 46.12%; backend — statements 84.90%, branches 66.39%, functions 87.43%, lines 86.18%.
 
 ## 3. Тесты и изменения существующих тестов
 
@@ -28,7 +28,7 @@ Coverage в финальном прогоне: frontend — statements 45.56%, b
 
 - Не все 97 endpoint имеют отдельный позитивный, невалидный, missing-object и разрешённый/запрещённый кейс для каждой роли. Матрица показывает фактическое покрытие без утверждения, что общий role snapshot доказывает каждый такой сценарий. Это остаточный пробел characterization.
 - Целевой coverage не ниже 80% строк для `backend/src/modules` пока не достигнут; текущие пороги не занижались. Текущие агрегированные показатели приведены выше, детализация и план роста — в [отчёте 8.2](stage-8-2-coverage.md).
-- Общие frontend/backend DTO не вынесены в `shared-types/`; единая compile-time проверка контрактов остаётся незавершённой частью ТЗ. Этап 8.6 применил требуемый `noUncheckedIndexedAccess`.
+- Общий каталог покрывает пять response DTO из пяти доменов; остальные формы ответов не переносились, чтобы ограничить контрактную миграцию проверенными наиболее часто используемыми моделями.
 - В рамках 8.5 оставлены крупные page/container файлы, перечисленные в [отчёте 8.5](stage-8-5-frontend-report.md); их UI не дробился без необходимости для извлечения сетевого слоя.
 - Коммиты этапов 8.1–8.7 находятся в `refactor/stage-8`. Согласно ТЗ, `master` не изменялся; push и deployment не выполнялись.
 

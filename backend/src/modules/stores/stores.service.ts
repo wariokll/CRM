@@ -1,4 +1,5 @@
-import { PermissionKey, Role, StoreStatus } from "@prisma/client";
+import { PermissionKey, Role, StoreStatus, UserStatus } from "@prisma/client";
+import type { StoreSummaryDTO } from "@crm/shared-types";
 import { config } from "../../config.js";
 import { prisma } from "../../db.js";
 import {
@@ -51,9 +52,19 @@ const include = {
 
 function present<
   T extends {
-    organization: { legalName: string; members: Array<{ user: unknown }> };
+    organization: {
+      legalName: string;
+      members: Array<{
+        user: {
+          id: number;
+          ipName: string;
+          phone: string;
+          status: UserStatus;
+        };
+      }>;
+    };
   },
->(store: T) {
+>(store: T): T & { user: T["organization"]["members"][number]["user"] } {
   return {
     ...store,
     user: store.organization.members[0]?.user ?? {
@@ -113,7 +124,7 @@ export async function listStores(userId: number) {
     include,
     orderBy: { updatedAt: "desc" },
   });
-  return stores.map(present);
+  return stores.map((store) => present(store) satisfies StoreSummaryDTO);
 }
 
 export async function createStore(userId: number, input: unknown) {
@@ -132,7 +143,7 @@ export async function createStore(userId: number, input: unknown) {
     },
     include,
   });
-  return present(store);
+  return present(store) satisfies StoreSummaryDTO;
 }
 
 export async function updateStore(id: number, userId: number, input: unknown) {
@@ -153,7 +164,7 @@ export async function updateStore(id: number, userId: number, input: unknown) {
     },
     include,
   });
-  return present(updated);
+  return present(updated) satisfies StoreSummaryDTO;
 }
 
 export async function deleteStore(id: number, userId: number) {
