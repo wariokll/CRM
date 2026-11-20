@@ -29,8 +29,8 @@ export function CardDialog({
     ) as Record<string, string>;
     try {
       await save({
-        title: values.title,
-        description: values.description,
+        title: values.title ?? "",
+        description: values.description ?? "",
         deadline: values.deadline || null,
       });
       close();

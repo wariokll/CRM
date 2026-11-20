@@ -28,24 +28,22 @@ export function AuthPage({ onAuth }: { onAuth: (user: User) => void }) {
     event.preventDefault();
     setBusy(true);
     setError("");
-    const v = Object.fromEntries(new FormData(event.currentTarget)) as Record<
-      string,
-      string
-    >;
+    const form = new FormData(event.currentTarget);
+    const value = (name: string) => String(form.get(name) ?? "");
     try {
       if (mode === "register")
         await registerUser({
-          ipName: v.ipName,
-          email: v.email,
-          password: v.password,
-          phone: v.phone,
+          ipName: value("ipName"),
+          email: value("email"),
+          password: value("password"),
+          phone: value("phone"),
           store: {
-            name: v.storeName,
-            address: v.address,
-            phone: v.storePhone || undefined,
+            name: value("storeName"),
+            address: value("address"),
+            phone: value("storePhone") || undefined,
           },
         });
-      onAuth(await login(v.email, v.password));
+      onAuth(await login(value("email"), value("password")));
     } catch (reason) {
       setError(errorText(reason));
     } finally {

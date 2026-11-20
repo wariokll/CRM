@@ -342,6 +342,7 @@ export function BoardsPage({
       const previous = board,
         columns = [...board.columns],
         [moved] = columns.splice(from, 1);
+      if (!moved) return;
       columns.splice(to, 0, moved);
       setBoard({ ...board, columns });
       try {

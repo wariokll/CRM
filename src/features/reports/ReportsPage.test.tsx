@@ -29,7 +29,9 @@ describe("ReportsPage URL state", () => {
     expect(screen.getByLabelText("report location")).toHaveTextContent(
       "view=team&from=2026-01-01",
     );
-    fireEvent.click(container.querySelectorAll(".report-tabs button")[0]);
+    const firstTab = container.querySelectorAll(".report-tabs button")[0];
+    if (!firstTab) throw new Error("Expected the first report tab to exist");
+    fireEvent.click(firstTab);
     expect(screen.getByLabelText("report location")).toHaveTextContent(
       "from=2026-01-01",
     );

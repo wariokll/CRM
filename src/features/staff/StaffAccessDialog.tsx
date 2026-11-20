@@ -159,7 +159,7 @@ export function StaffAccessDialog({
                 <div>
                   <b>Рабочий Telegram</b>
                   <p>
-                    {editing.linkedTelegramChats?.length ? (
+                    {editing.linkedTelegramChats?.[0] ? (
                       <>
                         Подключён: @
                         {editing.linkedTelegramChats[0].username ??

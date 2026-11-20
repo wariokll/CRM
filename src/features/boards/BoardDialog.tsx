@@ -47,7 +47,7 @@ export function Dialog({ title, close, children, wide }: DialogProps) {
             document.activeElement === dialog)
         ) {
           event.preventDefault();
-          last.focus();
+          last?.focus();
         } else if (
           !event.shiftKey &&
           (document.activeElement === last || document.activeElement === dialog)

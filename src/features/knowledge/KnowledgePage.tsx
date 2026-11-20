@@ -167,7 +167,7 @@ export function KnowledgePage() {
   const articles = articlesQuery.data ?? [];
   useEffect(() => {
     if (activeSectionId === null && sectionParam !== "all" && sections.length)
-      setActiveSectionId(sections[0].id);
+      setActiveSectionId(sections[0]?.id ?? null);
     if (
       activeSectionId !== null &&
       !sections.some((section) => section.id === activeSectionId)
@@ -400,10 +400,11 @@ export function KnowledgePage() {
           },
         );
         files.forEach((file, index) => {
-          if (file.type.startsWith("image/"))
+          const attachment = uploaded[index];
+          if (file.type.startsWith("image/") && attachment)
             finalBody = finalBody.replaceAll(
               `[[image:pending:${index}]]`,
-              `[[image:${uploaded[index].id}]]`,
+              `[[image:${attachment.id}]]`,
             );
         });
         if (finalBody !== body.body.replace(/\[\[image:pending:\d+\]\]/g, ""))
