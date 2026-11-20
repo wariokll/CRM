@@ -22,4 +22,4 @@
 
 ## Оставшиеся размеры файлов
 
-Актуальные крупные файлы приведены в [текущей инвентаризации](inventory.md). По состоянию на конец этапа 8 `backend/src/modules/requests/request.service.ts` — 709 строк, `backend/src/telegram/bot-handlers.ts` — 705 строк, `src/features/boards/BoardsPage.tsx` — 658 строк, `src/features/knowledge/KnowledgePage.tsx` — 641 строка. Их дальнейшее разбиение требует самостоятельных этапов characterization и извлечения; этап 8 не менял такую логику только ради лимита строк.
+Актуальные крупные файлы приведены в [текущей инвентаризации](inventory.md). По состоянию на конец этапа 8 `backend/src/modules/requests/request.service.ts` — 711 строк, `backend/src/telegram/bot-handlers.ts` — 705 строк, `src/features/boards/BoardsPage.tsx` — 658 строк, `src/features/knowledge/KnowledgePage.tsx` — 641 строка. Их дальнейшее разбиение требует самостоятельных этапов characterization и извлечения; этап 8 не менял такую логику только ради лимита строк.

@@ -21,20 +21,20 @@
 
 | Строк | Файл | Содержание |
 |---:|---|---|
-| 709 | `backend/src/modules/requests/request.service.ts` | Сервис заявок и связанные операции |
+| 711 | `backend/src/modules/requests/request.service.ts` | Сервис заявок и связанные операции |
 | 705 | `backend/src/telegram/bot-handlers.ts` | Обработчики Telegram команд и сообщений |
 | 658 | `src/features/boards/BoardsPage.tsx` | Контейнер страницы досок и координация UI |
 | 641 | `src/features/knowledge/KnowledgePage.tsx` | Контейнер базы знаний и координация действий |
-| 619 | `backend/src/modules/boards/board.service.ts` | Сервис досок |
+| 620 | `backend/src/modules/boards/board.service.ts` | Сервис досок |
 | 319 | `backend/src/modules/boards/board-api.characterization.test.ts` | HTTP characterization досок |
+| 292 | `backend/src/modules/stores/stores.service.ts` | Сервис торговых точек |
 | 281 | `backend/src/modules/knowledge/knowledge.service.ts` | Сервис базы знаний |
-| 281 | `backend/src/modules/stores/stores.service.ts` | Сервис торговых точек |
 | 259 | `src/features/requests/RequestsList.tsx` | Список заявок |
 | 256 | `backend/src/modules/requests/reports.service.ts` | Агрегация отчётов |
 | 248 | `src/features/boards/BoardLayoutDialog.tsx` | Настройка раскладки доски |
 | 242 | `src/features/organizations/OrganizationsPage.tsx` | Страница организаций |
 | 240 | `src/features/requests/RequestModal.tsx` | Диалог заявки |
-| 234 | `backend/src/modules/organizations/organizations.service.ts` | Сервис организаций |
+| 248 | `backend/src/modules/organizations/organizations.service.ts` | Сервис организаций |
 | 223 | `src/types/core.ts` | Общие типы frontend |
 | 220 | `src/features/requests/CreateRequestForm.tsx` | Форма создания заявки |
 | 220 | `src/features/reports/ReportsPage.tsx` | Страница отчётов |
