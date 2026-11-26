@@ -334,11 +334,7 @@ async function resolveTarget(
   return { kind: "missing" as const };
 }
 
-async function createRequest(
-  chatId: number,
-  session: Session,
-  description: string,
-) {
+async function prepareTelegramRequest(chatId: number, session: Session) {
   const chat = await prisma.telegramChat.findUnique({
     where: { id: chatId },
     include: { contact: true },
@@ -352,13 +348,17 @@ async function createRequest(
   });
   if (!chat || !type || !director)
     throw new Error("Не удалось подготовить заявку");
+  return { chat, type, director };
+}
+
+async function persistTelegramRequest(
+  session: Session,
+  description: string,
+  context: Awaited<ReturnType<typeof prepareTelegramRequest>>,
+) {
+  const { chat, type, director } = context;
   const organizationId = session.organizationId ?? null,
     storeId = session.storeId ?? null;
-  if (
-    (type.requiresOrganization && !organizationId) ||
-    (type.requiresStore && !storeId)
-  )
-    return null;
   return prisma.$transaction(async (transaction) => {
     const request = await transaction.request.create({
       data: {
@@ -388,6 +388,21 @@ async function createRequest(
     });
     return request;
   });
+}
+
+async function createRequest(
+  chatId: number,
+  session: Session,
+  description: string,
+) {
+  const context = await prepareTelegramRequest(chatId, session);
+  const { type } = context;
+  if (
+    (type.requiresOrganization && !session.organizationId) ||
+    (type.requiresStore && !session.storeId)
+  )
+    return null;
+  return persistTelegramRequest(session, description, context);
 }
 
 async function askNextField(
@@ -462,101 +477,135 @@ async function linkEmployeeChat(chatId: number, code: string) {
   return link.user;
 }
 
+type TelegramChatRecord = Awaited<ReturnType<typeof ensureChat>>;
+
+async function handleStaffLink(
+  chat: TelegramChatRecord,
+  startArgument: string | undefined,
+) {
+  if (!startArgument?.startsWith("staff_")) return false;
+  const employee = await linkEmployeeChat(
+    chat.id,
+    startArgument.slice("staff_".length),
+  );
+  await reply(
+    chat.id,
+    chat.externalChatId,
+    employee
+      ? `Telegram подключён к учётной записи «${employee.ipName}». Теперь вы будете получать рабочие уведомления по заявкам.`
+      : "Ссылка недействительна или устарела. Попросите руководителя сформировать новую ссылку.",
+  );
+  return true;
+}
+
+async function handleLinkedEmployeeMessage(chat: TelegramChatRecord) {
+  if (!chat.linkedUserId) return false;
+  const employee = await prisma.user.findUnique({
+    where: { id: chat.linkedUserId },
+    select: { role: true, status: true },
+  });
+  if (
+    !employee ||
+    employee.status !== UserStatus.ACTIVE ||
+    employee.role === Role.CLIENT
+  )
+    return false;
+  await reply(
+    chat.id,
+    chat.externalChatId,
+    "Рабочий Telegram подключён. Здесь будут приходить уведомления о назначенных заявках и напоминаниях.",
+  );
+  return true;
+}
+
+async function handleTelegramCommand(chat: TelegramChatRecord, lower: string) {
+  if (lower === "/start" || lower === "старт") {
+    await reply(
+      chat.id,
+      chat.externalChatId,
+      "Здравствуйте! Я бот ЦТО БАЗИС. Помогу создать заявку или показать её статус.",
+      { keyboard: [["Создать заявку"], ["Мои заявки"]], resize_keyboard: true },
+    );
+    return true;
+  }
+  if (lower === "создать заявку" || lower === "/new") {
+    await reply(
+      chat.id,
+      chat.externalChatId,
+      "Выберите шаблон заявки:",
+      await requestKeyboard(),
+    );
+    return true;
+  }
+  if (lower === "мои заявки" || lower === "/status") {
+    await reply(chat.id, chat.externalChatId, await statusText(chat.id));
+    return true;
+  }
+  return false;
+}
+
+async function handleRequestSessionMessage(
+  chat: TelegramChatRecord,
+  session: Session,
+  text: string,
+) {
+  const field = session.fields?.[session.fieldIndex ?? 0];
+  if (field) {
+    const parsed = parseFieldValue(field, text);
+    if (!parsed.ok) {
+      await reply(chat.id, chat.externalChatId, parsed.message);
+      return;
+    }
+    const templateData = {
+      ...(session.templateData ?? {}),
+      ...(parsed.value !== undefined && { [field.key]: parsed.value }),
+    };
+    const next = {
+      ...session,
+      templateData,
+      fieldIndex: (session.fieldIndex ?? 0) + 1,
+    };
+    sessions.set(chat.externalChatId, next);
+    await askNextField(chat.id, chat.externalChatId, next);
+    return;
+  }
+  sessions.delete(chat.externalChatId);
+  const request = await createRequest(chat.id, session, text);
+  if (request) {
+    await reply(
+      chat.id,
+      chat.externalChatId,
+      "Заявка принята. Мы сообщим о дальнейшем статусе.",
+    );
+    return;
+  }
+  const link = config.telegramRegistrationUrl
+    ? `\nЗарегистрируйтесь: ${config.telegramRegistrationUrl}`
+    : "";
+  await reply(
+    chat.id,
+    chat.externalChatId,
+    `Для этого шаблона нужны подтверждённые организация и торговая точка.${link}\nПосле регистрации сотрудник свяжет этот Telegram-диалог с вашей организацией.`,
+  );
+}
+
 async function handleMessage(integrationId: number, message: TelegramMessage) {
   const chat = await ensureChat(integrationId, message);
   await storeIncoming(chat.id, message);
   const text = message.text?.trim() ?? "";
   const lower = text.toLowerCase();
   const startArgument = /^\/start(?:\s+(.+))?$/i.exec(text)?.[1];
-  if (startArgument?.startsWith("staff_")) {
-    const employee = await linkEmployeeChat(
-      chat.id,
-      startArgument.slice("staff_".length),
-    );
-    return reply(
-      chat.id,
-      chat.externalChatId,
-      employee
-        ? `Telegram подключён к учётной записи «${employee.ipName}». Теперь вы будете получать рабочие уведомления по заявкам.`
-        : "Ссылка недействительна или устарела. Попросите руководителя сформировать новую ссылку.",
-    );
-  }
-  if (chat.linkedUserId) {
-    const employee = await prisma.user.findUnique({
-      where: { id: chat.linkedUserId },
-      select: { role: true, status: true },
-    });
-    if (
-      employee &&
-      employee.status === UserStatus.ACTIVE &&
-      employee.role !== Role.CLIENT
-    )
-      return reply(
-        chat.id,
-        chat.externalChatId,
-        "Рабочий Telegram подключён. Здесь будут приходить уведомления о назначенных заявках и напоминаниях.",
-      );
-  }
-  if (lower === "/start" || lower === "старт")
-    return reply(
-      chat.id,
-      chat.externalChatId,
-      "Здравствуйте! Я бот ЦТО БАЗИС. Помогу создать заявку или показать её статус.",
-      { keyboard: [["Создать заявку"], ["Мои заявки"]], resize_keyboard: true },
-    );
-  if (lower === "создать заявку" || lower === "/new")
-    return reply(
-      chat.id,
-      chat.externalChatId,
-      "Выберите шаблон заявки:",
-      await requestKeyboard(),
-    );
-  if (lower === "мои заявки" || lower === "/status")
-    return reply(chat.id, chat.externalChatId, await statusText(chat.id));
+  if (await handleStaffLink(chat, startArgument)) return;
+  if (await handleLinkedEmployeeMessage(chat)) return;
+  if (await handleTelegramCommand(chat, lower)) return;
   const session = sessions.get(chat.externalChatId);
-  if (session) {
-    const field = session.fields?.[session.fieldIndex ?? 0];
-    if (field) {
-      const parsed = parseFieldValue(field, text);
-      if (!parsed.ok)
-        return reply(chat.id, chat.externalChatId, parsed.message);
-      const templateData = {
-        ...(session.templateData ?? {}),
-        ...(parsed.value !== undefined && { [field.key]: parsed.value }),
-      };
-      const next = {
-        ...session,
-        templateData,
-        fieldIndex: (session.fieldIndex ?? 0) + 1,
-      };
-      sessions.set(chat.externalChatId, next);
-      return askNextField(chat.id, chat.externalChatId, next);
-    }
-    sessions.delete(chat.externalChatId);
-    const request = await createRequest(chat.id, session, text);
-    if (request)
-      return reply(
-        chat.id,
-        chat.externalChatId,
-        "Заявка принята. Мы сообщим о дальнейшем статусе.",
-      );
-    const link = config.telegramRegistrationUrl
-      ? `\nЗарегистрируйтесь: ${config.telegramRegistrationUrl}`
-      : "";
-    return reply(
-      chat.id,
-      chat.externalChatId,
-      `Для этого шаблона нужны подтверждённые организация и торговая точка.${link}\nПосле регистрации сотрудник свяжет этот Telegram-диалог с вашей организацией.`,
-    );
-  }
+  if (session) return handleRequestSessionMessage(chat, session, text);
   return reply(
     chat.id,
     chat.externalChatId,
     "Выберите действие в меню или отправьте /start.",
   );
 }
-
-type TelegramChatRecord = Awaited<ReturnType<typeof ensureChat>>;
 
 async function handleStoreSelection(chat: TelegramChatRecord, data: string) {
   const session = sessions.get(chat.externalChatId),
