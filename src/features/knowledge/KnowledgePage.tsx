@@ -103,7 +103,6 @@ export function KnowledgePage() {
   const queryClient = useQueryClient();
   const knowledgeMutation = useKnowledgeMutation();
   const attachmentMutation = useKnowledgeAttachmentMutation();
-  const requestedArticleRef = useRef<number | null>(null);
   const setActiveSectionId = useCallback(
     (id: number | null) => {
       setActiveSectionLocal(id);
@@ -134,7 +133,6 @@ export function KnowledgePage() {
   };
   const goToArticleList = () => {
     setArticle(null);
-    requestedArticleRef.current = null;
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current);
@@ -233,7 +231,6 @@ export function KnowledgePage() {
   const openArticle = useCallback(
     async (id: number) => {
       setError("");
-      requestedArticleRef.current = id;
       const sectionId =
         sections.find((section) =>
           section.articles.some((item) => item.id === id),
@@ -267,14 +264,33 @@ export function KnowledgePage() {
   );
 
   useEffect(() => {
-    if (articleIdFromUrl && requestedArticleRef.current !== articleIdFromUrl) {
-      requestedArticleRef.current = articleIdFromUrl;
-      void openArticle(articleIdFromUrl);
-    } else if (!articleIdFromUrl) {
-      requestedArticleRef.current = null;
-      if (article) setArticle(null);
+    if (!articleIdFromUrl) {
+      setArticle(null);
+      return;
     }
-  }, [article, articleIdFromUrl, openArticle]);
+    let active = true;
+    setError("");
+    void queryClient
+      .fetchQuery({
+        queryKey: queryKeys.knowledge.article(articleIdFromUrl),
+        queryFn: () =>
+          knowledgeRequest<KnowledgeArticle>(
+            `/knowledge/articles/${articleIdFromUrl}`,
+          ),
+      })
+      .then((loadedArticle) => {
+        if (!active) return;
+        setArticle(loadedArticle);
+        setActiveSectionLocal(loadedArticle.sectionId);
+        setSearchLocal("");
+      })
+      .catch((reason: unknown) => {
+        if (active) setError(errorText(reason));
+      });
+    return () => {
+      active = false;
+    };
+  }, [articleIdFromUrl, queryClient]);
 
   const downloadAttachment = async (attachment: KnowledgeAttachment) => {
     setError("");
