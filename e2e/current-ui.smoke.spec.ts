@@ -70,6 +70,23 @@ test("request filters stay in the URL after reload", async ({ page }) => {
   await expect(page.locator(".request-filters input")).toHaveValue("printer");
 });
 
+test("organization and staff dialogs can be restored from their URLs", async ({
+  page,
+}) => {
+  await signIn(page);
+  await page.goto("/organizations?organizationDialog=new");
+  await expect(page.locator(".modal")).toBeVisible();
+  await page.reload();
+  await expect(page.locator(".modal")).toBeVisible();
+  await page.locator(".modal-head .icon-button").click();
+  await expect(page).toHaveURL(/\/organizations$/);
+
+  await page.goto("/staff?staffDialog=new");
+  await expect(page.locator(".modal")).toBeVisible();
+  await page.reload();
+  await expect(page.locator(".modal")).toBeVisible();
+});
+
 test("creating a component updates the template catalog without a reload", async ({
   page,
 }) => {
