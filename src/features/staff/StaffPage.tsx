@@ -1,4 +1,10 @@
-import { useState, type FormEvent } from "react";
+import {
+  useState,
+  type Dispatch,
+  type FormEvent,
+  type SetStateAction,
+} from "react";
+import { useSearchParams } from "react-router-dom";
 import { Plus, UserRoundCog } from "lucide-react";
 import { ApiError } from "../../api";
 import { Button } from "../../components/ui";
@@ -25,8 +31,25 @@ export function StaffPage({
   departments: Department[];
   reload: () => void;
 }) {
-  const [editing, setEditing] = useState<StaffMember | "new" | null>(null),
-    [error, setError] = useState(""),
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editingKey = searchParams.get("staffDialog");
+  const editing =
+    editingKey === "new"
+      ? "new"
+      : (staff.find((person) => String(person.id) === editingKey) ?? null);
+  const setEditing: Dispatch<SetStateAction<StaffMember | "new" | null>> = (
+    value,
+  ) => {
+    const nextValue = typeof value === "function" ? value(editing) : value;
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (nextValue === "new") next.set("staffDialog", "new");
+      else if (nextValue) next.set("staffDialog", String(nextValue.id));
+      else next.delete("staffDialog");
+      return next;
+    });
+  };
+  const [error, setError] = useState(""),
     [telegramLink, setTelegramLink] = useState<{
       deepLink: string;
       expiresAt: string;

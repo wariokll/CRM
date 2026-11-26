@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { ApiError } from "../../api";
 import { Button, Empty, ErrorState, Field, Modal } from "../../components/ui";
@@ -23,8 +24,17 @@ export function OrganizationsPage({
   reload: () => void;
   openStores: (organizationId: number) => void;
 }) {
-  const [adding, setAdding] = useState(false),
-    [error, setError] = useState(""),
+  const [searchParams, setSearchParams] = useSearchParams();
+  const adding = searchParams.get("organizationDialog") === "new";
+  const setAdding = (open: boolean) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (open) next.set("organizationDialog", "new");
+      else next.delete("organizationDialog");
+      return next;
+    });
+  };
+  const [error, setError] = useState(""),
     [deletingId, setDeletingId] = useState<number | null>(null),
     [contacts, setContacts] = useState([{ fullName: "", phone: "", note: "" }]);
   const organizationMutation = useOrganizationMutation();
