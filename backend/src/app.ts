@@ -25,7 +25,7 @@ import { requestsRouter } from "./modules/requests/request.routes.js";
 import { requestTypesRouter } from "./modules/request-types/request-types.routes.js";
 import { recurringRequestsRouter } from "./modules/recurring-requests/recurring-requests.routes.js";
 import { staffRouter } from "./modules/staff/staff.routes.js";
-import { storesRouter } from "./modules/stores/stores.routes.js";
+import { createStoresRouter } from "./modules/stores/stores.routes.js";
 import { telegramRouter } from "./modules/telegram/telegram.routes.js";
 import { createUsersRouter } from "./modules/users/users.routes.js";
 
@@ -68,7 +68,7 @@ export function createApp(deps: AppDependencies = { prisma }) {
   app.use("/api/departments", createDepartmentsRouter(deps.prisma));
   app.use("/api/components", createComponentsRouter(deps.prisma));
   app.use("/api/organizations", createOrganizationsRouter(deps.prisma));
-  app.use("/api/stores", storesRouter);
+  app.use("/api/stores", createStoresRouter(deps.prisma));
   app.use("/api/requests", requestsRouter);
   app.use("/api/recurring-requests", recurringRequestsRouter);
   app.use("/api/request-types", requestTypesRouter);
