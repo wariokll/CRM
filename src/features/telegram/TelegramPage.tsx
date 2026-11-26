@@ -3,7 +3,7 @@ import { MessageCircle } from "lucide-react";
 import { ApiError } from "../../api";
 import { Button, Empty, Field } from "../../components/ui";
 import { formatDate } from "../../shared/formatDate";
-import { telegramRequest } from "./queries";
+import { useSaveTelegramLinksMutation } from "./queries";
 import type {
   Organization,
   Store,
@@ -33,6 +33,7 @@ export function TelegramPage({
   const [editing, setEditing] = useState<number | null>(null),
     [saving, setSaving] = useState(false),
     [error, setError] = useState("");
+  const saveTelegramLinksMutation = useSaveTelegramLinksMutation();
   const saveLinks = async (
     event: FormEvent<HTMLFormElement>,
     chatId: number,
@@ -42,12 +43,10 @@ export function TelegramPage({
     setError("");
     const form = new FormData(event.currentTarget);
     try {
-      await telegramRequest("/telegram/chats/" + chatId + "/links", {
-        method: "PUT",
-        body: JSON.stringify({
-          organizationIds: form.getAll("organizationIds").map(Number),
-          storeIds: form.getAll("storeIds").map(Number),
-        }),
+      await saveTelegramLinksMutation.mutateAsync({
+        chatId,
+        organizationIds: form.getAll("organizationIds").map(Number),
+        storeIds: form.getAll("storeIds").map(Number),
       });
       setEditing(null);
       await reload();

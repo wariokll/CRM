@@ -29,9 +29,8 @@ import {
   boardRequest,
   getBoardAccess,
   getBoardArchive,
-  restoreBoardCard,
-  updateBoardAccess,
-  updateBoardLayout,
+  useBoardDetailsMutation,
+  useBoardMutation,
 } from "./queries";
 import { queryKeys } from "../../shared/queryKeys";
 import { errorText } from "./BoardDialog";
@@ -112,6 +111,8 @@ export function BoardsPage({
   const [accessError, setAccessError] = useState("");
   const accessBoardId = board?.id;
   const queryClient = useQueryClient();
+  const boardMutation = useBoardMutation();
+  const boardDetailsMutation = useBoardDetailsMutation();
   const selectBoard = useCallback(
     (id: number | null, replace = false) => {
       const value = id === null ? null : String(id);
@@ -238,27 +239,36 @@ export function BoardsPage({
     }
     if (!board) return;
     if (nameEditor.kind === "rename-board") {
-      await boardRequest(`/boards/${board.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ name }),
+      await boardMutation.mutateAsync({
+        path: `/boards/${board.id}`,
+        init: {
+          method: "PATCH",
+          body: JSON.stringify({ name }),
+        },
       });
       await loadBoards(board.id);
       await loadBoard(board.id);
       return;
     }
     if (nameEditor.kind === "create-column") {
-      await boardRequest(`/boards/${board.id}/columns`, {
-        method: "POST",
-        body: JSON.stringify({ name }),
+      await boardMutation.mutateAsync({
+        path: `/boards/${board.id}/columns`,
+        init: {
+          method: "POST",
+          body: JSON.stringify({ name }),
+        },
       });
       await loadBoard();
       return;
     }
     const column = nameEditor.column!;
     try {
-      await boardRequest(`/boards/columns/${column.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ name, version: column.version }),
+      await boardMutation.mutateAsync({
+        path: `/boards/columns/${column.id}`,
+        init: {
+          method: "PATCH",
+          body: JSON.stringify({ name, version: column.version }),
+        },
       });
       await loadBoard();
     } catch (reason) {
@@ -268,7 +278,10 @@ export function BoardsPage({
   const deleteBoard = async () => {
     if (!board || !window.confirm(`Удалить доску «${board.name}»?`)) return;
     try {
-      await boardRequest(`/boards/${board.id}`, { method: "DELETE" });
+      await boardMutation.mutateAsync({
+        path: `/boards/${board.id}`,
+        init: { method: "DELETE" },
+      });
       setBoard(null);
       await loadBoards();
     } catch (reason) {
@@ -281,9 +294,12 @@ export function BoardsPage({
       : `Удалить столбец «${column.name}»?`;
     if (!window.confirm(warning)) return;
     try {
-      await boardRequest(`/boards/columns/${column.id}`, {
-        method: "DELETE",
-        body: JSON.stringify({ version: column.version }),
+      await boardMutation.mutateAsync({
+        path: `/boards/columns/${column.id}`,
+        init: {
+          method: "DELETE",
+          body: JSON.stringify({ version: column.version }),
+        },
       });
       await loadBoard();
     } catch (reason) {
@@ -302,14 +318,20 @@ export function BoardsPage({
     if (!cardEditor) return;
     try {
       if (cardEditor.card)
-        await boardRequest(`/boards/cards/${cardEditor.card.id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ ...data, version: cardEditor.card.version }),
+        await boardMutation.mutateAsync({
+          path: `/boards/cards/${cardEditor.card.id}`,
+          init: {
+            method: "PATCH",
+            body: JSON.stringify({ ...data, version: cardEditor.card.version }),
+          },
         });
       else
-        await boardRequest(`/boards/columns/${cardEditor.columnId}/cards`, {
-          method: "POST",
-          body: JSON.stringify(data),
+        await boardMutation.mutateAsync({
+          path: `/boards/columns/${cardEditor.columnId}/cards`,
+          init: {
+            method: "POST",
+            body: JSON.stringify(data),
+          },
         });
       await loadBoard();
     } catch (reason) {
@@ -319,9 +341,12 @@ export function BoardsPage({
   const deleteCard = async () => {
     if (!cardEditor?.card) return;
     try {
-      await boardRequest(`/boards/cards/${cardEditor.card.id}`, {
-        method: "DELETE",
-        body: JSON.stringify({ version: cardEditor.card.version }),
+      await boardMutation.mutateAsync({
+        path: `/boards/cards/${cardEditor.card.id}`,
+        init: {
+          method: "DELETE",
+          body: JSON.stringify({ version: cardEditor.card.version }),
+        },
       });
       await loadBoard();
     } catch (reason) {
@@ -381,9 +406,12 @@ export function BoardsPage({
         })),
       });
       try {
-        await boardRequest(`/boards/cards/${movedCard.id}/archive`, {
-          method: "POST",
-          body: JSON.stringify({ version: movedCard.version }),
+        await boardMutation.mutateAsync({
+          path: `/boards/cards/${movedCard.id}/archive`,
+          init: {
+            method: "POST",
+            body: JSON.stringify({ version: movedCard.version }),
+          },
         });
       } catch (reason) {
         setBoard(previous);
@@ -596,7 +624,15 @@ export function BoardsPage({
           }
           refresh={() => loadBoard(board.id)}
           loadArchive={getBoardArchive}
-          restoreCard={restoreBoardCard}
+          restoreCard={(cardId, version, targetColumnId) =>
+            boardDetailsMutation.mutateAsync({
+              path: `/boards/cards/${cardId}/restore`,
+              init: {
+                method: "POST",
+                body: JSON.stringify({ version, targetColumnId }),
+              },
+            })
+          }
         />
       )}
       {layoutEditor && board && (
@@ -611,7 +647,15 @@ export function BoardsPage({
             )
           }
           refresh={() => loadBoard(board.id)}
-          saveLayout={updateBoardLayout}
+          saveLayout={(boardId, columns) =>
+            boardDetailsMutation.mutateAsync({
+              path: `/boards/${boardId}/layout`,
+              init: {
+                method: "PATCH",
+                body: JSON.stringify({ columns }),
+              },
+            })
+          }
         />
       )}
       {cardEditor && (
@@ -653,7 +697,15 @@ export function BoardsPage({
           loadError={accessError}
           close={() => setAccessOpen(false)}
           updateAccess={async (targetUser) => {
-            await updateBoardAccess(board.id, targetUser);
+            await boardMutation.mutateAsync({
+              path: `/boards/${board.id}/access${targetUser.hasAccess ? `/${targetUser.id}` : ""}`,
+              init: {
+                method: targetUser.hasAccess ? "DELETE" : "POST",
+                ...(targetUser.hasAccess
+                  ? {}
+                  : { body: JSON.stringify({ userId: targetUser.id }) }),
+              },
+            });
             setAccessUsers(await getBoardAccess(board.id));
           }}
         />

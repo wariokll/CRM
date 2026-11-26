@@ -5,7 +5,11 @@ import { Button } from "../../components/ui";
 import { priorityLabel } from "../../features/requests/requestDisplay";
 import { TemplateEditDialog } from "./TemplateEditDialog";
 import type { Component, Department, RequestType } from "../../types";
-import { createComponent, getComponents, saveRequestType } from "./queries";
+import {
+  getComponents,
+  useCreateComponentMutation,
+  useSaveRequestTypeMutation,
+} from "./queries";
 
 function errorText(reason: unknown) {
   return reason instanceof ApiError || reason instanceof Error
@@ -25,6 +29,8 @@ export function TemplatesPage({
   const [editing, setEditing] = useState<RequestType | "new" | null>(null);
   const [components, setComponents] = useState<Component[]>([]);
   const [error, setError] = useState("");
+  const saveRequestTypeMutation = useSaveRequestTypeMutation();
+  const createComponentMutation = useCreateComponentMutation();
   const loadComponents = useCallback(
     () =>
       getComponents()
@@ -49,9 +55,9 @@ export function TemplatesPage({
       const templateFields = values.templateFields
         ? JSON.parse(values.templateFields)
         : [];
-      await saveRequestType(
-        editing === "new" ? null : (editing as RequestType).id,
-        {
+      await saveRequestTypeMutation.mutateAsync({
+        id: editing === "new" ? null : (editing as RequestType).id,
+        body: {
           ...values,
           departmentId: Number(values.departmentId),
           isActive: values.isActive === "on",
@@ -62,7 +68,7 @@ export function TemplatesPage({
           availableOnTelegram: values.availableOnTelegram === "on",
           templateFields,
         },
-      );
+      });
       setEditing(null);
       reload();
     } catch (reason) {
@@ -79,7 +85,7 @@ export function TemplatesPage({
     const name = String(new FormData(form).get("componentName") ?? "").trim();
     if (!name) return;
     try {
-      const component = await createComponent(name);
+      const component = await createComponentMutation.mutateAsync(name);
       form.reset();
       setComponents((items) =>
         [...items, component].sort((left, right) =>

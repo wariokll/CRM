@@ -1,4 +1,5 @@
 import { api } from "../../api";
+import { useMutation } from "@tanstack/react-query";
 import type { Component, StaffMember } from "../../types";
 
 export function getRequestAssignees(departmentId?: number) {
@@ -35,4 +36,11 @@ export function addRequestComment(
 
 export function takeRequest(id: number) {
   return api(`/requests/${id}/assignees/self`, { method: "POST" });
+}
+
+export function useRequestMutation() {
+  return useMutation({
+    mutationFn: ({ path, init }: { path: string; init?: RequestInit }) =>
+      api(path, init),
+  });
 }

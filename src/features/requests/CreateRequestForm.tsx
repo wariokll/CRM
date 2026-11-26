@@ -12,9 +12,9 @@ import type {
   User,
 } from "../../types";
 import {
-  createRequest,
   getRequestAssignees,
   getRequestComponents,
+  useRequestMutation,
 } from "./queries";
 
 function errorText(reason: unknown) {
@@ -59,6 +59,7 @@ export function CreateRequestForm({
     [recurrenceIntervalDays, setRecurrenceIntervalDays] = useState(""),
     [error, setError] = useState("");
   const selectedType = types.find((t) => t.id === typeId);
+  const requestMutation = useRequestMutation();
   const type = selectedType?.requiresComponents
     ? {
         ...selectedType,
@@ -117,20 +118,29 @@ export function CreateRequestForm({
       else if (values[field.key]) templateData[field.key] = values[field.key];
     });
     try {
-      await createRequest({
-        typeId,
-        organizationId: type?.requiresOrganization ? organizationId : undefined,
-        storeId: type?.requiresStore ? Number(values.storeId) : undefined,
-        urgency,
-        scheduledAt: urgency === "SCHEDULED" ? values.scheduledAt : undefined,
-        recurrenceIntervalDays:
-          urgency === "SCHEDULED" && recurrenceIntervalDays
-            ? Number(recurrenceIntervalDays)
-            : undefined,
-        assigneeId: assigneeId ? Number(assigneeId) : undefined,
-        components: selectedComponents,
-        description: values.description,
-        templateData,
+      await requestMutation.mutateAsync({
+        path: "/requests",
+        init: {
+          method: "POST",
+          body: JSON.stringify({
+            typeId,
+            organizationId: type?.requiresOrganization
+              ? organizationId
+              : undefined,
+            storeId: type?.requiresStore ? Number(values.storeId) : undefined,
+            urgency,
+            scheduledAt:
+              urgency === "SCHEDULED" ? values.scheduledAt : undefined,
+            recurrenceIntervalDays:
+              urgency === "SCHEDULED" && recurrenceIntervalDays
+                ? Number(recurrenceIntervalDays)
+                : undefined,
+            assigneeId: assigneeId ? Number(assigneeId) : undefined,
+            components: selectedComponents,
+            description: values.description,
+            templateData,
+          }),
+        },
       });
       reload();
       close();

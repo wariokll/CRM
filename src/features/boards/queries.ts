@@ -1,4 +1,5 @@
 import { api } from "../../api";
+import { useMutation } from "@tanstack/react-query";
 import type {
   ArchivedBoardCard,
   BoardAccessUser,
@@ -53,4 +54,19 @@ export function restoreBoardCard(
     method: "POST",
     body: JSON.stringify({ version, targetColumnId }),
   });
+}
+
+export function useBoardMutation() {
+  return useMutation({
+    mutationFn: ({ path, init }: { path: string; init?: RequestInit }) =>
+      boardRequest(path, init),
+  });
+}
+
+export function useBoardDetailsMutation() {
+  return useMutation<BoardDetails, Error, { path: string; init?: RequestInit }>(
+    {
+      mutationFn: ({ path, init }) => boardRequest<BoardDetails>(path, init),
+    },
+  );
 }

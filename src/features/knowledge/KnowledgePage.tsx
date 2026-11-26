@@ -13,7 +13,8 @@ import { useSearchParams } from "react-router-dom";
 import {
   downloadKnowledgeFile,
   knowledgeRequest,
-  uploadKnowledgeAttachments,
+  useKnowledgeAttachmentMutation,
+  useKnowledgeMutation,
 } from "./queries";
 import { queryKeys } from "../../shared/queryKeys";
 import { KnowledgeImportDialog } from "./KnowledgeImportDialog";
@@ -99,6 +100,8 @@ export function KnowledgePage() {
   const importFolderRef = useRef<HTMLInputElement>(null);
 
   const queryClient = useQueryClient();
+  const knowledgeMutation = useKnowledgeMutation();
+  const attachmentMutation = useKnowledgeAttachmentMutation();
   const requestedArticleRef = useRef<number | null>(null);
   const setActiveSectionId = useCallback(
     (id: number | null) => {
@@ -290,7 +293,7 @@ export function KnowledgePage() {
   };
 
   const uploadAttachments = async (articleId: number, files: File[]) => {
-    await uploadKnowledgeAttachments(articleId, files);
+    await attachmentMutation.mutateAsync({ articleId, files });
     await openArticle(articleId);
   };
 
@@ -408,9 +411,12 @@ export function KnowledgePage() {
             );
         });
         if (finalBody !== body.body.replace(/\[\[image:pending:\d+\]\]/g, ""))
-          await knowledgeRequest(`/knowledge/articles/${saved.id}`, {
-            method: "PATCH",
-            body: JSON.stringify({ body: finalBody }),
+          await knowledgeMutation.mutateAsync({
+            path: `/knowledge/articles/${saved.id}`,
+            init: {
+              method: "PATCH",
+              body: JSON.stringify({ body: finalBody }),
+            },
           });
       }
       setArticleDialog(null);

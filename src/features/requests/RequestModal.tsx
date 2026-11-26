@@ -14,13 +14,7 @@ import type {
   StaffMember,
   User,
 } from "../../types";
-import {
-  addRequestComment,
-  deleteRequest,
-  getRequestAssignees,
-  takeRequest,
-  updateRequest,
-} from "./queries";
+import { getRequestAssignees, useRequestMutation } from "./queries";
 
 function errorText(reason: unknown) {
   return reason instanceof ApiError || reason instanceof Error
@@ -51,6 +45,7 @@ export function RequestModal({
     [error, setError] = useState(""),
     [deleting, setDeleting] = useState(false);
   const staff = user.role !== "CLIENT";
+  const requestMutation = useRequestMutation();
   const canManage = staff && can(user, "MANAGE_REQUESTS");
   useEffect(() => {
     if (staff && can(user, "ASSIGN_MASTERS"))
@@ -60,11 +55,17 @@ export function RequestModal({
   }, [departmentId, staff, user]);
   const save = async (nextStatus = status) => {
     try {
-      await updateRequest(item.id, {
-        status: nextStatus,
-        ...(can(user, "SET_PRIORITY") && { priority }),
-        ...(can(user, "TRANSFER_REQUESTS") && { departmentId }),
-        ...(can(user, "ASSIGN_MASTERS") && { assigneeIds: selected }),
+      await requestMutation.mutateAsync({
+        path: `/requests/${item.id}`,
+        init: {
+          method: "PATCH",
+          body: JSON.stringify({
+            status: nextStatus,
+            ...(can(user, "SET_PRIORITY") && { priority }),
+            ...(can(user, "TRANSFER_REQUESTS") && { departmentId }),
+            ...(can(user, "ASSIGN_MASTERS") && { assigneeIds: selected }),
+          }),
+        },
       });
       reload();
       close();
@@ -75,9 +76,15 @@ export function RequestModal({
   const addComment = async () => {
     if (!comment.trim()) return;
     try {
-      await addRequestComment(item.id, {
-        body: comment,
-        visibility: internal ? "INTERNAL" : "CLIENT",
+      await requestMutation.mutateAsync({
+        path: `/requests/${item.id}/comments`,
+        init: {
+          method: "POST",
+          body: JSON.stringify({
+            body: comment,
+            visibility: internal ? "INTERNAL" : "CLIENT",
+          }),
+        },
       });
       setComment("");
       reload();
@@ -87,7 +94,10 @@ export function RequestModal({
   };
   const take = async () => {
     try {
-      await takeRequest(item.id);
+      await requestMutation.mutateAsync({
+        path: `/requests/${item.id}/assignees/self`,
+        init: { method: "POST" },
+      });
       reload();
     } catch (reason) {
       setError(errorText(reason));
@@ -104,7 +114,10 @@ export function RequestModal({
     try {
       setError("");
       setDeleting(true);
-      await deleteRequest(item.id);
+      await requestMutation.mutateAsync({
+        path: `/requests/${item.id}`,
+        init: { method: "DELETE" },
+      });
       reload();
       close();
     } catch (reason) {
