@@ -8,6 +8,7 @@ import {
 import type { ClientSummaryDTO } from "@crm/shared-types";
 import bcrypt from "bcrypt";
 import { prisma } from "../../db.js";
+import { clientSummaryDtoSchema } from "../../shared/response-schemas.js";
 import type {
   CreateClientInput,
   UpdateClientPasswordInput,
@@ -48,7 +49,7 @@ export async function listClients(search: string) {
   });
   return users.map(
     (user) =>
-      ({
+      clientSummaryDtoSchema.parse({
         ...user,
         stores: user.organizations.flatMap((item) => item.organization.stores),
       }) satisfies ClientSummaryDTO,

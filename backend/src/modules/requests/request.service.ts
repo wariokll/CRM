@@ -16,6 +16,7 @@ import {
   nextRecurringDate,
 } from "../../utils/business-days.js";
 import { prisma } from "../../db.js";
+import { requestAssigneeDtoSchema } from "../../shared/response-schemas.js";
 import {
   getUserAccess,
   hasPermission,
@@ -65,7 +66,9 @@ export async function listRequestAssignees(departmentId?: number) {
     },
     orderBy: { ipName: "asc" },
   });
-  return assignees satisfies RequestAssigneeDTO[];
+  return assignees.map((assignee) =>
+    requestAssigneeDtoSchema.parse(assignee),
+  ) satisfies RequestAssigneeDTO[];
 }
 
 export interface RequestListFilters {

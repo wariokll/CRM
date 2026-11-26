@@ -1,6 +1,7 @@
 import { BoardType, Prisma, Role, UserStatus } from "@prisma/client";
 import type { BoardAccessUserDTO } from "@crm/shared-types";
 import { prisma } from "../../db.js";
+import { boardAccessUserDtoSchema } from "../../shared/response-schemas.js";
 import { AppError } from "../../shared/errors.js";
 import {
   canAccessBoard,
@@ -288,11 +289,13 @@ export async function listBoardAccess(boardId: number, userId: number) {
     },
     orderBy: { ipName: "asc" },
   });
-  return users.map(({ boardAccesses, ...user }) => ({
-    ...user,
-    hasAccess: user.id === board.ownerId || boardAccesses.length > 0,
-    isOwner: user.id === board.ownerId,
-  })) satisfies BoardAccessUserDTO[];
+  return users.map(({ boardAccesses, ...user }) =>
+    boardAccessUserDtoSchema.parse({
+      ...user,
+      hasAccess: user.id === board.ownerId || boardAccesses.length > 0,
+      isOwner: user.id === board.ownerId,
+    }),
+  ) satisfies BoardAccessUserDTO[];
 }
 
 export async function grantBoardAccess(

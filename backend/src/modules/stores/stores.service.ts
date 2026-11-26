@@ -2,6 +2,7 @@ import { PermissionKey, Role, StoreStatus, UserStatus } from "@prisma/client";
 import type { StoreSummaryDTO } from "@crm/shared-types";
 import { config } from "../../config.js";
 import { prisma } from "../../db.js";
+import { storeSummaryDtoSchema } from "../../shared/response-schemas.js";
 import {
   getUserAccess,
   hasPermission,
@@ -124,7 +125,10 @@ export async function listStores(userId: number) {
     include,
     orderBy: { updatedAt: "desc" },
   });
-  return stores.map((store) => present(store) satisfies StoreSummaryDTO);
+  return stores.map(
+    (store) =>
+      storeSummaryDtoSchema.parse(present(store)) satisfies StoreSummaryDTO,
+  );
 }
 
 export async function createStore(userId: number, input: unknown) {
@@ -143,7 +147,7 @@ export async function createStore(userId: number, input: unknown) {
     },
     include,
   });
-  return present(store) satisfies StoreSummaryDTO;
+  return storeSummaryDtoSchema.parse(present(store)) satisfies StoreSummaryDTO;
 }
 
 export async function updateStore(id: number, userId: number, input: unknown) {
@@ -164,7 +168,9 @@ export async function updateStore(id: number, userId: number, input: unknown) {
     },
     include,
   });
-  return present(updated) satisfies StoreSummaryDTO;
+  return storeSummaryDtoSchema.parse(
+    present(updated),
+  ) satisfies StoreSummaryDTO;
 }
 
 export async function deleteStore(id: number, userId: number) {

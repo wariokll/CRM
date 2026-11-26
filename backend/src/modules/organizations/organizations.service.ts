@@ -4,6 +4,7 @@ import type {
   OrganizationMemberDTO,
 } from "@crm/shared-types";
 import { prisma } from "../../db.js";
+import { organizationRelationsDtoSchema } from "../../shared/response-schemas.js";
 import {
   getUserAccess,
   hasPermission,
@@ -65,14 +66,15 @@ export async function listOrganizations(userId: number) {
     orderBy: { legalName: "asc" },
   });
   return organizations.map((organization) => {
-    const relations = {
+    const relations = organizationRelationsDtoSchema.parse({
       contacts: organization.contacts,
       members: organization.members,
-    } satisfies {
+    });
+    const checkedRelations = relations satisfies {
       contacts: OrganizationContactDTO[];
       members: OrganizationMemberDTO[];
     };
-    return { ...organization, ...relations };
+    return { ...organization, ...checkedRelations };
   });
 }
 
