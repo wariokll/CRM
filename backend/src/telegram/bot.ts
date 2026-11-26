@@ -3,10 +3,11 @@ import { config } from "../config.js";
 import { prisma } from "../db.js";
 import {
   botApi,
-  integration,
-  processUpdate,
+  createBotHandlers,
   type TelegramUpdate,
 } from "./bot-handlers.js";
+
+const { integration, processUpdate } = createBotHandlers(prisma);
 
 let stopped = false;
 

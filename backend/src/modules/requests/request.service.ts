@@ -29,10 +29,7 @@ import {
   updateRequestSchema,
   validateRequiredTemplateFields,
 } from "./request.contracts.js";
-import {
-  notifyRequestAssignees,
-  notifyRequestClient,
-} from "../../utils/telegram-notifications.js";
+import { createTelegramNotifications } from "../../utils/telegram-notifications.js";
 
 export class RequestServiceError extends Error {
   constructor(
@@ -44,8 +41,12 @@ export class RequestServiceError extends Error {
 }
 
 type RequestCreationBody = z.infer<typeof createRequestSchema>;
+type RequestUpdateInput = z.infer<typeof updateRequestSchema>;
 type ActiveRequestType = Prisma.RequestTypeGetPayload<{
   include: { department: true };
+}>;
+type RequestUpdateRow = Prisma.RequestGetPayload<{
+  include: { assignees: true; type: { select: { name: true } } };
 }>;
 
 export interface RequestListFilters {
@@ -59,6 +60,8 @@ export interface RequestListFilters {
 }
 
 export function createRequestService(prisma: PrismaClient) {
+  const { notifyRequestAssignees, notifyRequestClient } =
+    createTelegramNotifications(prisma);
   type RequestCreationPersistArgs = {
     body: RequestCreationBody;
     type: ActiveRequestType;
@@ -659,16 +662,7 @@ export function createRequestService(prisma: PrismaClient) {
     return request;
   }
 
-  async function updateRequest(userId: number, id: number, input: unknown) {
-    const access = await getUserAccess(userId, prisma);
-    if (!access || access.role === Role.CLIENT)
-      throw new RequestServiceError(403, "Недостаточно прав");
-    const row = await prisma.request.findFirst({
-      where: { id, AND: [requestVisibilityWhere(access)] },
-      include: { assignees: true, type: { select: { name: true } } },
-    });
-    if (!row) throw new RequestServiceError(404, "Заявка не найдена");
-    const update = updateRequestSchema.parse(input);
+  function assertCanEditRequest(access: UserAccess, row: RequestUpdateRow) {
     const managesCurrent = canManageRequest(access, row.departmentId);
     const isAssignedMaster =
       access.role === Role.MASTER &&
@@ -678,18 +672,34 @@ export function createRequestService(prisma: PrismaClient) {
         403,
         "Сначала возьмите заявку в работу: сейчас доступен просмотр и комментарии",
       );
-    if (update.status) {
-      if (
-        update.status === RequestStatus.CANCELLED &&
-        !hasPermission(access, PermissionKey.CANCEL_REQUESTS)
-      )
-        throw new RequestServiceError(
-          403,
-          "Отменить заявку может руководитель или начальник отдела",
-        );
-      if (!canChangeRequestStatus(row.status, update.status))
-        throw new RequestServiceError(400, "Недопустимый переход статуса");
-    }
+    return managesCurrent;
+  }
+
+  function validateStatusUpdate(
+    access: UserAccess,
+    status: RequestStatus | undefined,
+    currentStatus: RequestStatus,
+  ) {
+    if (!status) return;
+    if (
+      status === RequestStatus.CANCELLED &&
+      !hasPermission(access, PermissionKey.CANCEL_REQUESTS)
+    )
+      throw new RequestServiceError(
+        403,
+        "Отменить заявку может руководитель или начальник отдела",
+      );
+    if (!canChangeRequestStatus(currentStatus, status))
+      throw new RequestServiceError(400, "Недопустимый переход статуса");
+  }
+
+  function validateRequestUpdate(
+    access: UserAccess,
+    managesCurrent: boolean,
+    row: RequestUpdateRow,
+    update: RequestUpdateInput,
+  ) {
+    validateStatusUpdate(access, update.status, row.status);
     if (
       update.priority &&
       (!managesCurrent || !hasPermission(access, PermissionKey.SET_PRIORITY))
@@ -716,140 +726,136 @@ export function createRequestService(prisma: PrismaClient) {
         403,
         "Недостаточно прав для назначения мастеров",
       );
+  }
 
-    await prisma.$transaction(async (transaction) => {
-      const nextDepartmentId = update.departmentId ?? row.departmentId;
-      if (update.departmentId && update.departmentId !== row.departmentId) {
-        await transaction.requestDepartmentHistory.create({
-          data: {
-            requestId: row.id,
-            fromDepartmentId: row.departmentId,
-            toDepartmentId: update.departmentId,
-            transferredByUserId: access.userId,
+  async function updateRequestAssignees(
+    transaction: Prisma.TransactionClient,
+    access: UserAccess,
+    row: RequestUpdateRow,
+    update: RequestUpdateInput,
+    departmentId: number,
+  ) {
+    if (!update.assigneeIds) return;
+    const ids = [...new Set(update.assigneeIds)];
+    const eligible = await transaction.user.findMany({
+      where: {
+        id: { in: ids },
+        status: "ACTIVE",
+        OR: [
+          { role: Role.DIRECTOR },
+          {
+            role: { in: [Role.MASTER, Role.DEPARTMENT_HEAD] },
+            departmentMemberships: { some: { departmentId } },
           },
-        });
-        await transaction.requestAssignee.deleteMany({
-          where: { requestId: row.id },
-        });
-      }
-      if (update.assigneeIds) {
-        const ids = [...new Set(update.assigneeIds)];
-        const eligible = await transaction.user.findMany({
-          where: {
-            id: { in: ids },
-            status: "ACTIVE",
-            OR: [
-              { role: Role.DIRECTOR },
-              {
-                role: { in: [Role.MASTER, Role.DEPARTMENT_HEAD] },
-                departmentMemberships: {
-                  some: { departmentId: nextDepartmentId },
-                },
-              },
-            ],
-          },
-          select: { id: true },
-        });
-        if (eligible.length !== ids.length)
-          throw new Error(
-            "Выбранный сотрудник не состоит в отделе заявки или недоступен",
-          );
-        await transaction.requestAssignee.deleteMany({
-          where: { requestId: row.id },
-        });
-        if (ids.length)
-          await transaction.requestAssignee.createMany({
-            data: ids.map((assignedUserId) => ({
-              requestId: row.id,
-              userId: assignedUserId,
-              assignedByUserId: access.userId,
-            })),
-          });
-      }
-      await transaction.request.update({
-        where: { id: row.id },
+        ],
+      },
+      select: { id: true },
+    });
+    if (eligible.length !== ids.length)
+      throw new Error(
+        "Выбранный сотрудник не состоит в отделе заявки или недоступен",
+      );
+    await transaction.requestAssignee.deleteMany({
+      where: { requestId: row.id },
+    });
+    if (ids.length)
+      await transaction.requestAssignee.createMany({
+        data: ids.map((assignedUserId) => ({
+          requestId: row.id,
+          userId: assignedUserId,
+          assignedByUserId: access.userId,
+        })),
+      });
+  }
+
+  async function createUpdateActivity(
+    transaction: Prisma.TransactionClient,
+    row: RequestUpdateRow,
+    access: UserAccess,
+    kind: string,
+    message: string,
+  ) {
+    await transaction.requestActivity.create({
+      data: { requestId: row.id, authorUserId: access.userId, kind, message },
+    });
+  }
+
+  async function createRequestUpdateActivities(
+    transaction: Prisma.TransactionClient,
+    access: UserAccess,
+    row: RequestUpdateRow,
+    update: RequestUpdateInput,
+  ) {
+    const statusLabels: Record<RequestStatus, string> = {
+      NEW: "Новая",
+      ACCEPTED: "Принята",
+      IN_PROGRESS: "В работе",
+      DONE: "Выполнена",
+      CANCELLED: "Отменена",
+    };
+    const priorityLabels: Record<Priority, string> = {
+      LOW: "низкий",
+      NORMAL: "обычный",
+      HIGH: "высокий",
+      CRITICAL: "критический",
+    };
+    if (update.status && update.status !== row.status)
+      await createUpdateActivity(
+        transaction,
+        row,
+        access,
+        "STATUS_CHANGED",
+        `Статус изменён: «${statusLabels[row.status]}» → «${statusLabels[update.status]}»`,
+      );
+    if (update.priority && update.priority !== row.priority)
+      await createUpdateActivity(
+        transaction,
+        row,
+        access,
+        "PRIORITY_CHANGED",
+        `Приоритет изменён: «${priorityLabels[row.priority]}» → «${priorityLabels[update.priority]}»`,
+      );
+    if (update.departmentId && update.departmentId !== row.departmentId)
+      await createUpdateActivity(
+        transaction,
+        row,
+        access,
+        "DEPARTMENT_CHANGED",
+        "Заявка передана в другой отдел",
+      );
+    if (update.assigneeIds)
+      await createUpdateActivity(
+        transaction,
+        row,
+        access,
+        "ASSIGNEES_CHANGED",
+        update.assigneeIds.length
+          ? "Исполнители обновлены"
+          : "Исполнители сняты с заявки",
+      );
+    if (update.adminComment?.trim())
+      await transaction.requestComment.create({
         data: {
-          ...(update.status && { status: update.status }),
-          ...(update.priority && { priority: update.priority }),
-          ...(update.departmentId && { departmentId: update.departmentId }),
-          ...(update.adminComment !== undefined && {
-            adminComment: update.adminComment,
-          }),
-          ...((update.status === RequestStatus.DONE ||
-            update.status === RequestStatus.CANCELLED) && {
-            closedAt: new Date(),
-          }),
+          requestId: row.id,
+          authorUserId: access.userId,
+          visibility: CommentVisibility.CLIENT,
+          body: update.adminComment.trim(),
         },
       });
-      const statusLabels: Record<RequestStatus, string> = {
-        NEW: "Новая",
-        ACCEPTED: "Принята",
-        IN_PROGRESS: "В работе",
-        DONE: "Выполнена",
-        CANCELLED: "Отменена",
-      };
-      const priorityLabels: Record<Priority, string> = {
-        LOW: "низкий",
-        NORMAL: "обычный",
-        HIGH: "высокий",
-        CRITICAL: "критический",
-      };
-      if (update.status && update.status !== row.status)
-        await transaction.requestActivity.create({
-          data: {
-            requestId: row.id,
-            authorUserId: access.userId,
-            kind: "STATUS_CHANGED",
-            message: `Статус изменён: «${statusLabels[row.status]}» → «${statusLabels[update.status]}»`,
-          },
-        });
-      if (update.priority && update.priority !== row.priority)
-        await transaction.requestActivity.create({
-          data: {
-            requestId: row.id,
-            authorUserId: access.userId,
-            kind: "PRIORITY_CHANGED",
-            message: `Приоритет изменён: «${priorityLabels[row.priority]}» → «${priorityLabels[update.priority]}»`,
-          },
-        });
-      if (update.departmentId && update.departmentId !== row.departmentId)
-        await transaction.requestActivity.create({
-          data: {
-            requestId: row.id,
-            authorUserId: access.userId,
-            kind: "DEPARTMENT_CHANGED",
-            message: "Заявка передана в другой отдел",
-          },
-        });
-      if (update.assigneeIds)
-        await transaction.requestActivity.create({
-          data: {
-            requestId: row.id,
-            authorUserId: access.userId,
-            kind: "ASSIGNEES_CHANGED",
-            message: update.assigneeIds.length
-              ? "Исполнители обновлены"
-              : "Исполнители сняты с заявки",
-          },
-        });
-      if (update.adminComment?.trim())
-        await transaction.requestComment.create({
-          data: {
-            requestId: row.id,
-            authorUserId: access.userId,
-            visibility: CommentVisibility.CLIENT,
-            body: update.adminComment.trim(),
-          },
-        });
-    });
+  }
+
+  function notifyRequestUpdate(
+    row: RequestUpdateRow,
+    update: RequestUpdateInput,
+  ) {
+    const labels: Record<RequestStatus, string> = {
+      NEW: "Новая",
+      ACCEPTED: "Принята",
+      IN_PROGRESS: "В работе",
+      DONE: "Выполнена",
+      CANCELLED: "Отменена",
+    };
     if (update.status && update.status !== row.status) {
-      const labels: Record<RequestStatus, string> = {
-        NEW: "Новая",
-        ACCEPTED: "Принята",
-        IN_PROGRESS: "В работе",
-        DONE: "Выполнена",
-        CANCELLED: "Отменена",
-      };
       void notifyRequestClient(
         row.id,
         `Заявка #${row.id}: статус изменён на «${labels[update.status]}».`,
@@ -869,6 +875,60 @@ export function createRequestService(prisma: PrismaClient) {
         row.id,
         `Вам назначена заявка «${row.type.name}». Откройте БАЗИС CRM для деталей.`,
       );
+  }
+
+  async function updateRequest(userId: number, id: number, input: unknown) {
+    const access = await getUserAccess(userId, prisma);
+    if (!access || access.role === Role.CLIENT)
+      throw new RequestServiceError(403, "Недостаточно прав");
+    const row = await prisma.request.findFirst({
+      where: { id, AND: [requestVisibilityWhere(access)] },
+      include: { assignees: true, type: { select: { name: true } } },
+    });
+    if (!row) throw new RequestServiceError(404, "Заявка не найдена");
+    const update = updateRequestSchema.parse(input);
+    const managesCurrent = assertCanEditRequest(access, row);
+    validateRequestUpdate(access, managesCurrent, row, update);
+    await prisma.$transaction(async (transaction) => {
+      const departmentId = update.departmentId ?? row.departmentId;
+      if (update.departmentId && update.departmentId !== row.departmentId) {
+        await transaction.requestDepartmentHistory.create({
+          data: {
+            requestId: row.id,
+            fromDepartmentId: row.departmentId,
+            toDepartmentId: update.departmentId,
+            transferredByUserId: access.userId,
+          },
+        });
+        await transaction.requestAssignee.deleteMany({
+          where: { requestId: row.id },
+        });
+      }
+      await updateRequestAssignees(
+        transaction,
+        access,
+        row,
+        update,
+        departmentId,
+      );
+      await transaction.request.update({
+        where: { id: row.id },
+        data: {
+          ...(update.status && { status: update.status }),
+          ...(update.priority && { priority: update.priority }),
+          ...(update.departmentId && { departmentId: update.departmentId }),
+          ...(update.adminComment !== undefined && {
+            adminComment: update.adminComment,
+          }),
+          ...((update.status === RequestStatus.DONE ||
+            update.status === RequestStatus.CANCELLED) && {
+            closedAt: new Date(),
+          }),
+        },
+      });
+      await createRequestUpdateActivities(transaction, access, row, update);
+    });
+    notifyRequestUpdate(row, update);
     return prisma.request.findUniqueOrThrow({
       where: { id: row.id },
       include: requestInclude,

@@ -1,8 +1,12 @@
 import { createApp } from "./app.js";
 import { config } from "./config.js";
 import { prisma } from "./db.js";
-import { sendScheduledRequestReminders } from "./utils/scheduled-reminders.js";
-import { generateRecurringRequests } from "./utils/recurring-requests.js";
+import { createScheduledRequestReminders } from "./utils/scheduled-reminders.js";
+import { createRecurringRequestGenerator } from "./utils/recurring-requests.js";
+
+const { sendScheduledRequestReminders } =
+  createScheduledRequestReminders(prisma);
+const { generateRecurringRequests } = createRecurringRequestGenerator(prisma);
 
 const app = createApp();
 const server = app.listen(config.port, () =>

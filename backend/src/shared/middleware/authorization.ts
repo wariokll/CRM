@@ -1,7 +1,6 @@
 import { PermissionKey, Role, UserStatus } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 import type { NextFunction, Request, Response } from "express";
-import { prisma } from "../../db.js";
 
 const allPermissions = Object.values(PermissionKey);
 
@@ -42,7 +41,7 @@ export interface UserAccess {
 
 export async function getUserAccess(
   userId: number,
-  database: PrismaClient = prisma,
+  database: PrismaClient,
 ): Promise<UserAccess | null> {
   const user = await database.user.findUnique({
     where: { id: userId },
@@ -83,7 +82,7 @@ export function hasPermission(
 
 export function requirePermission(
   permission: PermissionKey,
-  database: PrismaClient = prisma,
+  database: PrismaClient,
 ) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.auth)
