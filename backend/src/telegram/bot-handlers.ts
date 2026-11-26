@@ -1,37 +1,27 @@
-import {
-  Priority,
-  RequestSource,
-  Role,
-  TelegramIntegrationKind,
-  TelegramIntegrationStatus,
-  Urgency,
-  UserStatus,
-  type Prisma,
-} from "@prisma/client";
 import { config } from "../config.js";
-import { createBotTargetResolver } from "./bot-targets.js";
+import { createBotHandlerSupport } from "./bot-handler-support.js";
+import { createBotEmployeeHandlers } from "./bot-employee-handlers.js";
+import { createBotRequestSelectionHandlers } from "./bot-request-selections.js";
 import type { PrismaClient } from "@prisma/client";
 import {
-  fieldPrompt,
   parseFieldValue,
-  templateFields,
   type TelegramTemplateField,
 } from "../modules/telegram/template-fields.js";
 
-type TelegramUser = {
+export type TelegramUser = {
   id: number;
   first_name: string;
   last_name?: string;
   username?: string;
 };
-type TelegramChat = {
+export type TelegramChat = {
   id: number;
   title?: string;
   username?: string;
   first_name?: string;
   last_name?: string;
 };
-type TelegramMessage = {
+export type TelegramMessage = {
   message_id: number;
   chat: TelegramChat;
   from?: TelegramUser;
@@ -51,7 +41,7 @@ export type TelegramUpdate = {
 };
 type BotResponse<T> = { ok: boolean; result?: T; description?: string };
 
-type Session = {
+export type Session = {
   typeId: number;
   organizationId?: number;
   storeId?: number;
@@ -63,7 +53,7 @@ type Session = {
 };
 const sessions = new Map<string, Session>();
 
-function chatTitle(chat: TelegramChat, from?: TelegramUser) {
+export function chatTitle(chat: TelegramChat, from?: TelegramUser) {
   return (
     chat.title ??
     ([from?.first_name ?? chat.first_name, from?.last_name ?? chat.last_name]
@@ -97,313 +87,21 @@ export async function botApi<T>(
 }
 
 export function createBotHandlers(prisma: PrismaClient) {
-  async function integration() {
-    return prisma.telegramIntegration.upsert({
-      where: { kind: TelegramIntegrationKind.BOT },
-      create: {
-        kind: TelegramIntegrationKind.BOT,
-        status: TelegramIntegrationStatus.CONNECTING,
-        displayName: `@${config.telegramBotUsername}`,
-      },
-      update: {
-        status: TelegramIntegrationStatus.CONNECTING,
-        lastError: null,
-        displayName: `@${config.telegramBotUsername}`,
-      },
-    });
-  }
-
-  async function ensureChat(integrationId: number, message: TelegramMessage) {
-    const externalChatId = String(message.chat.id);
-    const title = chatTitle(message.chat, message.from);
-    const existing = await prisma.telegramChat.findUnique({
-      where: {
-        integrationId_externalChatId: { integrationId, externalChatId },
-      },
-    });
-    if (existing) {
-      return prisma.telegramChat.update({
-        where: { id: existing.id },
-        data: {
-          title,
-          username: message.from?.username ?? message.chat.username,
-          unreadCount: { increment: 1 },
-          lastMessageAt: new Date(message.date * 1000),
-        },
-      });
-    }
-    const contact = await prisma.contact.create({
-      data: { displayName: title },
-    });
-    return prisma.telegramChat.create({
-      data: {
-        integrationId,
-        externalChatId,
-        title,
-        username: message.from?.username ?? message.chat.username,
-        contactId: contact.id,
-        unreadCount: 1,
-        lastMessageAt: new Date(message.date * 1000),
-      },
-    });
-  }
-
-  async function storeIncoming(chatId: number, message: TelegramMessage) {
-    await prisma.telegramMessage.upsert({
-      where: {
-        chatId_externalMessageId: {
-          chatId,
-          externalMessageId: String(message.message_id),
-        },
-      },
-      create: {
-        chatId,
-        externalMessageId: String(message.message_id),
-        direction: "INCOMING",
-        body: message.text,
-        payload: message as unknown as Prisma.InputJsonValue,
-        sentAt: new Date(message.date * 1000),
-      },
-      update: {},
-    });
-  }
-
-  async function reply(
-    chatId: number,
-    externalChatId: string,
-    text: string,
-    replyMarkup?: Record<string, unknown>,
-  ) {
-    const result = await botApi<TelegramMessage>("sendMessage", {
-      chat_id: externalChatId,
-      text,
-      ...(replyMarkup && { reply_markup: replyMarkup }),
-    });
-    await prisma.telegramMessage.upsert({
-      where: {
-        chatId_externalMessageId: {
-          chatId,
-          externalMessageId: String(result.message_id),
-        },
-      },
-      create: {
-        chatId,
-        externalMessageId: String(result.message_id),
-        direction: "OUTGOING",
-        body: text,
-        payload: result as unknown as Prisma.InputJsonValue,
-        sentAt: new Date(result.date * 1000),
-      },
-      update: {},
-    });
-    await prisma.telegramChat.update({
-      where: { id: chatId },
-      data: { lastMessageAt: new Date(result.date * 1000) },
-    });
-  }
-
-  async function requestKeyboard() {
-    const types = await prisma.requestType.findMany({
-      where: { isActive: true, availableOnTelegram: true },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    });
-    return {
-      inline_keyboard: types.map((type) => [
-        { text: type.name, callback_data: `request:${type.id}` },
-      ]),
-    };
-  }
-
-  const { resolveTarget } = createBotTargetResolver(prisma);
-
-  async function prepareTelegramRequest(chatId: number, session: Session) {
-    const chat = await prisma.telegramChat.findUnique({
-      where: { id: chatId },
-      include: { contact: true },
-    });
-    const type = await prisma.requestType.findUnique({
-      where: { id: session.typeId },
-    });
-    const director = await prisma.user.findFirst({
-      where: { role: Role.DIRECTOR, status: "ACTIVE" },
-      select: { id: true },
-    });
-    if (!chat || !type || !director)
-      throw new Error("Не удалось подготовить заявку");
-    return { chat, type, director };
-  }
-
-  async function persistTelegramRequest(
-    session: Session,
-    description: string,
-    context: Awaited<ReturnType<typeof prepareTelegramRequest>>,
-  ) {
-    const { chat, type, director } = context;
-    const organizationId = session.organizationId ?? null,
-      storeId = session.storeId ?? null;
-    return prisma.$transaction(async (transaction) => {
-      const request = await transaction.request.create({
-        data: {
-          storeId,
-          organizationId,
-          createdByUserId: chat.linkedUserId,
-          contactId: chat.contactId,
-          typeId: type.id,
-          departmentId: type.departmentId,
-          urgency: Urgency.URGENT,
-          priority: type.defaultPriority ?? Priority.NORMAL,
-          source: RequestSource.TELEGRAM_BOT,
-          description,
-          templateData: session.templateData as
-            Prisma.InputJsonValue | undefined,
-        },
-      });
-      await transaction.requestDepartmentHistory.create({
-        data: {
-          requestId: request.id,
-          toDepartmentId: type.departmentId,
-          transferredByUserId: director.id,
-        },
-      });
-      await transaction.telegramChat.update({
-        where: { id: chat.id },
-        data: { requestId: request.id, unreadCount: 0 },
-      });
-      return request;
-    });
-  }
-
-  async function createRequest(
-    chatId: number,
-    session: Session,
-    description: string,
-  ) {
-    const context = await prepareTelegramRequest(chatId, session);
-    const { type } = context;
-    if (
-      (type.requiresOrganization && !session.organizationId) ||
-      (type.requiresStore && !session.storeId)
-    )
-      return null;
-    return persistTelegramRequest(session, description, context);
-  }
-
-  async function askNextField(
-    chatId: number,
-    externalChatId: string,
-    session: Session,
-  ) {
-    const field = session.fields?.[session.fieldIndex ?? 0];
-    return reply(
-      chatId,
-      externalChatId,
-      field ? fieldPrompt(field) : "Опишите проблему одним сообщением.",
-    );
-  }
-
-  async function statusText(chatId: number) {
-    const chat = await prisma.telegramChat.findUnique({
-      where: { id: chatId },
-      select: { linkedUserId: true, organizationId: true, contactId: true },
-    });
-    if (!chat) return "Не удалось найти диалог.";
-    const requests = await prisma.request.findMany({
-      where: {
-        OR: [
-          { contactId: chat.contactId },
-          ...(chat.linkedUserId
-            ? [{ createdByUserId: chat.linkedUserId }]
-            : []),
-          ...(chat.organizationId
-            ? [{ organizationId: chat.organizationId }]
-            : []),
-        ],
-      },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      include: { type: true },
-    });
-    if (!requests.length) return "У вас пока нет заявок.";
-    const labels: Record<string, string> = {
-      NEW: "новая",
-      ACCEPTED: "принята",
-      IN_PROGRESS: "в работе",
-      DONE: "выполнена",
-      CANCELLED: "отменена",
-    };
-    return `Последние заявки:\n${requests.map((row) => `#${row.id} · ${row.type.name} · ${labels[row.status]}`).join("\n")}`;
-  }
-
-  async function linkEmployeeChat(chatId: number, code: string) {
-    const link = await prisma.telegramLinkCode.findUnique({
-      where: { code },
-      include: {
-        user: { select: { id: true, ipName: true, role: true, status: true } },
-      },
-    });
-    if (
-      !link ||
-      link.usedAt ||
-      link.expiresAt <= new Date() ||
-      link.user.status !== UserStatus.ACTIVE ||
-      link.user.role === Role.CLIENT
-    )
-      return null;
-    await prisma.$transaction([
-      prisma.telegramChat.update({
-        where: { id: chatId },
-        data: { linkedUserId: link.userId, unreadCount: 0 },
-      }),
-      prisma.telegramLinkCode.update({
-        where: { id: link.id },
-        data: { usedAt: new Date() },
-      }),
-    ]);
-    return link.user;
-  }
-
+  const support = createBotHandlerSupport(prisma, { botApi, chatTitle });
+  const employeeHandlers = createBotEmployeeHandlers(prisma, support.reply);
+  const {
+    resolveTarget,
+    integration,
+    ensureChat,
+    storeIncoming,
+    reply,
+    requestKeyboard,
+    createRequest,
+    askNextField,
+  } = support;
+  const { statusText, handleStaffLink, handleLinkedEmployeeMessage } =
+    employeeHandlers;
   type TelegramChatRecord = Awaited<ReturnType<typeof ensureChat>>;
-
-  async function handleStaffLink(
-    chat: TelegramChatRecord,
-    startArgument: string | undefined,
-  ) {
-    if (!startArgument?.startsWith("staff_")) return false;
-    const employee = await linkEmployeeChat(
-      chat.id,
-      startArgument.slice("staff_".length),
-    );
-    await reply(
-      chat.id,
-      chat.externalChatId,
-      employee
-        ? `Telegram подключён к учётной записи «${employee.ipName}». Теперь вы будете получать рабочие уведомления по заявкам.`
-        : "Ссылка недействительна или устарела. Попросите руководителя сформировать новую ссылку.",
-    );
-    return true;
-  }
-
-  async function handleLinkedEmployeeMessage(chat: TelegramChatRecord) {
-    if (!chat.linkedUserId) return false;
-    const employee = await prisma.user.findUnique({
-      where: { id: chat.linkedUserId },
-      select: { role: true, status: true },
-    });
-    if (
-      !employee ||
-      employee.status !== UserStatus.ACTIVE ||
-      employee.role === Role.CLIENT
-    )
-      return false;
-    await reply(
-      chat.id,
-      chat.externalChatId,
-      "Рабочий Telegram подключён. Здесь будут приходить уведомления о назначенных заявках и напоминаниях.",
-    );
-    return true;
-  }
-
   async function handleTelegramCommand(
     chat: TelegramChatRecord,
     lower: string,
@@ -502,200 +200,16 @@ export function createBotHandlers(prisma: PrismaClient) {
     );
   }
 
-  async function handleStoreSelection(chat: TelegramChatRecord, data: string) {
-    const session = sessions.get(chat.externalChatId),
-      storeId = Number(data.slice("request-store:".length));
-    if (!session?.allowedStoreIds?.includes(storeId))
-      return reply(
-        chat.id,
-        chat.externalChatId,
-        "Выбор точки устарел. Начните создание заявки заново.",
-      );
-    const store = await prisma.store.findFirst({
-      where: { id: storeId, status: "ACTIVE" },
-      select: { id: true, organizationId: true, name: true },
-    });
-    if (!store)
-      return reply(
-        chat.id,
-        chat.externalChatId,
-        "Эта точка больше недоступна. Начните создание заявки заново.",
-      );
-    const next = {
-      ...session,
-      organizationId: store.organizationId,
-      storeId: store.id,
-      allowedStoreIds: undefined,
-    };
-    sessions.set(chat.externalChatId, next);
-    return askNextField(chat.id, chat.externalChatId, next);
-  }
-
-  async function handleOrganizationSelection(
-    chat: TelegramChatRecord,
-    data: string,
-  ) {
-    const session = sessions.get(chat.externalChatId),
-      organizationId = Number(data.slice("request-organization:".length));
-    if (!session?.allowedOrganizationIds?.includes(organizationId))
-      return reply(
-        chat.id,
-        chat.externalChatId,
-        "Выбор организации устарел. Начните создание заявки заново.",
-      );
-    const organization = await prisma.organization.findFirst({
-      where: { id: organizationId, status: "ACTIVE" },
-      select: { id: true, legalName: true },
-    });
-    if (!organization)
-      return reply(
-        chat.id,
-        chat.externalChatId,
-        "Эта организация больше недоступна. Начните создание заявки заново.",
-      );
-    const next = {
-      ...session,
-      organizationId: organization.id,
-      allowedOrganizationIds: undefined,
-    };
-    sessions.set(chat.externalChatId, next);
-    return askNextField(chat.id, chat.externalChatId, next);
-  }
-
-  async function loadTelegramRequestType(typeId: number) {
-    return prisma.requestType.findFirst({
-      where: { id: typeId, isActive: true, availableOnTelegram: true },
-      select: {
-        id: true,
-        name: true,
-        requiresOrganization: true,
-        requiresStore: true,
-        templateFields: true,
-      },
-    });
-  }
-
-  type TelegramRequestType = NonNullable<
-    Awaited<ReturnType<typeof loadTelegramRequestType>>
-  >;
-  type TelegramRequestTarget = Awaited<ReturnType<typeof resolveTarget>>;
-
-  async function renderRequestTarget(
-    chat: TelegramChatRecord,
-    type: TelegramRequestType,
-    target: TelegramRequestTarget,
-  ) {
-    if (target.kind === "missing") return reportMissingRequestTarget(chat);
-    if (target.kind === "stores") return showRequestStores(chat, type, target);
-    if (target.kind === "organizations")
-      return showRequestOrganizations(chat, type, target);
-    return beginTelegramRequest(chat, type, target);
-  }
-
-  async function reportMissingRequestTarget(chat: TelegramChatRecord) {
-    return reply(
-      chat.id,
-      chat.externalChatId,
-      "К этому Telegram-аккаунту не привязана активная организация или точка. Попросите сотрудника ЦТО настроить привязку в CRM.",
-    );
-  }
-
-  async function showRequestStores(
-    chat: TelegramChatRecord,
-    type: TelegramRequestType,
-    target: Extract<TelegramRequestTarget, { kind: "stores" }>,
-  ) {
-    sessions.set(chat.externalChatId, {
-      typeId: type.id,
-      fields: templateFields(type.templateFields),
-      fieldIndex: 0,
-      templateData: {},
-      allowedStoreIds: target.stores.map((store) => store.id),
-    });
-    return reply(
-      chat.id,
-      chat.externalChatId,
-      `Шаблон «${type.name}». Выберите торговую точку:`,
-      {
-        inline_keyboard: target.stores.map((store) => [
-          {
-            text: store.name + " — " + store.address,
-            callback_data: `request-store:${store.id}`,
-          },
-        ]),
-      },
-    );
-  }
-
-  async function showRequestOrganizations(
-    chat: TelegramChatRecord,
-    type: TelegramRequestType,
-    target: Extract<TelegramRequestTarget, { kind: "organizations" }>,
-  ) {
-    sessions.set(chat.externalChatId, {
-      typeId: type.id,
-      fields: templateFields(type.templateFields),
-      fieldIndex: 0,
-      templateData: {},
-      allowedOrganizationIds: target.organizations.map(
-        (organization) => organization.id,
-      ),
-    });
-    return reply(
-      chat.id,
-      chat.externalChatId,
-      `Шаблон «${type.name}». Выберите организацию:`,
-      {
-        inline_keyboard: target.organizations.map((organization) => [
-          {
-            text: organization.legalName,
-            callback_data: `request-organization:${organization.id}`,
-          },
-        ]),
-      },
-    );
-  }
-
-  async function beginTelegramRequest(
-    chat: TelegramChatRecord,
-    type: TelegramRequestType,
-    target: Extract<TelegramRequestTarget, { kind: "ready" }>,
-  ) {
-    const session = {
-      typeId: type.id,
-      organizationId: target.organizationId,
-      storeId: target.storeId,
-      fields: templateFields(type.templateFields),
-      fieldIndex: 0,
-      templateData: {},
-    };
-    sessions.set(chat.externalChatId, session);
-    await reply(
-      chat.id,
-      chat.externalChatId,
-      `Шаблон «${type.name}». ${session.fields?.length ? "Ответьте на дополнительные вопросы." : "Опишите проблему одним сообщением."}`,
-    );
-    if (session.fields?.length)
-      await askNextField(chat.id, chat.externalChatId, session);
-  }
-
-  async function handleRequestSelection(
-    chat: TelegramChatRecord,
-    data: string,
-  ) {
-    if (!data.startsWith("request:")) return;
-    const typeId = Number(data.slice("request:".length));
-    const type = await loadTelegramRequestType(typeId);
-    if (!type)
-      return reply(
-        chat.id,
-        chat.externalChatId,
-        "Этот шаблон больше недоступен. Выберите другой.",
-      );
-    const target = await resolveTarget(chat.id, type);
-    return renderRequestTarget(chat, type, target);
-  }
-
+  const requestSelectionHandlers = createBotRequestSelectionHandlers(
+    prisma,
+    sessions,
+    { resolveTarget, reply, askNextField },
+  );
+  const {
+    handleStoreSelection,
+    handleOrganizationSelection,
+    handleRequestSelection,
+  } = requestSelectionHandlers;
   async function handleCallback(
     integrationId: number,
     callback: TelegramCallback,
