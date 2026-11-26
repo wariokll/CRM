@@ -1,4 +1,4 @@
-import { PermissionKey, Role, StoreStatus, UserStatus } from "@prisma/client";
+import { PermissionKey, Role, StoreStatus } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 import type { StoreSummaryDTO } from "@crm/shared-types";
 import { config } from "../../config.js";
@@ -14,6 +14,7 @@ import {
   storeSchema,
   type StoreAccessInput,
 } from "./stores.contracts.js";
+import { present } from "./stores.mapper.js";
 
 export class StoresServiceError extends Error {
   constructor(
@@ -50,32 +51,6 @@ const include = {
   },
   _count: { select: { requests: true } },
 } as const;
-
-function present<
-  T extends {
-    organization: {
-      legalName: string;
-      members: Array<{
-        user: {
-          id: number;
-          ipName: string;
-          phone: string;
-          status: UserStatus;
-        };
-      }>;
-    };
-  },
->(store: T): T & { user: T["organization"]["members"][number]["user"] } {
-  return {
-    ...store,
-    user: store.organization.members[0]?.user ?? {
-      id: 0,
-      ipName: store.organization.legalName,
-      phone: "",
-      status: "ACTIVE",
-    },
-  };
-}
 
 export function createStoresService(prisma: PrismaClient) {
   async function canUseOrganization(

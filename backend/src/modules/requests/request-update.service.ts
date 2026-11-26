@@ -19,6 +19,7 @@ import { requestInclude } from "./request.include.js";
 import { updateRequestSchema } from "./request.contracts.js";
 import { createTelegramNotifications } from "../../utils/telegram-notifications.js";
 import { RequestServiceError } from "./request.errors.js";
+import { notifyRequestUpdate } from "./request-update-notifications.js";
 
 type RequestUpdateInput = z.infer<typeof updateRequestSchema>;
 type RequestUpdateRow = Prisma.RequestGetPayload<{
@@ -228,39 +229,6 @@ export function createRequestUpdateService(prisma: PrismaClient) {
     await createTransferAndAssigneeActivities(transaction, access, row, update);
   }
 
-  function notifyRequestUpdate(
-    row: RequestUpdateRow,
-    update: RequestUpdateInput,
-  ) {
-    const labels: Record<RequestStatus, string> = {
-      NEW: "Новая",
-      ACCEPTED: "Принята",
-      IN_PROGRESS: "В работе",
-      DONE: "Выполнена",
-      CANCELLED: "Отменена",
-    };
-    if (update.status && update.status !== row.status) {
-      void notifyRequestClient(
-        row.id,
-        `Заявка #${row.id}: статус изменён на «${labels[update.status]}».`,
-      );
-      void notifyRequestAssignees(
-        row.id,
-        `Заявка «${row.type.name}»: статус изменён на «${labels[update.status]}».`,
-      );
-    }
-    if (update.adminComment?.trim())
-      void notifyRequestClient(
-        row.id,
-        `Новый комментарий по заявке #${row.id}:\n${update.adminComment.trim()}`,
-      );
-    if (update.assigneeIds?.length)
-      void notifyRequestAssignees(
-        row.id,
-        `Вам назначена заявка «${row.type.name}». Откройте БАЗИС CRM для деталей.`,
-      );
-  }
-
   async function persistRequestFields(
     transaction: Prisma.TransactionClient,
     row: RequestUpdateRow,
@@ -320,7 +288,10 @@ export function createRequestUpdateService(prisma: PrismaClient) {
       await persistRequestFields(transaction, row, update);
       await createRequestUpdateActivities(transaction, access, row, update);
     });
-    notifyRequestUpdate(row, update);
+    notifyRequestUpdate(row, update, {
+      notifyRequestClient,
+      notifyRequestAssignees,
+    });
     return prisma.request.findUniqueOrThrow({
       where: { id: row.id },
       include: requestInclude,
