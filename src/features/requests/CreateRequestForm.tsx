@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ApiError } from "../../api";
-import { Button, Field, Modal } from "../../components/ui";
-import { RequestComponents } from "./RequestComponents";
+import { Button, Modal } from "../../components/ui";
+import { RequestDynamicField } from "./RequestDynamicField";
 import { RequestCreationFields } from "./RequestCreationFields";
 import type {
   Component,
@@ -150,47 +150,15 @@ export function CreateRequestForm({
   };
   const dynamic = (
     field: NonNullable<RequestType["templateFields"]>[number],
-  ) =>
-    field.key === "__components" ? (
-      <RequestComponents
-        key={field.key}
-        components={components}
-        selected={selectedComponents}
-        onChange={setSelectedComponents}
-      />
-    ) : (
-      <Field
-        label={`${field.label}${field.required ? " *" : ""}`}
-        key={field.key}
-      >
-        {field.type === "TEXTAREA" ? (
-          <textarea name={field.key} required={field.required} />
-        ) : field.type === "SELECT" ? (
-          <select name={field.key} required={field.required}>
-            <option value="">Выберите</option>
-            {field.options?.map((o) => (
-              <option key={o}>{o}</option>
-            ))}
-          </select>
-        ) : field.type === "CHECKBOX" ? (
-          <input name={field.key} type="checkbox" />
-        ) : (
-          <input
-            name={field.key}
-            type={
-              field.type === "DATE"
-                ? "date"
-                : field.type === "NUMBER"
-                  ? "number"
-                  : field.type === "FILE"
-                    ? "file"
-                    : "text"
-            }
-            required={field.required}
-          />
-        )}
-      </Field>
-    );
+  ) => (
+    <RequestDynamicField
+      key={field.key}
+      field={field}
+      components={components}
+      selectedComponents={selectedComponents}
+      setSelectedComponents={setSelectedComponents}
+    />
+  );
   return (
     <Modal title="Новая заявка" close={close}>
       <form onSubmit={submit}>
