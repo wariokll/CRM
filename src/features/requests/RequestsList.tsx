@@ -1,9 +1,8 @@
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search } from "lucide-react";
-import { Button, Empty } from "../../components/ui";
+import { Empty } from "../../components/ui";
 import { RequestCard } from "./RequestCard";
-import { priorityLabel, statusLabel } from "./requestDisplay";
+import { RequestFilters, type RequestSchedule } from "./RequestFilters";
 import type {
   Department,
   Priority,
@@ -45,8 +44,7 @@ export function RequestsList({
   const departmentId = params.get("departmentId") ?? "";
   const typeId = params.get("typeId") ?? "";
   const assigneeId = params.get("assigneeId") ?? "";
-  const schedule = (params.get("schedule") ?? "ALL") as
-    "ALL" | "TODAY" | "WEEK" | "OVERDUE";
+  const schedule = (params.get("schedule") ?? "ALL") as RequestSchedule;
   const myToday = params.get("myToday") === "1";
   const setShowClosed = (value: boolean) =>
     updateParam("closed", value ? "1" : "");
@@ -56,7 +54,7 @@ export function RequestsList({
   const setDepartmentId = (value: string) => updateParam("departmentId", value);
   const setTypeId = (value: string) => updateParam("typeId", value);
   const setAssigneeId = (value: string) => updateParam("assigneeId", value);
-  const setSchedule = (value: "ALL" | "TODAY" | "WEEK" | "OVERDUE") =>
+  const setSchedule = (value: RequestSchedule) =>
     updateParam("schedule", value === "ALL" ? "" : value);
   const setMyToday = (value: boolean) =>
     updateParam("myToday", value ? "1" : "");
@@ -149,100 +147,30 @@ export function RequestsList({
   };
   return (
     <section className="panel table-panel">
-      <div className="toolbar request-filters">
-        <div className="search-box">
-          <Search />
-          <input
-            value={search}
-            placeholder="Поиск по заявкам"
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </div>
-        <select
-          value={status}
-          onChange={(event) =>
-            setStatus(event.target.value as RequestStatus | "")
-          }
-        >
-          <option value="">Все активные статусы</option>
-          {Object.entries(statusLabel)
-            .filter(([value]) => value !== "DONE" && value !== "CANCELLED")
-            .map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-        </select>
-        <select
-          value={priority}
-          onChange={(event) => setPriority(event.target.value as Priority | "")}
-        >
-          <option value="">Все приоритеты</option>
-          {Object.entries(priorityLabel).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={departmentId}
-          onChange={(event) => setDepartmentId(event.target.value)}
-        >
-          <option value="">Все отделы</option>
-          {departments.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={typeId}
-          onChange={(event) => setTypeId(event.target.value)}
-        >
-          <option value="">Все шаблоны</option>
-          {types.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={assigneeId}
-          onChange={(event) => setAssigneeId(event.target.value)}
-        >
-          <option value="">Все исполнители</option>
-          {assignees.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.ipName}
-            </option>
-          ))}
-        </select>
-        <select
-          value={schedule}
-          onChange={(event) =>
-            setSchedule(
-              event.target.value as "ALL" | "TODAY" | "WEEK" | "OVERDUE",
-            )
-          }
-        >
-          <option value="ALL">Любая дата</option>
-          <option value="TODAY">Запланировано сегодня</option>
-          <option value="WEEK">Запланировано на 7 дней</option>
-          <option value="OVERDUE">Просроченные</option>
-        </select>
-        <Button
-          kind={myToday ? "primary" : "secondary"}
-          onClick={() => setMyToday(!myToday)}
-        >
-          Мои на сегодня
-        </Button>
-        <Button kind="ghost" onClick={clear}>
-          Сбросить
-        </Button>
-        <Button kind="secondary" onClick={() => setShowClosed(!showClosed)}>
-          {showClosed ? "Показать активные" : "Показать выполненные"}
-        </Button>
-      </div>
+      <RequestFilters
+        search={search}
+        status={status}
+        priority={priority}
+        departmentId={departmentId}
+        typeId={typeId}
+        assigneeId={assigneeId}
+        schedule={schedule}
+        myToday={myToday}
+        showClosed={showClosed}
+        departments={departments}
+        types={types}
+        assignees={assignees}
+        setSearch={setSearch}
+        setStatus={setStatus}
+        setPriority={setPriority}
+        setDepartmentId={setDepartmentId}
+        setTypeId={setTypeId}
+        setAssigneeId={setAssigneeId}
+        setSchedule={setSchedule}
+        setMyToday={setMyToday}
+        setShowClosed={setShowClosed}
+        clear={clear}
+      />
       <div className="request-filter-summary">Найдено: {rows.length}</div>
       <div className="request-grid">
         {rows.map((item) => (
