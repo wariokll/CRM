@@ -1,0 +1,32 @@
+# Отчёт о продолжении рефакторинга этапа 8
+
+Дата: 2026-11-26. Ветка: `master`. Основа работ: `ТЗ рефакторинг CRM.docx` и `stage-8-nontest-audit.md`.
+
+## Сделанные подэтапы
+
+- `8928ac0` — разделены knowledge import, stores mapper и request update notifications.
+- `c8ef14f` — `BoardsPage` разделён на оболочку, рабочее поле и группу диалогов.
+- `008cbb4` — knowledge page разделён на URL/query hook, editor hook и import hook.
+- `9a25505` — Telegram handler разделён на базовые операции, staff linking и target selection.
+- `d613639` — board actions и drag/drop вынесены из `useBoardsPage`.
+- `e063c8f` — request update policy вынесена из update service.
+- `26724ee` — загрузка knowledge page data и форматирование ошибок вынесены в общий helper.
+
+Каждый подэтап проверялся перед коммитом и был отправлен в `origin/master`.
+
+## Финальная проверка
+
+Последний полный `npm.cmd run verify` завершился с кодом 0:
+
+- UTF-8 check, frontend/backend TypeScript, ESLint, Prettier — успешно;
+- frontend: 10 тестов;
+- backend: 116 тестов;
+- Prisma: 14 миграций, нет ожидающих миграций и schema diff;
+- обе production-сборки и SPA fallback smoke — успешно;
+- Playwright: 12/12.
+
+API контракты и схема БД не менялись. Docker и службы не использовались по прямому указанию пользователя. Проверка/публикация production/LAN окружения не выполнялась.
+
+## Остаточные отклонения
+
+Ограничения и причины зафиксированы в [сверке ТЗ](stage-8-nontest-audit.md). Ключевые из них: развёртывание через Docker/services исключено пользователем; request validation оставлена рядом с операциями ради неизменности API ответов; физическая структура frontend папок не копирует буквально схему из ТЗ; approximate size/function limits остаются ориентиром для локальной декомпозиции. Актуальные размеры приведены в [инвентаризации](inventory.md).
