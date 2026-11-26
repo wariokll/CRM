@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { ApiError } from "../../api";
 import { Button, Empty, Field, Modal } from "../../components/ui";
 import { OrganizationCards } from "./OrganizationCards";
-import { organizationRequest } from "./queries";
+import { useOrganizationMutation } from "./queries";
 import type { Organization, User } from "../../types";
 
 function errorText(reason: unknown) {
@@ -27,16 +27,20 @@ export function OrganizationsPage({
     [error, setError] = useState(""),
     [deletingId, setDeletingId] = useState<number | null>(null),
     [contacts, setContacts] = useState([{ fullName: "", phone: "", note: "" }]);
+  const organizationMutation = useOrganizationMutation();
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(event.currentTarget));
     try {
-      await organizationRequest("/organizations", {
-        method: "POST",
-        body: JSON.stringify({
-          ...values,
-          contacts: contacts.filter((contact) => contact.fullName.trim()),
-        }),
+      await organizationMutation.mutateAsync({
+        path: "/organizations",
+        init: {
+          method: "POST",
+          body: JSON.stringify({
+            ...values,
+            contacts: contacts.filter((contact) => contact.fullName.trim()),
+          }),
+        },
       });
       setAdding(false);
       setContacts([{ fullName: "", phone: "", note: "" }]);
@@ -48,8 +52,9 @@ export function OrganizationsPage({
   const approve = async (id: number) => {
     try {
       setError("");
-      await organizationRequest("/organizations/" + id + "/approve", {
-        method: "POST",
+      await organizationMutation.mutateAsync({
+        path: "/organizations/" + id + "/approve",
+        init: { method: "POST" },
       });
       reload();
     } catch (reason) {
@@ -63,9 +68,9 @@ export function OrganizationsPage({
     if (!rejectionReason?.trim()) return;
     try {
       setError("");
-      await organizationRequest("/organizations/" + id + "/reject", {
-        method: "POST",
-        body: JSON.stringify({ rejectionReason }),
+      await organizationMutation.mutateAsync({
+        path: "/organizations/" + id + "/reject",
+        init: { method: "POST", body: JSON.stringify({ rejectionReason }) },
       });
       reload();
     } catch (reason) {
@@ -83,8 +88,9 @@ export function OrganizationsPage({
     try {
       setError("");
       setDeletingId(organization.id);
-      await organizationRequest(`/organizations/${organization.id}`, {
-        method: "DELETE",
+      await organizationMutation.mutateAsync({
+        path: `/organizations/${organization.id}`,
+        init: { method: "DELETE" },
       });
       reload();
     } catch (reason) {

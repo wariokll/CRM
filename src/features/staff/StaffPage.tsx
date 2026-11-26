@@ -5,7 +5,10 @@ import { Button } from "../../components/ui";
 import { permissionLabels, roleLabel } from "../../auth/permissions";
 import type { Department, PermissionKey, StaffMember } from "../../types";
 import { StaffAccessDialog } from "./StaffAccessDialog";
-import { staffRequest } from "./queries";
+import {
+  useCreateStaffTelegramLinkMutation,
+  useStaffMutation,
+} from "./queries";
 
 function errorText(reason: unknown) {
   return reason instanceof ApiError || reason instanceof Error
@@ -28,6 +31,8 @@ export function StaffPage({
       deepLink: string;
       expiresAt: string;
     } | null>(null);
+  const staffMutation = useStaffMutation();
+  const telegramLinkMutation = useCreateStaffTelegramLinkMutation();
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
@@ -42,28 +47,34 @@ export function StaffPage({
     );
     try {
       if (editing === "new")
-        await staffRequest("/staff", {
-          method: "POST",
-          body: JSON.stringify({
-            name: form.get("name"),
-            email: form.get("email"),
-            phone: form.get("phone"),
-            password: form.get("password"),
-            role,
-            departmentIds: ids,
-          }),
+        await staffMutation.mutateAsync({
+          path: "/staff",
+          init: {
+            method: "POST",
+            body: JSON.stringify({
+              name: form.get("name"),
+              email: form.get("email"),
+              phone: form.get("phone"),
+              password: form.get("password"),
+              role,
+              departmentIds: ids,
+            }),
+          },
         });
       else
-        await staffRequest(`/staff/${editing!.id}/access`, {
-          method: "PUT",
-          body: JSON.stringify({
-            role,
-            departments: ids.map((departmentId) => ({
-              departmentId,
-              membershipRole: role === "DEPARTMENT_HEAD" ? "HEAD" : "MASTER",
-            })),
-            permissions,
-          }),
+        await staffMutation.mutateAsync({
+          path: `/staff/${editing!.id}/access`,
+          init: {
+            method: "PUT",
+            body: JSON.stringify({
+              role,
+              departments: ids.map((departmentId) => ({
+                departmentId,
+                membershipRole: role === "DEPARTMENT_HEAD" ? "HEAD" : "MASTER",
+              })),
+              permissions,
+            }),
+          },
         });
       setEditing(null);
       reload();
@@ -74,12 +85,7 @@ export function StaffPage({
   const createTelegramLink = async (id: number) => {
     try {
       setError("");
-      setTelegramLink(
-        await staffRequest<{ deepLink: string; expiresAt: string }>(
-          `/staff/${id}/telegram-link`,
-          { method: "POST" },
-        ),
-      );
+      setTelegramLink(await telegramLinkMutation.mutateAsync(id));
     } catch (reason) {
       setError(errorText(reason));
     }

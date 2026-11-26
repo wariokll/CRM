@@ -6,7 +6,11 @@ import { Button, Empty } from "../../components/ui";
 import { StoreGroups } from "./StoreGroups";
 import { StoreDetails } from "./StoreDetails";
 import { StoreCreateDialog } from "./StoreCreateDialog";
-import { getStoreAccess, saveStoreAccess, storeRequest } from "./queries";
+import {
+  getStoreAccess,
+  useSaveStoreAccessMutation,
+  useStoreMutation,
+} from "./queries";
 import type { Organization, Store, User } from "../../types";
 
 function errorText(reason: unknown) {
@@ -34,6 +38,8 @@ export function StoresPage({
   const [adding, setAdding] = useState(false),
     [error, setError] = useState(""),
     [deletingId, setDeletingId] = useState<number | null>(null);
+  const storeMutation = useStoreMutation();
+  const saveAccessMutation = useSaveStoreAccessMutation();
   const selectedId = Number(searchParams.get("storeId")) || null;
   const selected = stores.find((store) => store.id === selectedId) ?? null;
   const setSelected = (store: Store | null) => {
@@ -83,12 +89,15 @@ export function StoresPage({
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(event.currentTarget));
-    await storeRequest("/stores", {
-      method: "POST",
-      body: JSON.stringify({
-        ...values,
-        organizationId: Number(values.organizationId),
-      }),
+    await storeMutation.mutateAsync({
+      path: "/stores",
+      init: {
+        method: "POST",
+        body: JSON.stringify({
+          ...values,
+          organizationId: Number(values.organizationId),
+        }),
+      },
     });
     setAdding(false);
     reload();
@@ -96,7 +105,10 @@ export function StoresPage({
   const approve = async (id: number) => {
     try {
       setError("");
-      await storeRequest("/stores/" + id + "/approve", { method: "POST" });
+      await storeMutation.mutateAsync({
+        path: "/stores/" + id + "/approve",
+        init: { method: "POST" },
+      });
       reload();
     } catch (reason) {
       setError(errorText(reason));
@@ -109,9 +121,9 @@ export function StoresPage({
     if (!rejectionReason?.trim()) return;
     try {
       setError("");
-      await storeRequest("/stores/" + id + "/reject", {
-        method: "POST",
-        body: JSON.stringify({ rejectionReason }),
+      await storeMutation.mutateAsync({
+        path: "/stores/" + id + "/reject",
+        init: { method: "POST", body: JSON.stringify({ rejectionReason }) },
       });
       reload();
     } catch (reason) {
@@ -128,7 +140,10 @@ export function StoresPage({
     try {
       setError("");
       setDeletingId(store.id);
-      await storeRequest(`/stores/${store.id}`, { method: "DELETE" });
+      await storeMutation.mutateAsync({
+        path: `/stores/${store.id}`,
+        init: { method: "DELETE" },
+      });
       reload();
     } catch (reason) {
       setError(errorText(reason));
@@ -206,9 +221,9 @@ export function StoresPage({
           user={user}
           close={() => setSelected(null)}
           loadAccess={getStoreAccess}
-          saveAccessRequest={async (storeId, values) => {
-            await saveStoreAccess(storeId, values);
-          }}
+          saveAccessRequest={(storeId, values) =>
+            saveAccessMutation.mutateAsync({ storeId, values })
+          }
         />
       )}
     </>
