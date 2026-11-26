@@ -2,7 +2,7 @@
 
 ## 1. Что сделано
 
-Создан `shared-types/index.d.ts` с DTO для пользователей, доступа к доскам, исполнителей заявок, контактов и участников организаций, сводных торговых точек и клиентов. Общие типы подключены через `paths` в корневом и backend `tsconfig`; npm-зависимости, workspaces и runtime-код не добавлялись.
+Создан `shared-types/index.d.ts` с DTO для пользователей, доступа к доскам, исполнителей заявок, контактов и участников организаций, сводных торговых точек и клиентов. Общие типы подключены через `paths` в корневом и backend `tsconfig`; каталог типов не требует npm-зависимостей или workspaces. Позднее для пяти выбранных групп DTO добавлена backend runtime-валидация в `backend/src/shared/response-schemas.ts`.
 
 Frontend использует общие Role/User status, BoardAccessUser, OrganizationContact и OrganizationMember типы. Backend проверяет выборки и ответы сервисов для board access, request assignees, organization relations, store summaries и client summaries через общие DTO.
 

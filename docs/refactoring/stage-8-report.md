@@ -9,7 +9,7 @@
 - **8.3 — HTTP characterization.** Описаны 97 API endpoints, общие проверки аутентификации и ролей, доменные HTTP-сценарии и реальные ограничения. Материалы: [описание](stage-8-3-api-characterization.md) и [матрица](stage-8-3-endpoint-matrix.md).
 - **8.4 — backend layers.** Request, boards, knowledge, stores, organizations и Telegram bot разделены на более узкие route/controller/service/handler файлы там, где это применимо.
 - **8.5 — frontend data access.** Вызовы из выбранных дочерних компонентов перемещены в feature query-файлы; компоненты получают данные и callbacks. Добавлена страница отказа доступа для существующих ограниченных разделов.
-- **8.6 — TypeScript и контракты.** `noUncheckedIndexedAccess` включён сначала для backend, затем отдельным commit для frontend; потенциально отсутствующие индексированные значения обрабатываются явно. Добавлен `shared-types/` с пятью response DTO, подключённый через tsconfig path alias без workspaces и runtime-зависимостей.
+- **8.6 — TypeScript и контракты.** `noUncheckedIndexedAccess` включён сначала для backend, затем отдельным commit для frontend; потенциально отсутствующие индексированные значения обрабатываются явно. Добавлен `shared-types/` с пятью response DTO, подключённый через tsconfig path alias без workspaces и runtime-зависимостей. Позже сервисы получили backend Zod runtime-валидацию этих групп DTO.
 - **8.7 — документация.** Обновлена текущая инвентаризация, уточнён эксплуатационный статус этапа 7, создан этот сводный отчёт.
 
 ## 2. Результат финального `npm.cmd run verify`
