@@ -1,15 +1,12 @@
 import { useEffect, useState } from "react";
-import { Trash2 } from "lucide-react";
 import { ApiError } from "../../api";
-import { can, roleLabel } from "../../auth/permissions";
-import { Button, Field, Modal } from "../../components/ui";
+import { can } from "../../auth/permissions";
+import { Modal } from "../../components/ui";
 import { RequestSummary } from "./RequestSummary";
 import { RequestHistory } from "./RequestHistory";
-import { priorityLabel, statusLabel, transitions } from "./requestDisplay";
+import { RequestStaffControls } from "./RequestStaffControls";
 import type {
   Department,
-  Priority,
-  RequestStatus,
   ServiceRequest,
   StaffMember,
   User,
@@ -132,122 +129,32 @@ export function RequestModal({
       <RequestHistory item={item} />
       {staff && (
         <>
-          <div className="form-grid">
-            <Field label="Статус">
-              <select
-                disabled={!canManage}
-                value={status}
-                onChange={(e) => setStatus(e.target.value as RequestStatus)}
-              >
-                {[item.status, ...transitions[item.status]].map((value) => (
-                  <option key={value} value={value}>
-                    {statusLabel[value]}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            {can(user, "SET_PRIORITY") && (
-              <Field label="Приоритет">
-                <select
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value as Priority)}
-                >
-                  {Object.entries(priorityLabel).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            )}
-            {can(user, "TRANSFER_REQUESTS") && (
-              <Field label="Передать в отдел">
-                <select
-                  value={departmentId}
-                  onChange={(e) => setDepartmentId(Number(e.target.value))}
-                >
-                  {departments
-                    .filter((d) => d.isActive)
-                    .map((d) => (
-                      <option value={d.id} key={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                </select>
-              </Field>
-            )}
-          </div>
-          {can(user, "ASSIGN_MASTERS") && (
-            <Field label="Исполнители (можно выбрать нескольких)">
-              <select
-                multiple
-                value={selected.map(String)}
-                onChange={(e) =>
-                  setSelected(
-                    Array.from(e.currentTarget.selectedOptions, (option) =>
-                      Number(option.value),
-                    ),
-                  )
-                }
-              >
-                {assignees.map((person) => (
-                  <option value={person.id} key={person.id}>
-                    {person.ipName} · {roleLabel[person.role]}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          )}
-          <div className="form-grid">
-            <Field label="Комментарий">
-              <textarea
-                rows={3}
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Напишите клиенту или оставьте внутреннюю заметку"
-              />
-            </Field>
-            <Field label="Видимость">
-              <select
-                value={internal ? "INTERNAL" : "CLIENT"}
-                onChange={(e) => setInternal(e.target.value === "INTERNAL")}
-              >
-                <option value="CLIENT">Виден клиенту</option>
-                <option value="INTERNAL">Только сотрудникам</option>
-              </select>
-            </Field>
-          </div>
-          {error && <div className="form-error">{error}</div>}
-          <div className="modal-actions">
-            {can(user, "DELETE_REQUESTS") && (
-              <Button
-                kind="danger"
-                onClick={() => void remove()}
-                disabled={deleting}
-              >
-                <Trash2 /> {deleting ? "Удаление…" : "Удалить заявку"}
-              </Button>
-            )}
-            {user.role === "MASTER" &&
-              !item.assignees.some((a) => a.user.id === user.id) && (
-                <Button kind="secondary" onClick={take}>
-                  Взять в работу
-                </Button>
-              )}
-            <Button kind="secondary" onClick={addComment}>
-              Добавить комментарий
-            </Button>
-            {canManage &&
-              item.status !== "DONE" &&
-              item.status !== "CANCELLED" && (
-                <Button kind="secondary" onClick={finish}>
-                  Завершить заявку
-                </Button>
-              )}
-            {canManage && (
-              <Button onClick={() => void save()}>Сохранить изменения</Button>
-            )}
-          </div>
+          <RequestStaffControls
+            item={item}
+            user={user}
+            canManage={canManage}
+            status={status}
+            setStatus={setStatus}
+            priority={priority}
+            setPriority={setPriority}
+            departmentId={departmentId}
+            setDepartmentId={setDepartmentId}
+            departments={departments}
+            assignees={assignees}
+            selected={selected}
+            setSelected={setSelected}
+            comment={comment}
+            setComment={setComment}
+            internal={internal}
+            setInternal={setInternal}
+            error={error}
+            deleting={deleting}
+            remove={() => void remove()}
+            take={() => void take()}
+            addComment={() => void addComment()}
+            finish={() => void finish()}
+            save={() => void save()}
+          />
         </>
       )}
     </Modal>
