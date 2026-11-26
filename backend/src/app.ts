@@ -21,7 +21,7 @@ import { createDepartmentsRouter } from "./modules/departments/departments.route
 import { createComponentsRouter } from "./modules/components/components.routes.js";
 import { createModerationRouter } from "./modules/moderation/moderation.routes.js";
 import { createOrganizationsRouter } from "./modules/organizations/organizations.routes.js";
-import { requestsRouter } from "./modules/requests/request.routes.js";
+import { createRequestsRouter } from "./modules/requests/request.routes.js";
 import { createRequestTypesRouter } from "./modules/request-types/request-types.routes.js";
 import { createRecurringRequestsRouter } from "./modules/recurring-requests/recurring-requests.routes.js";
 import { createStaffRouter } from "./modules/staff/staff.routes.js";
@@ -69,7 +69,7 @@ export function createApp(deps: AppDependencies = { prisma }) {
   app.use("/api/components", createComponentsRouter(deps.prisma));
   app.use("/api/organizations", createOrganizationsRouter(deps.prisma));
   app.use("/api/stores", createStoresRouter(deps.prisma));
-  app.use("/api/requests", requestsRouter);
+  app.use("/api/requests", createRequestsRouter(deps.prisma));
   app.use(
     "/api/recurring-requests",
     createRecurringRequestsRouter(deps.prisma),

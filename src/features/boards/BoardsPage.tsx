@@ -199,7 +199,9 @@ export function BoardsPage({
     setArchiveOpen(false);
     setLayoutEditor(null);
     setCardEditor(null);
-    setNameEditor(null);
+    setNameEditor((current) =>
+      current?.kind === "create-board" ? current : null,
+    );
     setAccessOpen(false);
     if (selectedId) void loadBoard(selectedId);
   }, [loadBoard, selectedId]);

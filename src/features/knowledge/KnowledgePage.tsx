@@ -168,6 +168,7 @@ export function KnowledgePage() {
   });
   const articles = articlesQuery.data ?? [];
   useEffect(() => {
+    if (!sectionsQuery.isSuccess) return;
     if (activeSectionId === null && sectionParam !== "all" && sections.length)
       setActiveSectionId(sections[0]?.id ?? null);
     if (
@@ -175,7 +176,13 @@ export function KnowledgePage() {
       !sections.some((section) => section.id === activeSectionId)
     )
       setActiveSectionId(sections[0]?.id ?? null);
-  }, [activeSectionId, sectionParam, sections, setActiveSectionId]);
+  }, [
+    activeSectionId,
+    sectionParam,
+    sections,
+    sectionsQuery.isSuccess,
+    setActiveSectionId,
+  ]);
   useEffect(() => {
     if (sectionsQuery.error) setError(errorText(sectionsQuery.error));
     if (articlesQuery.error) setError(errorText(articlesQuery.error));
