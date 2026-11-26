@@ -1,21 +1,32 @@
 import type { RequestHandler } from "express";
-import {
-  createDepartment,
-  listDepartments,
-  updateDepartment,
-} from "./departments.service.js";
+import type { createDepartmentsService } from "./departments.service.js";
 import type {
   DepartmentInput,
   DepartmentPatch,
 } from "./departments.schemas.js";
 
-export const listDepartmentsController: RequestHandler = async (_req, res) =>
-  res.json(await listDepartments());
+type DepartmentsService = ReturnType<typeof createDepartmentsService>;
 
-export const createDepartmentController: RequestHandler = async (req, res) =>
-  res.status(201).json(await createDepartment(req.body as DepartmentInput));
+export function createDepartmentsControllers(service: DepartmentsService) {
+  const listDepartmentsController: RequestHandler = async (_req, res) =>
+    res.json(await service.listDepartments());
 
-export const updateDepartmentController: RequestHandler = async (req, res) =>
-  res.json(
-    await updateDepartment(Number(req.params.id), req.body as DepartmentPatch),
-  );
+  const createDepartmentController: RequestHandler = async (req, res) =>
+    res
+      .status(201)
+      .json(await service.createDepartment(req.body as DepartmentInput));
+
+  const updateDepartmentController: RequestHandler = async (req, res) =>
+    res.json(
+      await service.updateDepartment(
+        Number(req.params.id),
+        req.body as DepartmentPatch,
+      ),
+    );
+
+  return {
+    listDepartmentsController,
+    createDepartmentController,
+    updateDepartmentController,
+  };
+}

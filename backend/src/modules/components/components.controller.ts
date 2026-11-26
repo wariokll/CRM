@@ -1,24 +1,32 @@
 import type { RequestHandler } from "express";
-import {
-  createComponent,
-  listComponents,
-  updateComponent,
-} from "./components.service.js";
+import type { createComponentsService } from "./components.service.js";
 import type {
   CreateComponentInput,
   UpdateComponentInput,
 } from "./components.schemas.js";
 
-export const listComponentsController: RequestHandler = async (_req, res) =>
-  res.json(await listComponents());
+type ComponentsService = ReturnType<typeof createComponentsService>;
 
-export const createComponentController: RequestHandler = async (req, res) =>
-  res.status(201).json(await createComponent(req.body as CreateComponentInput));
+export function createComponentsControllers(service: ComponentsService) {
+  const listComponentsController: RequestHandler = async (_req, res) =>
+    res.json(await service.listComponents());
 
-export const updateComponentController: RequestHandler = async (req, res) =>
-  res.json(
-    await updateComponent(
-      Number(req.params.id),
-      req.body as UpdateComponentInput,
-    ),
-  );
+  const createComponentController: RequestHandler = async (req, res) =>
+    res
+      .status(201)
+      .json(await service.createComponent(req.body as CreateComponentInput));
+
+  const updateComponentController: RequestHandler = async (req, res) =>
+    res.json(
+      await service.updateComponent(
+        Number(req.params.id),
+        req.body as UpdateComponentInput,
+      ),
+    );
+
+  return {
+    listComponentsController,
+    createComponentController,
+    updateComponentController,
+  };
+}
