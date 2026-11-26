@@ -14,7 +14,7 @@ import { config } from "./config.js";
 import { prisma } from "./db.js";
 import { errorHandler } from "./shared/middleware/errors.js";
 import { requestLogger } from "./shared/middleware/request-logger.js";
-import { authRouter } from "./modules/auth/auth.routes.js";
+import { createAuthRouter } from "./modules/auth/auth.routes.js";
 import { boardsRouter } from "./modules/boards/board.routes.js";
 import { knowledgeRouter } from "./modules/knowledge/knowledge.routes.js";
 import { createDepartmentsRouter } from "./modules/departments/departments.routes.js";
@@ -62,7 +62,7 @@ export function createApp(deps: AppDependencies = { prisma }) {
       ...(integration?.lastError && { error: integration.lastError }),
     });
   });
-  app.use("/api/auth", authRouter);
+  app.use("/api/auth", createAuthRouter(deps.prisma));
   app.use("/api/knowledge", knowledgeRouter);
   app.use("/api/boards", boardsRouter);
   app.use("/api/departments", createDepartmentsRouter(deps.prisma));
