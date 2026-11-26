@@ -211,6 +211,34 @@ export function createRequestService(prisma: PrismaClient) {
     });
   }
 
+  async function saveRequestComment(
+    access: UserAccess,
+    id: number,
+    body: { body: string; visibility: CommentVisibility },
+  ) {
+    const comment = await prisma.requestComment.create({
+      data: {
+        requestId: id,
+        authorUserId: access.userId,
+        visibility: body.visibility,
+        body: body.body,
+      },
+      include: { author: { select: { id: true, ipName: true, role: true } } },
+    });
+    await prisma.requestActivity.create({
+      data: {
+        requestId: id,
+        authorUserId: access.userId,
+        kind: "COMMENT_ADDED",
+        message:
+          body.visibility === CommentVisibility.INTERNAL
+            ? "Добавлен внутренний комментарий"
+            : "Добавлен комментарий для клиента",
+      },
+    });
+    return comment;
+  }
+
   async function addRequestComment(
     access: UserAccess | null,
     id: number,
@@ -242,26 +270,8 @@ export function createRequestService(prisma: PrismaClient) {
         status: 403 as const,
         body: { message: "Недостаточно прав" },
       };
-    const comment = await prisma.requestComment.create({
-      data: {
-        requestId: id,
-        authorUserId: access.userId,
-        visibility: body.visibility,
-        body: body.body,
-      },
-      include: { author: { select: { id: true, ipName: true, role: true } } },
-    });
-    await prisma.requestActivity.create({
-      data: {
-        requestId: id,
-        authorUserId: access.userId,
-        kind: "COMMENT_ADDED",
-        message:
-          body.visibility === CommentVisibility.INTERNAL
-            ? "Добавлен внутренний комментарий"
-            : "Добавлен комментарий для клиента",
-      },
-    });
+    const comment = await saveRequestComment(access, id, body);
+
     if (
       access.role !== Role.CLIENT &&
       comment.visibility === CommentVisibility.CLIENT
@@ -780,7 +790,7 @@ export function createRequestService(prisma: PrismaClient) {
     });
   }
 
-  async function createRequestUpdateActivities(
+  async function createStatusAndPriorityActivities(
     transaction: Prisma.TransactionClient,
     access: UserAccess,
     row: RequestUpdateRow,
@@ -815,6 +825,14 @@ export function createRequestService(prisma: PrismaClient) {
         "PRIORITY_CHANGED",
         `Приоритет изменён: «${priorityLabels[row.priority]}» → «${priorityLabels[update.priority]}»`,
       );
+  }
+
+  async function createTransferAndAssigneeActivities(
+    transaction: Prisma.TransactionClient,
+    access: UserAccess,
+    row: RequestUpdateRow,
+    update: RequestUpdateInput,
+  ) {
     if (update.departmentId && update.departmentId !== row.departmentId)
       await createUpdateActivity(
         transaction,
@@ -842,6 +860,16 @@ export function createRequestService(prisma: PrismaClient) {
           body: update.adminComment.trim(),
         },
       });
+  }
+
+  async function createRequestUpdateActivities(
+    transaction: Prisma.TransactionClient,
+    access: UserAccess,
+    row: RequestUpdateRow,
+    update: RequestUpdateInput,
+  ) {
+    await createStatusAndPriorityActivities(transaction, access, row, update);
+    await createTransferAndAssigneeActivities(transaction, access, row, update);
   }
 
   function notifyRequestUpdate(
@@ -875,6 +903,28 @@ export function createRequestService(prisma: PrismaClient) {
         row.id,
         `Вам назначена заявка «${row.type.name}». Откройте БАЗИС CRM для деталей.`,
       );
+  }
+
+  async function persistRequestFields(
+    transaction: Prisma.TransactionClient,
+    row: RequestUpdateRow,
+    update: RequestUpdateInput,
+  ) {
+    await transaction.request.update({
+      where: { id: row.id },
+      data: {
+        ...(update.status && { status: update.status }),
+        ...(update.priority && { priority: update.priority }),
+        ...(update.departmentId && { departmentId: update.departmentId }),
+        ...(update.adminComment !== undefined && {
+          adminComment: update.adminComment,
+        }),
+        ...((update.status === RequestStatus.DONE ||
+          update.status === RequestStatus.CANCELLED) && {
+          closedAt: new Date(),
+        }),
+      },
+    });
   }
 
   async function updateRequest(userId: number, id: number, input: unknown) {
@@ -911,21 +961,7 @@ export function createRequestService(prisma: PrismaClient) {
         update,
         departmentId,
       );
-      await transaction.request.update({
-        where: { id: row.id },
-        data: {
-          ...(update.status && { status: update.status }),
-          ...(update.priority && { priority: update.priority }),
-          ...(update.departmentId && { departmentId: update.departmentId }),
-          ...(update.adminComment !== undefined && {
-            adminComment: update.adminComment,
-          }),
-          ...((update.status === RequestStatus.DONE ||
-            update.status === RequestStatus.CANCELLED) && {
-            closedAt: new Date(),
-          }),
-        },
-      });
+      await persistRequestFields(transaction, row, update);
       await createRequestUpdateActivities(transaction, access, row, update);
     });
     notifyRequestUpdate(row, update);

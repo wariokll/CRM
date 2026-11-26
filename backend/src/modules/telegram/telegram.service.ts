@@ -46,12 +46,11 @@ export function createTelegramService(prisma: PrismaClient) {
     return prisma.telegramChat.update({ where: { id: chatId }, data });
   }
 
-  async function replaceTelegramChatLinks(
+  async function validateTelegramChatLinks(
     chatId: number,
-    data: ReplaceTelegramLinksInput,
+    organizationIds: number[],
+    storeIds: number[],
   ) {
-    const organizationIds = [...new Set(data.organizationIds)];
-    const storeIds = [...new Set(data.storeIds)];
     const [chat, organizations, stores] = await Promise.all([
       prisma.telegramChat.findUnique({
         where: { id: chatId },
@@ -72,7 +71,13 @@ export function createTelegramService(prisma: PrismaClient) {
       stores.length !== storeIds.length
     )
       throw new AppError(telegramMessages.linksNotFound, 400);
+  }
 
+  async function persistTelegramChatLinks(
+    chatId: number,
+    organizationIds: number[],
+    storeIds: number[],
+  ) {
     await prisma.$transaction([
       prisma.telegramChatOrganization.deleteMany({
         where: { telegramChatId: chatId },
@@ -105,6 +110,16 @@ export function createTelegramService(prisma: PrismaClient) {
       where: { id: chatId },
       include: telegramChatLinksInclude,
     });
+  }
+
+  async function replaceTelegramChatLinks(
+    chatId: number,
+    data: ReplaceTelegramLinksInput,
+  ) {
+    const organizationIds = [...new Set(data.organizationIds)];
+    const storeIds = [...new Set(data.storeIds)];
+    await validateTelegramChatLinks(chatId, organizationIds, storeIds);
+    return persistTelegramChatLinks(chatId, organizationIds, storeIds);
   }
 
   async function sendTelegramMessage(

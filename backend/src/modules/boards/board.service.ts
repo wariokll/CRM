@@ -550,6 +550,108 @@ export function createBoardService(prisma: PrismaClient) {
       throw new AppError("Данные были изменены другим пользователем", 409);
   }
 
+  type CardMoveState = {
+    current: Prisma.BoardCardGetPayload<Prisma.BoardCardDefaultArgs>;
+    sourceCards: Prisma.BoardCardGetPayload<Prisma.BoardCardDefaultArgs>[];
+    affected: Prisma.BoardCardGetPayload<Prisma.BoardCardDefaultArgs>[];
+    sameColumn: boolean;
+  };
+
+  async function loadCardMoveState(
+    transaction: Prisma.TransactionClient,
+    cardId: number,
+    targetColumnId: number,
+    position: number,
+    version: number,
+  ): Promise<CardMoveState> {
+    const current = await transaction.boardCard.findFirst({
+      where: { id: cardId, deletedAt: null, archivedAt: null },
+    });
+    if (!current) throw new AppError("Карточка не найдена", 404);
+    if (!versionMatches(current.version, version))
+      throw new AppError("Целевой столбец не найден", 409);
+    const sourceCards = await transaction.boardCard.findMany({
+      where: {
+        columnId: current.columnId,
+        deletedAt: null,
+        archivedAt: null,
+        id: { not: cardId },
+      },
+      orderBy: [{ position: "asc" }, { id: "asc" }],
+    });
+    const sameColumn = current.columnId === targetColumnId;
+    const destinationCards = sameColumn
+      ? sourceCards
+      : await transaction.boardCard.findMany({
+          where: {
+            columnId: targetColumnId,
+            deletedAt: null,
+            archivedAt: null,
+          },
+          orderBy: [{ position: "asc" }, { id: "asc" }],
+        });
+    destinationCards.splice(
+      Math.min(position, destinationCards.length),
+      0,
+      current,
+    );
+    return {
+      current,
+      sourceCards,
+      affected: sameColumn
+        ? destinationCards
+        : [...sourceCards, ...destinationCards],
+      sameColumn,
+    };
+  }
+
+  async function persistCardMovePositions(
+    transaction: Prisma.TransactionClient,
+    state: CardMoveState,
+    targetColumnId: number,
+  ) {
+    if (!state.sameColumn)
+      for (const [index, sourceCard] of state.sourceCards.entries())
+        await transaction.boardCard.update({
+          where: { id: sourceCard.id },
+          data: { position: index, version: { increment: 1 } },
+        });
+    const destinationStart = state.sameColumn ? 0 : state.sourceCards.length;
+    for (
+      let index = destinationStart;
+      index < state.affected.length;
+      index += 1
+    ) {
+      const item = state.affected[index];
+      if (!item) continue;
+      await transaction.boardCard.update({
+        where: { id: item.id },
+        data: {
+          columnId: targetColumnId,
+          position: state.sameColumn ? index : index - destinationStart,
+          version: { increment: 1 },
+        },
+      });
+    }
+  }
+
+  async function moveCardInTransaction(
+    transaction: Prisma.TransactionClient,
+    cardId: number,
+    targetColumnId: number,
+    position: number,
+    version: number,
+  ) {
+    const state = await loadCardMoveState(
+      transaction,
+      cardId,
+      targetColumnId,
+      position,
+      version,
+    );
+    await persistCardMovePositions(transaction, state, targetColumnId);
+  }
+
   async function moveBoardCard(
     cardId: number,
     userId: number,
@@ -575,83 +677,17 @@ export function createBoardService(prisma: PrismaClient) {
       },
       select: { id: true },
     });
-    if (!target) throw new AppError("Целевой столбец не найден", 404);
+    if (!target) throw new AppError("Карточка не найдена", 404);
     await serializable(() =>
       prisma.$transaction(
-        async (transaction) => {
-          const current = await transaction.boardCard.findFirst({
-            where: { id: cardId, deletedAt: null, archivedAt: null },
-          });
-          if (!current) throw new AppError("Карточка не найдена", 404);
-          if (!versionMatches(current.version, version))
-            throw new AppError(
-              "Данные были изменены другим пользователем",
-              409,
-            );
-          const sourceCards = await transaction.boardCard.findMany({
-            where: {
-              columnId: current.columnId,
-              deletedAt: null,
-              archivedAt: null,
-              id: { not: cardId },
-            },
-            orderBy: [{ position: "asc" }, { id: "asc" }],
-          });
-          const destinationCards =
-            current.columnId === targetColumnId
-              ? sourceCards
-              : await transaction.boardCard.findMany({
-                  where: {
-                    columnId: targetColumnId,
-                    deletedAt: null,
-                    archivedAt: null,
-                  },
-                  orderBy: [{ position: "asc" }, { id: "asc" }],
-                });
-          destinationCards.splice(
-            Math.min(position, destinationCards.length),
-            0,
-            current,
-          );
-          const affected =
-            current.columnId === targetColumnId
-              ? destinationCards
-              : [...sourceCards, ...destinationCards];
-          for (
-            let index = 0;
-            index < sourceCards.length && current.columnId !== targetColumnId;
-            index += 1
-          ) {
-            const sourceCard = sourceCards[index];
-            if (!sourceCard) continue;
-            await transaction.boardCard.update({
-              where: { id: sourceCard.id },
-              data: { position: index, version: { increment: 1 } },
-            });
-          }
-          const destinationStart =
-            current.columnId === targetColumnId ? 0 : sourceCards.length;
-          for (
-            let index = destinationStart;
-            index < affected.length;
-            index += 1
-          ) {
-            const item = affected[index];
-            if (!item) continue;
-            const targetPosition =
-              current.columnId === targetColumnId
-                ? index
-                : index - destinationStart;
-            await transaction.boardCard.update({
-              where: { id: item.id },
-              data: {
-                columnId: targetColumnId,
-                position: targetPosition,
-                version: { increment: 1 },
-              },
-            });
-          }
-        },
+        (transaction) =>
+          moveCardInTransaction(
+            transaction,
+            cardId,
+            targetColumnId,
+            position,
+            version,
+          ),
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       ),
     );
