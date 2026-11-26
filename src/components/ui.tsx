@@ -37,6 +37,23 @@ export function Empty({ title, text }: { title: string; text: string }) {
     </div>
   );
 }
+
+export function LoadingState({ children }: { children: ReactNode }) {
+  return (
+    <div className="loading-line" role="status">
+      {children}
+    </div>
+  );
+}
+
+export function ErrorState({ children }: { children: ReactNode }) {
+  return (
+    <div className="page-error" role="alert">
+      {children}
+    </div>
+  );
+}
+
 export function Modal({
   title,
   close,

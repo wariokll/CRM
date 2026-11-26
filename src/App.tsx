@@ -18,6 +18,7 @@ import { AccessDeniedPage } from "./features/layout/AccessDeniedPage";
 import { RequestModal } from "./features/requests/RequestModal";
 import { CreateRequestForm } from "./features/requests/CreateRequestForm";
 import { useAppData } from "./features/layout/useAppData";
+import { ErrorState } from "./components/ui";
 import "./recurrence.css";
 import type { ServiceRequest } from "./types";
 
@@ -178,7 +179,7 @@ export function AppContent() {
           setCalendarDate={setCalendarDate}
           setCreateRequest={setCreateRequest}
         >
-          {loadError && <div className="page-error">{loadError}</div>}
+          {loadError && <ErrorState>{loadError}</ErrorState>}
           {body}
         </AppPageHeader>
       </section>

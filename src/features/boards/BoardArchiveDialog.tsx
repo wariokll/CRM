@@ -9,6 +9,7 @@ import {
 import { ApiError } from "../../api";
 import type { ArchivedBoardCard, BoardDetails } from "../../types";
 import { Dialog, errorText } from "./BoardDialog";
+import { LoadingState } from "../../components/ui";
 
 const dateFormat = new Intl.DateTimeFormat("ru-RU");
 
@@ -127,11 +128,7 @@ export function BoardArchiveDialog({
           {notice}
         </p>
       )}
-      {loading && (
-        <div className="loading-line" role="status">
-          Загрузка архива…
-        </div>
-      )}
+      {loading && <LoadingState>Загрузка архива…</LoadingState>}
       <div className="board-archive-list" aria-busy={loading}>
         {visible.map((card) => (
           <article className="archived-card" key={card.id}>

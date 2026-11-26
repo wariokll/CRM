@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { ApiError } from "../../api";
-import { Button, Empty } from "../../components/ui";
+import { Button, Empty, ErrorState } from "../../components/ui";
 import { StoreGroups } from "./StoreGroups";
 import { StoreDetails } from "./StoreDetails";
 import { StoreCreateDialog } from "./StoreCreateDialog";
@@ -153,7 +153,7 @@ export function StoresPage({
   };
   return (
     <>
-      {error && <div className="page-error">{error}</div>}
+      {error && <ErrorState>{error}</ErrorState>}
       <div className="section-actions">
         <span>
           {visibleCount} торговых точек

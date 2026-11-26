@@ -10,6 +10,7 @@ import type {
   TelegramIntegration,
   User,
 } from "../../types";
+import { LoadingState } from "../../components/ui";
 
 const RequestsList = lazy(() =>
   import("../requests/RequestsList").then((module) => ({
@@ -108,7 +109,7 @@ export function AppPageContent(props: Props) {
     setStoreOrganizationId,
   } = props;
   return (
-    <Suspense fallback={<div className="loading-line">Загрузка раздела…</div>}>
+    <Suspense fallback={<LoadingState>Загрузка раздела…</LoadingState>}>
       {page === "requests" ? (
         <RequestsList
           requests={requests}

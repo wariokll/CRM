@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
 import { ApiError } from "../../api";
 import { queryKeys } from "../../shared/queryKeys";
-import { Button, Field } from "../../components/ui";
+import { Button, ErrorState, Field } from "../../components/ui";
 import { getComponents, getReportData } from "./queries";
 import {
   ProcurementReport,
@@ -74,7 +74,7 @@ export function ReportsPage() {
   const error = reportQuery.error ? errorText(reportQuery.error) : "";
   return (
     <>
-      {error && <div className="page-error">{error}</div>}
+      {error && <ErrorState>{error}</ErrorState>}
       <section className="panel table-panel">
         <div className="toolbar">
           <Field label="С">

@@ -34,6 +34,7 @@ import {
 } from "./queries";
 import { queryKeys } from "../../shared/queryKeys";
 import { errorText } from "./BoardDialog";
+import { ErrorState, LoadingState } from "../../components/ui";
 import { CardDialog, NameDialog } from "./BoardDialogs";
 import { AccessDialog } from "./BoardAccessDialog";
 import { BoardArchiveDialog } from "./BoardArchiveDialog";
@@ -497,10 +498,10 @@ export function BoardsPage({
         )}
       </div>
       {error && (
-        <div className="page-error">
+        <ErrorState>
           <AlertTriangle />
           {error}
-        </div>
+        </ErrorState>
       )}
       {notice && (
         <div className="board-notice">
@@ -512,7 +513,7 @@ export function BoardsPage({
         </div>
       )}
       {loading && !board ? (
-        <div className="loading-line">Загрузка досок…</div>
+        <LoadingState>Загрузка досок…</LoadingState>
       ) : !board ? (
         <div className="panel board-empty">
           <Users />

@@ -16,6 +16,7 @@ import {
   useKnowledgeAttachmentMutation,
   useKnowledgeMutation,
 } from "./queries";
+import { ErrorState } from "../../components/ui";
 import { queryKeys } from "../../shared/queryKeys";
 import { KnowledgeImportDialog } from "./KnowledgeImportDialog";
 import { KnowledgeEditDialogs } from "./KnowledgeEditDialogs";
@@ -604,7 +605,7 @@ export function KnowledgePage() {
       </aside>
 
       <section className="knowledge-content">
-        {error && <div className="page-error">{error}</div>}
+        {error && <ErrorState>{error}</ErrorState>}
         {article ? (
           <KnowledgeArticleView
             article={article}

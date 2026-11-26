@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { ApiError } from "../../api";
-import { Button, Empty, Field, Modal } from "../../components/ui";
+import { Button, Empty, ErrorState, Field, Modal } from "../../components/ui";
 import { OrganizationCards } from "./OrganizationCards";
 import { useOrganizationMutation } from "./queries";
 import type { Organization, User } from "../../types";
@@ -108,7 +108,7 @@ export function OrganizationsPage({
           <Plus /> Добавить организацию
         </Button>
       </div>
-      {error && <div className="page-error">{error}</div>}
+      {error && <ErrorState>{error}</ErrorState>}
       <OrganizationCards
         organizations={organizations}
         user={user}
