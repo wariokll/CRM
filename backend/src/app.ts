@@ -27,7 +27,7 @@ import { recurringRequestsRouter } from "./modules/recurring-requests/recurring-
 import { staffRouter } from "./modules/staff/staff.routes.js";
 import { storesRouter } from "./modules/stores/stores.routes.js";
 import { telegramRouter } from "./modules/telegram/telegram.routes.js";
-import { usersRouter } from "./modules/users/users.routes.js";
+import { createUsersRouter } from "./modules/users/users.routes.js";
 
 export interface AppDependencies {
   prisma: PrismaClient;
@@ -73,7 +73,7 @@ export function createApp(deps: AppDependencies = { prisma }) {
   app.use("/api/recurring-requests", recurringRequestsRouter);
   app.use("/api/request-types", requestTypesRouter);
   app.use("/api/moderation", moderationRouter);
-  app.use("/api/users", usersRouter);
+  app.use("/api/users", createUsersRouter(deps.prisma));
   app.use("/api/staff", staffRouter);
   app.use("/api/telegram", telegramRouter);
   const frontendDist = resolve(
