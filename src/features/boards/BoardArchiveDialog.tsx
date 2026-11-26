@@ -1,17 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  AlertTriangle,
-  Archive,
-  Calendar,
-  RotateCcw,
-  Search,
-} from "lucide-react";
+import { AlertTriangle, Archive, Search } from "lucide-react";
 import { ApiError } from "../../api";
 import type { ArchivedBoardCard, BoardDetails } from "../../types";
 import { Dialog, errorText } from "./BoardDialog";
 import { LoadingState } from "../../components/ui";
-
-const dateFormat = new Intl.DateTimeFormat("ru-RU");
+import { ArchivedCardItem } from "./ArchivedCardItem";
 
 export function BoardArchiveDialog({
   board,
@@ -131,60 +124,18 @@ export function BoardArchiveDialog({
       {loading && <LoadingState>Загрузка архива…</LoadingState>}
       <div className="board-archive-list" aria-busy={loading}>
         {visible.map((card) => (
-          <article className="archived-card" key={card.id}>
-            <div className="archived-card-heading">
-              <b>{card.title}</b>
-              <span>{card.column.name}</span>
-            </div>
-            <div className="archived-card-meta">
-              <span>
-                В архиве с {dateFormat.format(new Date(card.archivedAt))}
-              </span>
-              {card.deadline && (
-                <span>
-                  <Calendar /> Срок:{" "}
-                  {dateFormat.format(
-                    new Date(card.deadline.slice(0, 10) + "T00:00:00"),
-                  )}
-                </span>
-              )}
-            </div>
-            {card.description && (
-              <details>
-                <summary>Описание</summary>
-                <p>{card.description}</p>
-              </details>
-            )}
-            <div className="archived-card-actions">
-              <label className="field">
-                <span>Восстановить в столбец</span>
-                <select
-                  value={targetFor(card) ?? ""}
-                  disabled={busyId !== null || loading}
-                  onChange={(event) =>
-                    setTargets((current) => ({
-                      ...current,
-                      [card.id]: Number(event.target.value),
-                    }))
-                  }
-                >
-                  {board.columns.map((column) => (
-                    <option key={column.id} value={column.id}>
-                      {column.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                className="button secondary compact"
-                disabled={busyId !== null || loading || !targetFor(card)}
-                onClick={() => void restore(card)}
-              >
-                <RotateCcw />
-                {busyId === card.id ? "Восстановление…" : "Восстановить"}
-              </button>
-            </div>
-          </article>
+          <ArchivedCardItem
+            key={card.id}
+            card={card}
+            columns={board.columns}
+            targetColumnId={targetFor(card)}
+            busy={busyId !== null}
+            loading={loading}
+            onTargetChange={(columnId) =>
+              setTargets((current) => ({ ...current, [card.id]: columnId }))
+            }
+            onRestore={() => void restore(card)}
+          />
         ))}
         {!loading && !visible.length && !error && (
           <div className="archive-empty">

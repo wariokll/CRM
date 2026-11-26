@@ -1,23 +1,17 @@
 import { useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus } from "lucide-react";
-import { ApiError } from "../../api";
-import { Button, Empty, ErrorState } from "../../components/ui";
+import { Empty, ErrorState } from "../../components/ui";
 import { StoreGroups } from "./StoreGroups";
 import { StoreDetails } from "./StoreDetails";
 import { StoreCreateDialog } from "./StoreCreateDialog";
+import { StoresToolbar } from "./StoresToolbar";
+import { storeErrorText } from "./store-utils";
 import {
   getStoreAccess,
   useSaveStoreAccessMutation,
   useStoreMutation,
 } from "./queries";
 import type { Organization, Store, User } from "../../types";
-
-function errorText(reason: unknown) {
-  return reason instanceof ApiError || reason instanceof Error
-    ? reason.message
-    : "Request failed";
-}
 
 export function StoresPage({
   stores,
@@ -111,7 +105,7 @@ export function StoresPage({
       });
       reload();
     } catch (reason) {
-      setError(errorText(reason));
+      setError(storeErrorText(reason));
     }
   };
   const reject = async (id: number) => {
@@ -127,7 +121,7 @@ export function StoresPage({
       });
       reload();
     } catch (reason) {
-      setError(errorText(reason));
+      setError(storeErrorText(reason));
     }
   };
   const remove = async (store: Store) => {
@@ -146,7 +140,7 @@ export function StoresPage({
       });
       reload();
     } catch (reason) {
-      setError(errorText(reason));
+      setError(storeErrorText(reason));
     } finally {
       setDeletingId(null);
     }
@@ -154,44 +148,14 @@ export function StoresPage({
   return (
     <>
       {error && <ErrorState>{error}</ErrorState>}
-      <div className="section-actions">
-        <span>
-          {visibleCount} торговых точек
-          {selectedOrganizationId &&
-            " · " + (visibleOrganizations[0]?.legalName ?? "")}
-        </span>
-        <div className="inline-actions">
-          <select
-            className="store-organization-filter"
-            value={selectedOrganizationId ?? ""}
-            aria-label="Фильтр по организации"
-            onChange={(event) => {
-              const value = Number(event.target.value) || null;
-              setOrganizationFilter(value);
-            }}
-          >
-            <option value="">Все организации</option>
-            {organizations.map((organization) => (
-              <option value={organization.id} key={organization.id}>
-                {organization.legalName}
-              </option>
-            ))}
-          </select>
-          {selectedOrganizationId && (
-            <Button
-              kind="secondary"
-              onClick={() => {
-                setOrganizationFilter(null);
-              }}
-            >
-              Все организации
-            </Button>
-          )}
-          <Button onClick={() => setAdding(true)}>
-            <Plus /> Добавить точку
-          </Button>
-        </div>
-      </div>
+      <StoresToolbar
+        organizations={organizations}
+        selectedOrganizationId={selectedOrganizationId}
+        visibleCount={visibleCount}
+        selectOrganization={setOrganizationFilter}
+        clearFilter={() => setOrganizationFilter(null)}
+        addStore={() => setAdding(true)}
+      />
       <StoreGroups
         groups={groups}
         user={user}
