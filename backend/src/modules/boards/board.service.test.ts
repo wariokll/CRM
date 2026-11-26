@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BoardType, Prisma } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { boardLayoutSchema, restoreCardSchema } from "./board.contracts.js";
 
 const db = vi.hoisted(() => ({
@@ -13,12 +14,10 @@ const db = vi.hoisted(() => ({
   boardColumn: { findFirst: vi.fn(), updateMany: vi.fn() },
   $transaction: vi.fn(),
 }));
-vi.mock("../../db.js", () => ({ prisma: db }));
-import {
-  listArchivedCards,
-  restoreArchivedCard,
-  updateBoardLayout,
-} from "./board.service.js";
+import { createBoardService } from "./board.service.js";
+
+const { listArchivedCards, restoreArchivedCard, updateBoardLayout } =
+  createBoardService(db as unknown as PrismaClient);
 
 beforeEach(() => {
   vi.resetAllMocks();

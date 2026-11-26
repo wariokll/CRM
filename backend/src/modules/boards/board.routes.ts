@@ -1,76 +1,71 @@
 import { Role } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import { authenticate } from "../../shared/middleware/auth.js";
-import {
-  archiveBoardCardController,
-  createBoardController,
-  createBoardCardController,
-  createBoardColumnController,
-  deleteBoardController,
-  deleteBoardCardController,
-  deleteBoardColumnController,
-  grantBoardAccessController,
-  getBoardController,
-  listArchivedCardsController,
-  listBoardAccessController,
-  listBoardsController,
-  moveBoardCardController,
-  moveBoardColumnController,
-  renameBoardController,
-  revokeBoardAccessController,
-  restoreArchivedCardController,
-  updateBoardCardController,
-  updateBoardColumnController,
-  updateBoardLayoutController,
-} from "./board.controller.js";
+import { createBoardControllers } from "./board.controller.js";
+import { createBoardService } from "./board.service.js";
 
-export const boardsRouter = Router();
-boardsRouter.use(authenticate);
-boardsRouter.use((req: Request, res: Response, next: NextFunction) => {
-  if (req.auth?.role === Role.CLIENT)
-    return res.status(403).json({
-      message: "Доски доступны только сотрудникам",
-    });
-  next();
-});
+export function createBoardsRouter(prisma: PrismaClient) {
+  const router = Router();
+  const controllers = createBoardControllers(createBoardService(prisma));
+  router.use(authenticate);
+  router.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.auth?.role === Role.CLIENT)
+      return res.status(403).json({
+        message: "Доски доступны только сотрудникам",
+      });
+    next();
+  });
 
-boardsRouter.get("/", listBoardsController);
+  router.get("/", controllers.listBoardsController);
 
-boardsRouter.post("/", createBoardController);
+  router.post("/", controllers.createBoardController);
 
-boardsRouter.get("/:boardId", getBoardController);
+  router.get("/:boardId", controllers.getBoardController);
 
-boardsRouter.get("/:boardId/archive", listArchivedCardsController);
+  router.get("/:boardId/archive", controllers.listArchivedCardsController);
 
-boardsRouter.patch("/:boardId/layout", updateBoardLayoutController);
+  router.patch("/:boardId/layout", controllers.updateBoardLayoutController);
 
-boardsRouter.post("/cards/:cardId/restore", restoreArchivedCardController);
+  router.post(
+    "/cards/:cardId/restore",
+    controllers.restoreArchivedCardController,
+  );
 
-boardsRouter.patch("/:boardId", renameBoardController);
+  router.patch("/:boardId", controllers.renameBoardController);
 
-boardsRouter.delete("/:boardId", deleteBoardController);
+  router.delete("/:boardId", controllers.deleteBoardController);
 
-boardsRouter.get("/:boardId/access", listBoardAccessController);
+  router.get("/:boardId/access", controllers.listBoardAccessController);
 
-boardsRouter.post("/:boardId/access", grantBoardAccessController);
+  router.post("/:boardId/access", controllers.grantBoardAccessController);
 
-boardsRouter.delete("/:boardId/access/:userId", revokeBoardAccessController);
+  router.delete(
+    "/:boardId/access/:userId",
+    controllers.revokeBoardAccessController,
+  );
 
-boardsRouter.post("/:boardId/columns", createBoardColumnController);
+  router.post("/:boardId/columns", controllers.createBoardColumnController);
 
-boardsRouter.patch("/columns/:columnId", updateBoardColumnController);
+  router.patch("/columns/:columnId", controllers.updateBoardColumnController);
 
-boardsRouter.delete("/columns/:columnId", deleteBoardColumnController);
+  router.delete("/columns/:columnId", controllers.deleteBoardColumnController);
 
-boardsRouter.post("/columns/:columnId/move", moveBoardColumnController);
+  router.post("/columns/:columnId/move", controllers.moveBoardColumnController);
 
-boardsRouter.post("/columns/:columnId/cards", createBoardCardController);
+  router.post(
+    "/columns/:columnId/cards",
+    controllers.createBoardCardController,
+  );
 
-boardsRouter.patch("/cards/:cardId", updateBoardCardController);
+  router.patch("/cards/:cardId", controllers.updateBoardCardController);
 
-boardsRouter.delete("/cards/:cardId", deleteBoardCardController);
+  router.delete("/cards/:cardId", controllers.deleteBoardCardController);
 
-boardsRouter.post("/cards/:cardId/archive", archiveBoardCardController);
+  router.post("/cards/:cardId/archive", controllers.archiveBoardCardController);
 
-boardsRouter.post("/cards/:cardId/move", moveBoardCardController);
+  router.post("/cards/:cardId/move", controllers.moveBoardCardController);
+
+  return router;
+}

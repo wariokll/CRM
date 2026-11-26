@@ -15,8 +15,8 @@ import { prisma } from "./db.js";
 import { errorHandler } from "./shared/middleware/errors.js";
 import { requestLogger } from "./shared/middleware/request-logger.js";
 import { createAuthRouter } from "./modules/auth/auth.routes.js";
-import { boardsRouter } from "./modules/boards/board.routes.js";
-import { knowledgeRouter } from "./modules/knowledge/knowledge.routes.js";
+import { createBoardsRouter } from "./modules/boards/board.routes.js";
+import { createKnowledgeRouter } from "./modules/knowledge/knowledge.routes.js";
 import { createDepartmentsRouter } from "./modules/departments/departments.routes.js";
 import { createComponentsRouter } from "./modules/components/components.routes.js";
 import { createModerationRouter } from "./modules/moderation/moderation.routes.js";
@@ -26,7 +26,7 @@ import { createRequestTypesRouter } from "./modules/request-types/request-types.
 import { createRecurringRequestsRouter } from "./modules/recurring-requests/recurring-requests.routes.js";
 import { createStaffRouter } from "./modules/staff/staff.routes.js";
 import { createStoresRouter } from "./modules/stores/stores.routes.js";
-import { telegramRouter } from "./modules/telegram/telegram.routes.js";
+import { createTelegramRouter } from "./modules/telegram/telegram.routes.js";
 import { createUsersRouter } from "./modules/users/users.routes.js";
 
 export interface AppDependencies {
@@ -63,8 +63,8 @@ export function createApp(deps: AppDependencies = { prisma }) {
     });
   });
   app.use("/api/auth", createAuthRouter(deps.prisma));
-  app.use("/api/knowledge", knowledgeRouter);
-  app.use("/api/boards", boardsRouter);
+  app.use("/api/knowledge", createKnowledgeRouter(deps.prisma));
+  app.use("/api/boards", createBoardsRouter(deps.prisma));
   app.use("/api/departments", createDepartmentsRouter(deps.prisma));
   app.use("/api/components", createComponentsRouter(deps.prisma));
   app.use("/api/organizations", createOrganizationsRouter(deps.prisma));
@@ -78,7 +78,7 @@ export function createApp(deps: AppDependencies = { prisma }) {
   app.use("/api/moderation", createModerationRouter(deps.prisma));
   app.use("/api/users", createUsersRouter(deps.prisma));
   app.use("/api/staff", createStaffRouter(deps.prisma));
-  app.use("/api/telegram", telegramRouter);
+  app.use("/api/telegram", createTelegramRouter(deps.prisma));
   const frontendDist = resolve(
     dirname(fileURLToPath(import.meta.url)),
     "../../dist",

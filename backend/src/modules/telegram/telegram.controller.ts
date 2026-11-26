@@ -1,50 +1,62 @@
 import type { RequestHandler } from "express";
-import {
-  listChatMessages,
-  listChats,
-  listIntegrations,
-  replaceTelegramChatLinks,
-  sendTelegramMessage,
-  updateTelegramChat,
-} from "./telegram.service.js";
+import type { createTelegramService } from "./telegram.service.js";
 import type {
   ReplaceTelegramLinksInput,
   SendTelegramMessageInput,
   UpdateTelegramChatInput,
 } from "./telegram.schemas.js";
 
-export const listIntegrationsController: RequestHandler = async (_req, res) =>
-  res.json(await listIntegrations());
+export function createTelegramControllers(
+  service: ReturnType<typeof createTelegramService>,
+) {
+  const {
+    listChatMessages,
+    listChats,
+    listIntegrations,
+    replaceTelegramChatLinks,
+    sendTelegramMessage,
+    updateTelegramChat,
+  } = service;
 
-export const listChatsController: RequestHandler = async (_req, res) =>
-  res.json(await listChats());
+  const listIntegrationsController: RequestHandler = async (_req, res) =>
+    res.json(await listIntegrations());
 
-export const listChatMessagesController: RequestHandler = async (req, res) =>
-  res.json(await listChatMessages(Number(req.params.id)));
+  const listChatsController: RequestHandler = async (_req, res) =>
+    res.json(await listChats());
 
-export const updateTelegramChatController: RequestHandler = async (req, res) =>
-  res.json(
-    await updateTelegramChat(
-      Number(req.params.id),
-      req.body as UpdateTelegramChatInput,
-    ),
-  );
+  const listChatMessagesController: RequestHandler = async (req, res) =>
+    res.json(await listChatMessages(Number(req.params.id)));
 
-export const replaceTelegramChatLinksController: RequestHandler = async (
-  req,
-  res,
-) =>
-  res.json(
-    await replaceTelegramChatLinks(
-      Number(req.params.id),
-      req.body as ReplaceTelegramLinksInput,
-    ),
-  );
+  const updateTelegramChatController: RequestHandler = async (req, res) =>
+    res.json(
+      await updateTelegramChat(
+        Number(req.params.id),
+        req.body as UpdateTelegramChatInput,
+      ),
+    );
 
-export const sendTelegramMessageController: RequestHandler = async (req, res) =>
-  res.json(
-    await sendTelegramMessage(
-      Number(req.params.id),
-      req.body as SendTelegramMessageInput,
-    ),
-  );
+  const replaceTelegramChatLinksController: RequestHandler = async (req, res) =>
+    res.json(
+      await replaceTelegramChatLinks(
+        Number(req.params.id),
+        req.body as ReplaceTelegramLinksInput,
+      ),
+    );
+
+  const sendTelegramMessageController: RequestHandler = async (req, res) =>
+    res.json(
+      await sendTelegramMessage(
+        Number(req.params.id),
+        req.body as SendTelegramMessageInput,
+      ),
+    );
+
+  return {
+    listIntegrationsController,
+    listChatsController,
+    listChatMessagesController,
+    updateTelegramChatController,
+    replaceTelegramChatLinksController,
+    sendTelegramMessageController,
+  };
+}
