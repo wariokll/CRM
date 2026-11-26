@@ -15,8 +15,7 @@ import { AppPageHeader } from "./features/layout/AppPageHeader";
 import { buildNavigation } from "./features/layout/navigation";
 import { AccountStatusPage } from "./features/layout/AccountStatusPage";
 import { AccessDeniedPage } from "./features/layout/AccessDeniedPage";
-import { RequestModal } from "./features/requests/RequestModal";
-import { CreateRequestForm } from "./features/requests/CreateRequestForm";
+import { AppDialogs } from "./features/layout/AppDialogs";
 import { useAppData } from "./features/layout/useAppData";
 import { ErrorState } from "./components/ui";
 import "./recurrence.css";
@@ -183,30 +182,22 @@ export function AppContent() {
           {body}
         </AppPageHeader>
       </section>
-      {selected && (
-        <RequestModal
-          item={selected}
-          user={user}
-          departments={departments}
-          close={closeRequest}
-          reload={load}
-        />
-      )}
-      {createRequest && (
-        <CreateRequestForm
-          organizations={organizations}
-          stores={stores}
-          types={types}
-          user={user}
-          close={() => {
-            setCreateRequest(false);
-            setCalendarDate(null);
-          }}
-          reload={load}
-          initialUrgency={calendarDate ? "SCHEDULED" : "URGENT"}
-          initialScheduledAt={calendarDate}
-        />
-      )}
+      <AppDialogs
+        user={user}
+        departments={departments}
+        organizations={organizations}
+        stores={stores}
+        types={types}
+        selected={selected}
+        createRequest={createRequest}
+        calendarDate={calendarDate}
+        reload={load}
+        closeRequest={closeRequest}
+        closeCreateRequest={() => {
+          setCreateRequest(false);
+          setCalendarDate(null);
+        }}
+      />
     </main>
   );
 }
