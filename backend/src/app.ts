@@ -20,7 +20,7 @@ import { knowledgeRouter } from "./modules/knowledge/knowledge.routes.js";
 import { createDepartmentsRouter } from "./modules/departments/departments.routes.js";
 import { createComponentsRouter } from "./modules/components/components.routes.js";
 import { moderationRouter } from "./modules/moderation/moderation.routes.js";
-import { organizationsRouter } from "./modules/organizations/organizations.routes.js";
+import { createOrganizationsRouter } from "./modules/organizations/organizations.routes.js";
 import { requestsRouter } from "./modules/requests/request.routes.js";
 import { requestTypesRouter } from "./modules/request-types/request-types.routes.js";
 import { recurringRequestsRouter } from "./modules/recurring-requests/recurring-requests.routes.js";
@@ -67,7 +67,7 @@ export function createApp(deps: AppDependencies = { prisma }) {
   app.use("/api/boards", boardsRouter);
   app.use("/api/departments", createDepartmentsRouter(deps.prisma));
   app.use("/api/components", createComponentsRouter(deps.prisma));
-  app.use("/api/organizations", organizationsRouter);
+  app.use("/api/organizations", createOrganizationsRouter(deps.prisma));
   app.use("/api/stores", storesRouter);
   app.use("/api/requests", requestsRouter);
   app.use("/api/recurring-requests", recurringRequestsRouter);

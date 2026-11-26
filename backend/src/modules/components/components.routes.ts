@@ -20,13 +20,13 @@ export function createComponentsRouter(prisma: PrismaClient) {
   router.get("/", controllers.listComponentsController);
   router.post(
     "/",
-    requirePermission(PermissionKey.MANAGE_TEMPLATES),
+    requirePermission(PermissionKey.MANAGE_TEMPLATES, prisma),
     validateBody(createComponentSchema),
     controllers.createComponentController,
   );
   router.patch(
     "/:id",
-    requirePermission(PermissionKey.MANAGE_TEMPLATES),
+    requirePermission(PermissionKey.MANAGE_TEMPLATES, prisma),
     validateBody(updateComponentSchema),
     controllers.updateComponentController,
   );

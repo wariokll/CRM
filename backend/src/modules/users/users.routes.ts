@@ -15,7 +15,10 @@ import {
 export function createUsersRouter(prisma: PrismaClient) {
   const router = Router();
   const controllers = createUsersControllers(createUsersService(prisma));
-  router.use(authenticate, requirePermission(PermissionKey.MANAGE_CLIENTS));
+  router.use(
+    authenticate,
+    requirePermission(PermissionKey.MANAGE_CLIENTS, prisma),
+  );
   router.get("/", controllers.listClientsController);
   router.post(
     "/",

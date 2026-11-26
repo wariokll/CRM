@@ -1,9 +1,9 @@
 import { OrganizationStatus, PermissionKey, Role } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import type {
   OrganizationContactDTO,
   OrganizationMemberDTO,
 } from "@crm/shared-types";
-import { prisma } from "../../db.js";
 import { organizationRelationsDtoSchema } from "../../shared/response-schemas.js";
 import {
   getUserAccess,
@@ -44,217 +44,232 @@ const include = {
   _count: { select: { requests: true } },
 } as const;
 
-async function context(userId: number) {
-  const access = await getUserAccess(userId);
-  if (!access) return null;
-  return {
-    access,
-    manages: hasPermission(access, PermissionKey.MANAGE_ORGANIZATIONS),
-  };
-}
-
-export async function listOrganizations(userId: number) {
-  const ctx = await context(userId);
-  if (!ctx) throw new OrganizationsServiceError(401, "Пользователь не найден");
-  const where =
-    ctx.manages || ctx.access.role !== Role.CLIENT
-      ? {}
-      : { members: { some: { userId } } };
-  const organizations = await prisma.organization.findMany({
-    where,
-    include,
-    orderBy: { legalName: "asc" },
-  });
-  return organizations.map((organization) => {
-    const relations = organizationRelationsDtoSchema.parse({
-      contacts: organization.contacts,
-      members: organization.members,
-    });
-    const checkedRelations = relations satisfies {
-      contacts: OrganizationContactDTO[];
-      members: OrganizationMemberDTO[];
+export function createOrganizationsService(prisma: PrismaClient) {
+  async function context(userId: number) {
+    const access = await getUserAccess(userId, prisma);
+    if (!access) return null;
+    return {
+      access,
+      manages: hasPermission(access, PermissionKey.MANAGE_ORGANIZATIONS),
     };
-    return { ...organization, ...checkedRelations };
-  });
-}
+  }
 
-export async function createOrganization(userId: number, input: unknown) {
-  const ctx = await context(userId);
-  if (!ctx) throw new OrganizationsServiceError(401, "Пользователь не найден");
-  const body = organizationSchema.parse(input);
-  const requestedMembers = requestedMemberIdsSchema.parse(
-    (input as { memberIds?: unknown }).memberIds,
-  );
-  const memberIds =
-    ctx.manages && requestedMembers?.length
-      ? [...new Set(requestedMembers)]
-      : [userId];
-  const { contacts, ...organizationData } = body;
-  return prisma.organization.create({
-    data: {
-      ...organizationData,
-      status: ctx.manages
-        ? OrganizationStatus.ACTIVE
-        : OrganizationStatus.PENDING,
-      createdByUserId: userId,
-      members: {
-        create: memberIds.map((memberId, index) => ({
+  async function listOrganizations(userId: number) {
+    const ctx = await context(userId);
+    if (!ctx)
+      throw new OrganizationsServiceError(401, "Пользователь не найден");
+    const where =
+      ctx.manages || ctx.access.role !== Role.CLIENT
+        ? {}
+        : { members: { some: { userId } } };
+    const organizations = await prisma.organization.findMany({
+      where,
+      include,
+      orderBy: { legalName: "asc" },
+    });
+    return organizations.map((organization) => {
+      const relations = organizationRelationsDtoSchema.parse({
+        contacts: organization.contacts,
+        members: organization.members,
+      });
+      const checkedRelations = relations satisfies {
+        contacts: OrganizationContactDTO[];
+        members: OrganizationMemberDTO[];
+      };
+      return { ...organization, ...checkedRelations };
+    });
+  }
+
+  async function createOrganization(userId: number, input: unknown) {
+    const ctx = await context(userId);
+    if (!ctx)
+      throw new OrganizationsServiceError(401, "Пользователь не найден");
+    const body = organizationSchema.parse(input);
+    const requestedMembers = requestedMemberIdsSchema.parse(
+      (input as { memberIds?: unknown }).memberIds,
+    );
+    const memberIds =
+      ctx.manages && requestedMembers?.length
+        ? [...new Set(requestedMembers)]
+        : [userId];
+    const { contacts, ...organizationData } = body;
+    return prisma.organization.create({
+      data: {
+        ...organizationData,
+        status: ctx.manages
+          ? OrganizationStatus.ACTIVE
+          : OrganizationStatus.PENDING,
+        createdByUserId: userId,
+        members: {
+          create: memberIds.map((memberId, index) => ({
+            userId: memberId,
+            isPrimary: index === 0,
+          })),
+        },
+        contacts: contacts.length ? { create: contacts } : undefined,
+      },
+      include,
+    });
+  }
+
+  async function updateOrganization(
+    id: number,
+    userId: number,
+    input: unknown,
+  ) {
+    const ctx = await context(userId);
+    if (!ctx)
+      throw new OrganizationsServiceError(401, "Пользователь не найден");
+    const existing = await prisma.organization.findUnique({
+      where: { id },
+      select: {
+        members: {
+          where: { userId },
+          select: { userId: true },
+        },
+      },
+    });
+    if (!existing || (!ctx.manages && !existing.members.length))
+      throw new OrganizationsServiceError(404, "Организация не найдена");
+    const data = organizationSchema.partial().parse(input);
+    const { contacts, ...organizationData } = data;
+    return prisma.organization.update({
+      where: { id },
+      data: {
+        ...organizationData,
+        ...(contacts !== undefined && {
+          contacts: { deleteMany: {}, create: contacts },
+        }),
+        ...(!ctx.manages && { status: OrganizationStatus.PENDING }),
+      },
+      include,
+    });
+  }
+
+  async function deleteOrganization(id: number, userId: number) {
+    const access = await getUserAccess(userId, prisma);
+    if (
+      !access ||
+      access.status !== "ACTIVE" ||
+      !hasPermission(access, PermissionKey.DELETE_ORGANIZATIONS)
+    )
+      throw new OrganizationsServiceError(
+        403,
+        "Недостаточно прав для удаления организаций",
+      );
+    const organization = await prisma.organization.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!organization)
+      throw new OrganizationsServiceError(404, "Организация не найдена");
+    await prisma.organization.delete({ where: { id } });
+  }
+
+  async function updateOrganizationMembers(
+    id: number,
+    userId: number,
+    input: unknown,
+  ) {
+    const ctx = await context(userId);
+    if (!ctx?.manages)
+      throw new OrganizationsServiceError(403, "Недостаточно прав");
+    const memberIds = [
+      ...new Set(organizationMemberIdsSchema.parse(input).userIds),
+    ];
+    await prisma.$transaction(async (transaction) => {
+      await transaction.organizationMember.deleteMany({
+        where: { organizationId: id },
+      });
+      await transaction.organizationMember.createMany({
+        data: memberIds.map((memberId, index) => ({
+          organizationId: id,
           userId: memberId,
           isPrimary: index === 0,
         })),
-      },
-      contacts: contacts.length ? { create: contacts } : undefined,
-    },
-    include,
-  });
-}
-
-export async function updateOrganization(
-  id: number,
-  userId: number,
-  input: unknown,
-) {
-  const ctx = await context(userId);
-  if (!ctx) throw new OrganizationsServiceError(401, "Пользователь не найден");
-  const existing = await prisma.organization.findUnique({
-    where: { id },
-    select: {
-      members: {
-        where: { userId },
-        select: { userId: true },
-      },
-    },
-  });
-  if (!existing || (!ctx.manages && !existing.members.length))
-    throw new OrganizationsServiceError(404, "Организация не найдена");
-  const data = organizationSchema.partial().parse(input);
-  const { contacts, ...organizationData } = data;
-  return prisma.organization.update({
-    where: { id },
-    data: {
-      ...organizationData,
-      ...(contacts !== undefined && {
-        contacts: { deleteMany: {}, create: contacts },
-      }),
-      ...(!ctx.manages && { status: OrganizationStatus.PENDING }),
-    },
-    include,
-  });
-}
-
-export async function deleteOrganization(id: number, userId: number) {
-  const access = await getUserAccess(userId);
-  if (
-    !access ||
-    access.status !== "ACTIVE" ||
-    !hasPermission(access, PermissionKey.DELETE_ORGANIZATIONS)
-  )
-    throw new OrganizationsServiceError(
-      403,
-      "Недостаточно прав для удаления организаций",
-    );
-  const organization = await prisma.organization.findUnique({
-    where: { id },
-    select: { id: true },
-  });
-  if (!organization)
-    throw new OrganizationsServiceError(404, "Организация не найдена");
-  await prisma.organization.delete({ where: { id } });
-}
-
-export async function updateOrganizationMembers(
-  id: number,
-  userId: number,
-  input: unknown,
-) {
-  const ctx = await context(userId);
-  if (!ctx?.manages)
-    throw new OrganizationsServiceError(403, "Недостаточно прав");
-  const memberIds = [
-    ...new Set(organizationMemberIdsSchema.parse(input).userIds),
-  ];
-  await prisma.$transaction(async (transaction) => {
-    await transaction.organizationMember.deleteMany({
-      where: { organizationId: id },
+      });
     });
-    await transaction.organizationMember.createMany({
-      data: memberIds.map((memberId, index) => ({
-        organizationId: id,
-        userId: memberId,
-        isPrimary: index === 0,
-      })),
-    });
-  });
-  return prisma.organization.findUniqueOrThrow({ where: { id }, include });
-}
+    return prisma.organization.findUniqueOrThrow({ where: { id }, include });
+  }
 
-export async function approveOrganization(id: number, userId: number) {
-  const access = await getUserAccess(userId);
-  if (!access || access.status !== "ACTIVE" || access.role === Role.CLIENT)
-    throw new OrganizationsServiceError(
-      403,
-      "Принять организацию может только активный сотрудник",
-    );
-  const organization = await prisma.organization.findFirst({
-    where: { id, status: OrganizationStatus.PENDING },
-    select: { id: true },
-  });
-  if (!organization)
-    throw new OrganizationsServiceError(
-      404,
-      "Организация на модерации не найдена",
-    );
-  await prisma.$transaction(async (transaction) => {
-    await transaction.organization.update({
+  async function approveOrganization(id: number, userId: number) {
+    const access = await getUserAccess(userId, prisma);
+    if (!access || access.status !== "ACTIVE" || access.role === Role.CLIENT)
+      throw new OrganizationsServiceError(
+        403,
+        "Принять организацию может только активный сотрудник",
+      );
+    const organization = await prisma.organization.findFirst({
+      where: { id, status: OrganizationStatus.PENDING },
+      select: { id: true },
+    });
+    if (!organization)
+      throw new OrganizationsServiceError(
+        404,
+        "Организация на модерации не найдена",
+      );
+    await prisma.$transaction(async (transaction) => {
+      await transaction.organization.update({
+        where: { id: organization.id },
+        data: { status: OrganizationStatus.ACTIVE, rejectionReason: null },
+      });
+      await transaction.store.updateMany({
+        where: { organizationId: organization.id, status: "PENDING" },
+        data: { status: "ACTIVE", rejectionReason: null },
+      });
+      await transaction.user.updateMany({
+        where: {
+          status: "PENDING",
+          role: Role.CLIENT,
+          organizations: { some: { organizationId: organization.id } },
+        },
+        data: { status: "ACTIVE", rejectionReason: null },
+      });
+    });
+    return prisma.organization.findUniqueOrThrow({
       where: { id: organization.id },
-      data: { status: OrganizationStatus.ACTIVE, rejectionReason: null },
+      include,
     });
-    await transaction.store.updateMany({
-      where: { organizationId: organization.id, status: "PENDING" },
-      data: { status: "ACTIVE", rejectionReason: null },
-    });
-    await transaction.user.updateMany({
-      where: {
-        status: "PENDING",
-        role: Role.CLIENT,
-        organizations: { some: { organizationId: organization.id } },
-      },
-      data: { status: "ACTIVE", rejectionReason: null },
-    });
-  });
-  return prisma.organization.findUniqueOrThrow({
-    where: { id: organization.id },
-    include,
-  });
-}
+  }
 
-export async function rejectOrganization(
-  id: number,
-  userId: number,
-  input: unknown,
-) {
-  const access = await getUserAccess(userId);
-  if (!access || access.status !== "ACTIVE" || access.role === Role.CLIENT)
-    throw new OrganizationsServiceError(
-      403,
-      "Отклонить организацию может только активный сотрудник",
-    );
-  const body = organizationRejectionSchema.parse(input);
-  const organization = await prisma.organization.findFirst({
-    where: { id, status: OrganizationStatus.PENDING },
-    select: { id: true },
-  });
-  if (!organization)
-    throw new OrganizationsServiceError(
-      404,
-      "Организация на модерации не найдена",
-    );
-  return prisma.organization.update({
-    where: { id: organization.id },
-    data: {
-      status: OrganizationStatus.REJECTED,
-      rejectionReason: body.rejectionReason,
-    },
-    include,
-  });
+  async function rejectOrganization(
+    id: number,
+    userId: number,
+    input: unknown,
+  ) {
+    const access = await getUserAccess(userId, prisma);
+    if (!access || access.status !== "ACTIVE" || access.role === Role.CLIENT)
+      throw new OrganizationsServiceError(
+        403,
+        "Отклонить организацию может только активный сотрудник",
+      );
+    const body = organizationRejectionSchema.parse(input);
+    const organization = await prisma.organization.findFirst({
+      where: { id, status: OrganizationStatus.PENDING },
+      select: { id: true },
+    });
+    if (!organization)
+      throw new OrganizationsServiceError(
+        404,
+        "Организация на модерации не найдена",
+      );
+    return prisma.organization.update({
+      where: { id: organization.id },
+      data: {
+        status: OrganizationStatus.REJECTED,
+        rejectionReason: body.rejectionReason,
+      },
+      include,
+    });
+  }
+
+  return {
+    listOrganizations,
+    createOrganization,
+    updateOrganization,
+    deleteOrganization,
+    updateOrganizationMembers,
+    approveOrganization,
+    rejectOrganization,
+  };
 }

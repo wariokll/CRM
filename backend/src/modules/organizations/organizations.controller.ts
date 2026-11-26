@@ -1,13 +1,7 @@
 import type { Request, Response } from "express";
 import {
-  approveOrganization,
-  createOrganization,
-  deleteOrganization,
-  listOrganizations,
   OrganizationsServiceError,
-  rejectOrganization,
-  updateOrganization,
-  updateOrganizationMembers,
+  type createOrganizationsService,
 } from "./organizations.service.js";
 
 async function sendResult(
@@ -24,71 +18,78 @@ async function sendResult(
   }
 }
 
-export async function listOrganizationsController(req: Request, res: Response) {
-  return sendResult(res, () => listOrganizations(req.auth!.userId));
-}
+type OrganizationsService = ReturnType<typeof createOrganizationsService>;
 
-export async function createOrganizationController(
-  req: Request,
-  res: Response,
-) {
-  return sendResult(
-    res,
-    () => createOrganization(req.auth!.userId, req.body),
-    201,
-  );
-}
-
-export async function updateOrganizationController(
-  req: Request,
-  res: Response,
-) {
-  return sendResult(res, () =>
-    updateOrganization(Number(req.params.id), req.auth!.userId, req.body),
-  );
-}
-
-export async function deleteOrganizationController(
-  req: Request,
-  res: Response,
-) {
-  try {
-    await deleteOrganization(Number(req.params.id), req.auth!.userId);
-    return res.status(204).end();
-  } catch (error) {
-    if (error instanceof OrganizationsServiceError)
-      return res.status(error.status).json({ message: error.message });
-    throw error;
+export function createOrganizationsControllers(service: OrganizationsService) {
+  async function listOrganizationsController(req: Request, res: Response) {
+    return sendResult(res, () => service.listOrganizations(req.auth!.userId));
   }
-}
 
-export async function updateOrganizationMembersController(
-  req: Request,
-  res: Response,
-) {
-  return sendResult(res, () =>
-    updateOrganizationMembers(
-      Number(req.params.id),
-      req.auth!.userId,
-      req.body,
-    ),
-  );
-}
+  async function createOrganizationController(req: Request, res: Response) {
+    return sendResult(
+      res,
+      () => service.createOrganization(req.auth!.userId, req.body),
+      201,
+    );
+  }
 
-export async function approveOrganizationController(
-  req: Request,
-  res: Response,
-) {
-  return sendResult(res, () =>
-    approveOrganization(Number(req.params.id), req.auth!.userId),
-  );
-}
+  async function updateOrganizationController(req: Request, res: Response) {
+    return sendResult(res, () =>
+      service.updateOrganization(
+        Number(req.params.id),
+        req.auth!.userId,
+        req.body,
+      ),
+    );
+  }
 
-export async function rejectOrganizationController(
-  req: Request,
-  res: Response,
-) {
-  return sendResult(res, () =>
-    rejectOrganization(Number(req.params.id), req.auth!.userId, req.body),
-  );
+  async function deleteOrganizationController(req: Request, res: Response) {
+    try {
+      await service.deleteOrganization(Number(req.params.id), req.auth!.userId);
+      return res.status(204).end();
+    } catch (error) {
+      if (error instanceof OrganizationsServiceError)
+        return res.status(error.status).json({ message: error.message });
+      throw error;
+    }
+  }
+
+  async function updateOrganizationMembersController(
+    req: Request,
+    res: Response,
+  ) {
+    return sendResult(res, () =>
+      service.updateOrganizationMembers(
+        Number(req.params.id),
+        req.auth!.userId,
+        req.body,
+      ),
+    );
+  }
+
+  async function approveOrganizationController(req: Request, res: Response) {
+    return sendResult(res, () =>
+      service.approveOrganization(Number(req.params.id), req.auth!.userId),
+    );
+  }
+
+  async function rejectOrganizationController(req: Request, res: Response) {
+    return sendResult(res, () =>
+      service.rejectOrganization(
+        Number(req.params.id),
+        req.auth!.userId,
+        req.body,
+      ),
+    );
+  }
+
+  return {
+    listOrganizationsController,
+    createOrganizationController,
+    updateOrganizationController,
+    deleteOrganizationController,
+    updateOrganizationMembersController,
+    approveOrganizationController,
+    rejectOrganizationController,
+  };
 }

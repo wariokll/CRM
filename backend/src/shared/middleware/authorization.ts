@@ -1,4 +1,5 @@
 import { PermissionKey, Role, UserStatus } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import type { NextFunction, Request, Response } from "express";
 import { prisma } from "../../db.js";
 
@@ -41,8 +42,9 @@ export interface UserAccess {
 
 export async function getUserAccess(
   userId: number,
+  database: PrismaClient = prisma,
 ): Promise<UserAccess | null> {
-  const user = await prisma.user.findUnique({
+  const user = await database.user.findUnique({
     where: { id: userId },
     select: {
       id: true,
@@ -79,11 +81,14 @@ export function hasPermission(
   return access.permissions.has(permission);
 }
 
-export function requirePermission(permission: PermissionKey) {
+export function requirePermission(
+  permission: PermissionKey,
+  database: PrismaClient = prisma,
+) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.auth)
       return res.status(401).json({ message: "Требуется авторизация" });
-    const access = await getUserAccess(req.auth.userId);
+    const access = await getUserAccess(req.auth.userId, database);
     if (
       !access ||
       access.status !== UserStatus.ACTIVE ||

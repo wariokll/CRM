@@ -20,13 +20,13 @@ export function createDepartmentsRouter(prisma: PrismaClient) {
   router.get("/", controllers.listDepartmentsController);
   router.post(
     "/",
-    requirePermission(PermissionKey.MANAGE_STAFF),
+    requirePermission(PermissionKey.MANAGE_STAFF, prisma),
     validateBody(departmentSchema),
     controllers.createDepartmentController,
   );
   router.patch(
     "/:id",
-    requirePermission(PermissionKey.MANAGE_STAFF),
+    requirePermission(PermissionKey.MANAGE_STAFF, prisma),
     validateBody(departmentPatchSchema),
     controllers.updateDepartmentController,
   );
