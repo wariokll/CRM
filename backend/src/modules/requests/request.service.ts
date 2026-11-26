@@ -366,7 +366,7 @@ export async function createRequest(userId: number, input: unknown) {
   }));
   const requestedDepartment = body.departmentId ?? type.departmentId;
   if (access.role === Role.CLIENT && requestedDepartment !== type.departmentId)
-    throw new RequestServiceError(403, "Отдел определяется С€аблоном заявки");
+    throw new RequestServiceError(403, "Отдел определяется шаблоном заявки");
   let assignee: { id: number; ipName: string } | null = null;
   if (body.assigneeId) {
     if (access.role === Role.CLIENT)
