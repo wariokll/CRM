@@ -24,7 +24,7 @@ import { createOrganizationsRouter } from "./modules/organizations/organizations
 import { requestsRouter } from "./modules/requests/request.routes.js";
 import { requestTypesRouter } from "./modules/request-types/request-types.routes.js";
 import { recurringRequestsRouter } from "./modules/recurring-requests/recurring-requests.routes.js";
-import { staffRouter } from "./modules/staff/staff.routes.js";
+import { createStaffRouter } from "./modules/staff/staff.routes.js";
 import { createStoresRouter } from "./modules/stores/stores.routes.js";
 import { telegramRouter } from "./modules/telegram/telegram.routes.js";
 import { createUsersRouter } from "./modules/users/users.routes.js";
@@ -74,7 +74,7 @@ export function createApp(deps: AppDependencies = { prisma }) {
   app.use("/api/request-types", requestTypesRouter);
   app.use("/api/moderation", moderationRouter);
   app.use("/api/users", createUsersRouter(deps.prisma));
-  app.use("/api/staff", staffRouter);
+  app.use("/api/staff", createStaffRouter(deps.prisma));
   app.use("/api/telegram", telegramRouter);
   const frontendDist = resolve(
     dirname(fileURLToPath(import.meta.url)),

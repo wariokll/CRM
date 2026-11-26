@@ -1,12 +1,5 @@
 import type { RequestHandler } from "express";
-import {
-  createStaff,
-  createTelegramLink,
-  listStaff,
-  updateStaff,
-  updateStaffAccess,
-  updateStaffPassword,
-} from "./staff.service.js";
+import type { createStaffService } from "./staff.service.js";
 import type {
   CreateStaffInput,
   UpdateStaffAccessInput,
@@ -14,36 +7,51 @@ import type {
   UpdateStaffPasswordInput,
 } from "./staff.schemas.js";
 
-export const listStaffController: RequestHandler = async (_req, res) =>
-  res.json(await listStaff());
+type StaffService = ReturnType<typeof createStaffService>;
 
-export const createStaffController: RequestHandler = async (req, res) =>
-  res.status(201).json(await createStaff(req.body as CreateStaffInput));
+export function createStaffControllers(service: StaffService) {
+  const listStaffController: RequestHandler = async (_req, res) =>
+    res.json(await service.listStaff());
 
-export const updateStaffController: RequestHandler = async (req, res) =>
-  res.json(
-    await updateStaff(Number(req.params.id), req.body as UpdateStaffInput),
-  );
+  const createStaffController: RequestHandler = async (req, res) =>
+    res
+      .status(201)
+      .json(await service.createStaff(req.body as CreateStaffInput));
 
-export const updateStaffAccessController: RequestHandler = async (req, res) =>
-  res.json(
-    await updateStaffAccess(
+  const updateStaffController: RequestHandler = async (req, res) =>
+    res.json(
+      await service.updateStaff(
+        Number(req.params.id),
+        req.body as UpdateStaffInput,
+      ),
+    );
+
+  const updateStaffAccessController: RequestHandler = async (req, res) =>
+    res.json(
+      await service.updateStaffAccess(
+        Number(req.params.id),
+        req.auth!.userId,
+        req.body as UpdateStaffAccessInput,
+      ),
+    );
+
+  const updateStaffPasswordController: RequestHandler = async (req, res) => {
+    await service.updateStaffPassword(
       Number(req.params.id),
-      req.auth!.userId,
-      req.body as UpdateStaffAccessInput,
-    ),
-  );
+      req.body as UpdateStaffPasswordInput,
+    );
+    return res.status(204).end();
+  };
 
-export const updateStaffPasswordController: RequestHandler = async (
-  req,
-  res,
-) => {
-  await updateStaffPassword(
-    Number(req.params.id),
-    req.body as UpdateStaffPasswordInput,
-  );
-  return res.status(204).end();
-};
+  const createTelegramLinkController: RequestHandler = async (req, res) =>
+    res.json(await service.createTelegramLink(Number(req.params.id)));
 
-export const createTelegramLinkController: RequestHandler = async (req, res) =>
-  res.json(await createTelegramLink(Number(req.params.id)));
+  return {
+    listStaffController,
+    createStaffController,
+    updateStaffController,
+    updateStaffAccessController,
+    updateStaffPasswordController,
+    createTelegramLinkController,
+  };
+}
