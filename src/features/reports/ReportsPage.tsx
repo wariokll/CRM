@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
-import { RefreshCw } from "lucide-react";
 import { ApiError } from "../../api";
 import { queryKeys } from "../../shared/queryKeys";
-import { Button, ErrorState, Field } from "../../components/ui";
+import { ErrorState } from "../../components/ui";
 import { getComponents, getReportData } from "./queries";
+import { ReportControls } from "./ReportControls";
 import {
   ProcurementReport,
   RequestsReport,
@@ -75,86 +75,23 @@ export function ReportsPage() {
   return (
     <>
       {error && <ErrorState>{error}</ErrorState>}
-      <section className="panel table-panel">
-        <div className="toolbar">
-          <Field label="С">
-            <input
-              type="date"
-              value={from}
-              max={to}
-              onChange={(event) => setParam("from", event.target.value)}
-            />
-          </Field>
-          <Field label="По">
-            <input
-              type="date"
-              value={to}
-              min={from}
-              onChange={(event) => setParam("to", event.target.value)}
-            />
-          </Field>
-          {view === "procurement" && (
-            <Field label="Компонент">
-              <select
-                value={componentId}
-                onChange={(event) => {
-                  setComponentIdState(event.target.value);
-                  setParam("componentId", event.target.value);
-                }}
-              >
-                <option value="">Все компоненты</option>
-                {components
-                  .filter((component) => component.isActive)
-                  .map((component) => (
-                    <option value={component.id} key={component.id}>
-                      {component.name}
-                    </option>
-                  ))}
-              </select>
-            </Field>
-          )}
-          <Button kind="secondary" onClick={() => void reportQuery.refetch()}>
-            <RefreshCw /> Обновить
-          </Button>
-        </div>
-        <div className="segmented report-tabs">
-          <button
-            type="button"
-            className={view === "overview" ? "active" : ""}
-            onClick={() => setView("overview")}
-          >
-            Сводка
-          </button>
-          <button
-            type="button"
-            className={view === "clients" ? "active" : ""}
-            onClick={() => setView("clients")}
-          >
-            Клиенты и точки
-          </button>
-          <button
-            type="button"
-            className={view === "team" ? "active" : ""}
-            onClick={() => setView("team")}
-          >
-            Команда
-          </button>
-          <button
-            type="button"
-            className={view === "requests" ? "active" : ""}
-            onClick={() => setView("requests")}
-          >
-            Реестр заявок
-          </button>
-          <button
-            type="button"
-            className={view === "procurement" ? "active" : ""}
-            onClick={() => setView("procurement")}
-          >
-            Планируемые закупки
-          </button>
-        </div>
-      </section>
+      <ReportControls
+        from={from}
+        to={to}
+        view={view}
+        componentId={componentId}
+        components={components}
+        setParam={(key, value) => {
+          if (key === "componentId") setComponentIdState(value);
+          setParam(key, value);
+        }}
+        setView={setView}
+        setComponentId={(value) => {
+          setComponentIdState(value);
+          setParam("componentId", value);
+        }}
+        refetch={() => reportQuery.refetch()}
+      />
       {stats && (
         <>
           <ReportStats stats={stats} />
