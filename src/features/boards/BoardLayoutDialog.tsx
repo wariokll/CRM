@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from "react";
-import { AlertTriangle, RotateCcw } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { ApiError } from "../../api";
 import type { BoardDetails } from "../../types";
 import { Dialog, errorText } from "./BoardDialog";
-import { BoardLayoutPreview } from "./BoardLayoutPreview";
+import { BoardLayoutFields } from "./BoardLayoutFields";
 
 const DEFAULT_WIDTH = 294;
 const MAX_WIDTH = 1800;
@@ -104,8 +104,6 @@ export function BoardLayoutDialog({
     );
     selectScope(selected.length ? scope : "all");
   };
-  const previewCards = selected[0]?.cards ?? [];
-
   return (
     <Dialog title="Вид доски" close={close} wide>
       <form onSubmit={submit}>
@@ -113,114 +111,24 @@ export function BoardLayoutDialog({
           Настройте столбцы под свой рабочий процесс. Изменения сохраняются для
           всех участников доски.
         </p>
-        <fieldset className="board-layout-fields" disabled={busy}>
-          <label className="field">
-            <span>Применить к</span>
-            <select
-              value={scope}
-              onChange={(event) => selectScope(event.target.value)}
-            >
-              <option value="all">Все столбцы ({board.columns.length})</option>
-              {board.columns.map((column) => (
-                <option key={column.id} value={column.id}>
-                  {column.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="layout-control-heading">
-            <label htmlFor="board-column-width">Ширина столбца</label>
-            <div className="layout-width-input">
-              <input
-                id="board-column-width"
-                type="number"
-                min={min}
-                max={MAX_WIDTH}
-                step={1}
-                required
-                value={widthText}
-                onChange={(event) => setWidthText(event.target.value)}
-                onBlur={() => setWidth(width || min)}
-              />
-              <span>px</span>
-            </div>
-          </div>
-          <input
-            className="layout-width-slider"
-            type="range"
-            min={min}
-            max={MAX_WIDTH}
-            step={1}
-            value={previewWidth}
-            onChange={(event) => setWidth(Number(event.target.value))}
-            aria-label="Ширина столбца ползунком"
-          />
-          <div className="layout-presets">
-            {[1, 2, 3, 4].map((scale) => (
-              <button
-                type="button"
-                key={scale}
-                className={width === DEFAULT_WIDTH * scale ? "active" : ""}
-                onClick={() => setWidth(DEFAULT_WIDTH * scale)}
-              >
-                {scale === 1 ? "Обычная" : `×${scale}`}
-              </button>
-            ))}
-          </div>
-          <div className="layout-control-heading">
-            <span id="board-grid-label">Карточек в строке</span>
-            <b>{cardsPerRow}</b>
-          </div>
-          <div
-            className="layout-grid-options"
-            role="group"
-            aria-labelledby="board-grid-label"
-          >
-            {[1, 2, 3, 4, 5, 6].map((count) => (
-              <button
-                type="button"
-                key={count}
-                aria-pressed={cardsPerRow === count}
-                className={cardsPerRow === count ? "active" : ""}
-                onClick={() => {
-                  setCardsPerRow(count);
-                  setWidthText(
-                    String(
-                      Math.max(width || DEFAULT_WIDTH, minimumWidth(count)),
-                    ),
-                  );
-                }}
-              >
-                {count}
-              </button>
-            ))}
-          </div>
-          <p className="board-dialog-hint">
-            Ширина карточки: около{" "}
-            {Math.floor(
-              (previewWidth - 24 - (cardsPerRow - 1) * 8) / cardsPerRow,
-            )}{" "}
-            px. При увеличении сетки столбец расширится, чтобы текст оставался
-            читаемым.
-          </p>
-          <BoardLayoutPreview
-            previewWidth={previewWidth}
-            cardsPerRow={cardsPerRow}
-            scope={scope}
-            selectedColumnName={selected[0]?.name}
-            previewCards={previewCards}
-          />
-          <button
-            type="button"
-            className="button ghost compact layout-reset"
-            onClick={() => {
-              setWidthText(String(DEFAULT_WIDTH));
-              setCardsPerRow(1);
-            }}
-          >
-            <RotateCcw /> Стандартный вид
-          </button>
-        </fieldset>
+        <BoardLayoutFields
+          board={board}
+          scope={scope}
+          selectScope={selectScope}
+          widthText={widthText}
+          setWidthText={setWidthText}
+          width={width}
+          min={min}
+          max={MAX_WIDTH}
+          setWidth={setWidth}
+          previewWidth={previewWidth}
+          cardsPerRow={cardsPerRow}
+          setCardsPerRow={setCardsPerRow}
+          selected={selected}
+          busy={busy}
+          defaultWidth={DEFAULT_WIDTH}
+          minWidth={minimumWidth}
+        />
         {error && (
           <div className="form-error" role="alert">
             <AlertTriangle />
