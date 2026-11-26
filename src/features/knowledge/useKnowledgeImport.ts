@@ -2,6 +2,7 @@ import { useRef, useState, type Dispatch, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { knowledgeRequest } from "./queries";
 import { queryKeys } from "../../shared/queryKeys";
+import { errorText } from "./knowledge-page-data";
 import type { KnowledgeImportResult } from "./KnowledgeImportDialog";
 import type { KnowledgeArticle, KnowledgeSection } from "../../types";
 
@@ -84,11 +85,7 @@ export function useKnowledgeImport({
         queryKey: queryKeys.knowledge.articles,
       });
     } catch (reason) {
-      setError(
-        reason instanceof Error
-          ? reason.message
-          : "Не удалось выполнить действие",
-      );
+      setError(errorText(reason));
     } finally {
       setBusy(false);
     }

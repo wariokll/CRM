@@ -14,17 +14,12 @@ import {
 } from "./queries";
 import { queryKeys } from "../../shared/queryKeys";
 import { useKnowledgeImport } from "./useKnowledgeImport";
+import { errorText } from "./knowledge-page-data";
 import type {
   KnowledgeArticle,
   KnowledgeAttachment,
   KnowledgeSection,
 } from "../../types";
-
-function errorText(reason: unknown) {
-  return reason instanceof Error
-    ? reason.message
-    : "Не удалось выполнить действие";
-}
 
 type KnowledgeEditorOptions = {
   sections: KnowledgeSection[];
