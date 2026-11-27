@@ -213,13 +213,13 @@ export function createBoardControllers(
   async function moveBoardCardController(req: Request, res: Response) {
     const cardId = boardIdSchema.parse(req.params.cardId);
     const input = moveCardSchema.parse(req.body);
-    const boardId = await moveBoardCard(
+    const boardId = await moveBoardCard({
       cardId,
-      req.auth!.userId,
-      input.targetColumnId,
-      input.position,
-      input.version,
-    );
+      userId: req.auth!.userId,
+      targetColumnId: input.targetColumnId,
+      position: input.position,
+      version: input.version,
+    });
     return res.json(await loadBoard(boardId, req.auth!.userId));
   }
 

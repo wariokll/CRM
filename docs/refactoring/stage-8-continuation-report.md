@@ -16,6 +16,7 @@
 - `01f4809` — структура frontend features приведена к `components/`, `pages/`, `hooks/` и `types/`; 64 TSX UI/type файла и 6 существующих TS hooks перенесены, импорты скорректированы. Knowledge editor разделён на editing и attachment hooks.
 - текущий backend подэтап — create/update body schemas вынесены из request services в Zod middleware; update middleware выполняет access/visibility preparation перед парсингом body, сохраняя исходный порядок API проверок.
 - knowledge page coordinator сокращён: URL/query selection, section tree, save action и attachments разделены на отдельные hooks/component.
+- параметры board move и request update helpers переведены в объектные inputs; AST scan не обнаруживает функций с более чем четырьмя позиционными аргументами.
 
 Каждый подэтап проверялся перед коммитом и был отправлен в `origin/master`.
 
@@ -30,7 +31,7 @@
 - обе production-сборки и SPA fallback smoke — успешно;
 - Playwright: 12/12.
 
-Последний полный прогон выполнен после request-validation подэтапа: request API characterization включён в backend suite (все 116 тестов прошли), а production smoke и browser E2E также прошли.
+Последний полный прогон выполнен после request-validation и object-parameter подэтапов: request API characterization включён в backend suite (все 116 тестов прошли), а production smoke и browser E2E также прошли.
 
 Полный прогон после реорганизации папок и разделения knowledge attachment hook также завершился успешно: frontend 10/10, backend 116/116, Prisma без schema diff, обе сборки, SPA fallback smoke и Playwright 12/12.
 

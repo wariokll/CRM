@@ -15,6 +15,12 @@ export function createBoardCardsService(
   prisma: PrismaClient,
   core: BoardCoreService,
 ) {
+  type CardMoveInput = {
+    cardId: number;
+    targetColumnId: number;
+    position: number;
+    version: number;
+  };
   const { findBoard, serializable } = core;
   async function createBoardCard(
     columnId: number,
@@ -122,13 +128,15 @@ export function createBoardCardsService(
       throw new AppError("Данные были изменены другим пользователем", 409);
   }
 
-  async function loadCardMoveState(
-    transaction: Prisma.TransactionClient,
-    cardId: number,
-    targetColumnId: number,
-    position: number,
-    version: number,
-  ): Promise<CardMoveState> {
+  async function loadCardMoveState({
+    transaction,
+    cardId,
+    targetColumnId,
+    position,
+    version,
+  }: CardMoveInput & {
+    transaction: Prisma.TransactionClient;
+  }): Promise<CardMoveState> {
     const current = await transaction.boardCard.findFirst({
       where: { id: cardId, deletedAt: null, archivedAt: null },
     });
@@ -200,30 +208,21 @@ export function createBoardCardsService(
     }
   }
 
-  async function moveCardInTransaction(
-    transaction: Prisma.TransactionClient,
-    cardId: number,
-    targetColumnId: number,
-    position: number,
-    version: number,
-  ) {
-    const state = await loadCardMoveState(
-      transaction,
-      cardId,
-      targetColumnId,
-      position,
-      version,
-    );
-    await persistCardMovePositions(transaction, state, targetColumnId);
+  async function moveCardInTransaction({
+    transaction,
+    ...input
+  }: CardMoveInput & { transaction: Prisma.TransactionClient }) {
+    const state = await loadCardMoveState({ transaction, ...input });
+    await persistCardMovePositions(transaction, state, input.targetColumnId);
   }
 
-  async function moveBoardCard(
-    cardId: number,
-    userId: number,
-    targetColumnId: number,
-    position: number,
-    version: number,
-  ) {
+  async function moveBoardCard({
+    cardId,
+    userId,
+    targetColumnId,
+    position,
+    version,
+  }: CardMoveInput & { userId: number }) {
     const card = await prisma.boardCard.findFirst({
       where: { id: cardId, deletedAt: null, archivedAt: null },
       select: {
@@ -246,13 +245,13 @@ export function createBoardCardsService(
     await serializable(() =>
       prisma.$transaction(
         (transaction) =>
-          moveCardInTransaction(
+          moveCardInTransaction({
             transaction,
             cardId,
             targetColumnId,
             position,
             version,
-          ),
+          }),
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       ),
     );

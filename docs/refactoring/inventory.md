@@ -24,11 +24,11 @@
 |   298 | `backend/src/modules/stores/stores.service.ts`               |
 |   276 | `backend/src/modules/organizations/organizations.service.ts` |
 |   270 | `backend/src/modules/requests/reports.service.ts`            |
-|   269 | `backend/src/modules/boards/board-cards.service.ts`          |
+|   268 | `backend/src/modules/boards/board-cards.service.ts`          |
 |   260 | `backend/src/modules/boards/board-structure.service.ts`      |
+|   252 | `backend/src/modules/requests/request-update.service.ts`     |
 |   249 | `backend/src/modules/boards/board.controller.ts`             |
 |   241 | `backend/src/telegram/bot-handler-support.ts`                |
-|   240 | `backend/src/modules/requests/request-update.service.ts`     |
 |   238 | `backend/src/telegram/bot-handlers.ts`                       |
 |   232 | `src/types/core.ts`                                          |
 |   232 | `backend/src/modules/requests/request-read.service.ts`       |
@@ -51,11 +51,11 @@
 |   298 | `backend/src/modules/stores/stores.service.ts`               |
 |   276 | `backend/src/modules/organizations/organizations.service.ts` |
 |   270 | `backend/src/modules/requests/reports.service.ts`            |
-|   269 | `backend/src/modules/boards/board-cards.service.ts`          |
+|   268 | `backend/src/modules/boards/board-cards.service.ts`          |
 |   260 | `backend/src/modules/boards/board-structure.service.ts`      |
+|   252 | `backend/src/modules/requests/request-update.service.ts`     |
 |   249 | `backend/src/modules/boards/board.controller.ts`             |
 |   241 | `backend/src/telegram/bot-handler-support.ts`                |
-|   240 | `backend/src/modules/requests/request-update.service.ts`     |
 |   238 | `backend/src/telegram/bot-handlers.ts`                       |
 |   232 | `backend/src/modules/requests/request-read.service.ts`       |
 |   232 | `backend/src/telegram/bot-request-selections.ts`             |

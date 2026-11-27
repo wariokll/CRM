@@ -25,13 +25,19 @@ import {
 export function createRequestUpdateService(prisma: PrismaClient) {
   const { notifyRequestAssignees, notifyRequestClient } =
     createTelegramNotifications(prisma);
-  async function updateRequestAssignees(
-    transaction: Prisma.TransactionClient,
-    access: UserAccess,
-    row: RequestUpdateRow,
-    update: RequestUpdateInput,
-    departmentId: number,
-  ) {
+  async function updateRequestAssignees({
+    transaction,
+    access,
+    row,
+    update,
+    departmentId,
+  }: {
+    transaction: Prisma.TransactionClient;
+    access: UserAccess;
+    row: RequestUpdateRow;
+    update: RequestUpdateInput;
+    departmentId: number;
+  }) {
     if (!update.assigneeIds) return;
     const ids = [...new Set(update.assigneeIds)];
     const eligible = await transaction.user.findMany({
@@ -65,13 +71,19 @@ export function createRequestUpdateService(prisma: PrismaClient) {
       });
   }
 
-  async function createUpdateActivity(
-    transaction: Prisma.TransactionClient,
-    row: RequestUpdateRow,
-    access: UserAccess,
-    kind: string,
-    message: string,
-  ) {
+  async function createUpdateActivity({
+    transaction,
+    row,
+    access,
+    kind,
+    message,
+  }: {
+    transaction: Prisma.TransactionClient;
+    row: RequestUpdateRow;
+    access: UserAccess;
+    kind: string;
+    message: string;
+  }) {
     await transaction.requestActivity.create({
       data: { requestId: row.id, authorUserId: access.userId, kind, message },
     });
@@ -97,21 +109,21 @@ export function createRequestUpdateService(prisma: PrismaClient) {
       CRITICAL: "критический",
     };
     if (update.status && update.status !== row.status)
-      await createUpdateActivity(
+      await createUpdateActivity({
         transaction,
         row,
         access,
-        "STATUS_CHANGED",
-        `Статус изменён: «${statusLabels[row.status]}» → «${statusLabels[update.status]}»`,
-      );
+        kind: "STATUS_CHANGED",
+        message: `Статус изменён: «${statusLabels[row.status]}» → «${statusLabels[update.status]}»`,
+      });
     if (update.priority && update.priority !== row.priority)
-      await createUpdateActivity(
+      await createUpdateActivity({
         transaction,
         row,
         access,
-        "PRIORITY_CHANGED",
-        `Приоритет изменён: «${priorityLabels[row.priority]}» → «${priorityLabels[update.priority]}»`,
-      );
+        kind: "PRIORITY_CHANGED",
+        message: `Приоритет изменён: «${priorityLabels[row.priority]}» → «${priorityLabels[update.priority]}»`,
+      });
   }
 
   async function createTransferAndAssigneeActivities(
@@ -121,23 +133,23 @@ export function createRequestUpdateService(prisma: PrismaClient) {
     update: RequestUpdateInput,
   ) {
     if (update.departmentId && update.departmentId !== row.departmentId)
-      await createUpdateActivity(
+      await createUpdateActivity({
         transaction,
         row,
         access,
-        "DEPARTMENT_CHANGED",
-        "Заявка передана в другой отдел",
-      );
+        kind: "DEPARTMENT_CHANGED",
+        message: "Заявка передана в другой отдел",
+      });
     if (update.assigneeIds)
-      await createUpdateActivity(
+      await createUpdateActivity({
         transaction,
         row,
         access,
-        "ASSIGNEES_CHANGED",
-        update.assigneeIds.length
+        kind: "ASSIGNEES_CHANGED",
+        message: update.assigneeIds.length
           ? "Исполнители обновлены"
           : "Исполнители сняты с заявки",
-      );
+      });
     if (update.adminComment?.trim())
       await transaction.requestComment.create({
         data: {
@@ -215,13 +227,13 @@ export function createRequestUpdateService(prisma: PrismaClient) {
           where: { requestId: row.id },
         });
       }
-      await updateRequestAssignees(
+      await updateRequestAssignees({
         transaction,
         access,
         row,
         update,
         departmentId,
-      );
+      });
       await persistRequestFields(transaction, row, update);
       await createRequestUpdateActivities(transaction, access, row, update);
     });
