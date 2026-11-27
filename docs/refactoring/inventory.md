@@ -22,13 +22,11 @@
 | Строк | Файл                                                         |
 | ----: | ------------------------------------------------------------ |
 |   298 | `backend/src/modules/stores/stores.service.ts`               |
-|   286 | `src/features/knowledge/hooks/useKnowledgePage.tsx`          |
 |   276 | `backend/src/modules/organizations/organizations.service.ts` |
 |   270 | `backend/src/modules/requests/reports.service.ts`            |
 |   269 | `backend/src/modules/boards/board-cards.service.ts`          |
 |   260 | `backend/src/modules/boards/board-structure.service.ts`      |
 |   249 | `backend/src/modules/boards/board.controller.ts`             |
-|   241 | `src/features/knowledge/hooks/useKnowledgeEditor.ts`         |
 |   241 | `backend/src/telegram/bot-handler-support.ts`                |
 |   240 | `backend/src/modules/requests/request-update.service.ts`     |
 |   238 | `backend/src/telegram/bot-handlers.ts`                       |
@@ -39,8 +37,10 @@
 |   225 | `backend/src/modules/requests/request-create-targets.ts`     |
 |   216 | `backend/src/modules/knowledge/knowledge.service.ts`         |
 |   209 | `src/features/boards/hooks/useBoardsPage.ts`                 |
+|   208 | `src/features/knowledge/hooks/useKnowledgeSelection.ts`      |
 |   201 | `src/features/requests/components/CreateRequestForm.tsx`     |
 |   199 | `src/features/boards/hooks/useBoardActions.ts`               |
+|   196 | `src/features/stores/pages/StoresPage.tsx`                   |
 
 ## 2.1. Топ-30 backend-файлов
 
@@ -85,10 +85,9 @@
 
 | Строк | Файл                                                           |
 | ----: | -------------------------------------------------------------- |
-|   286 | `src/features/knowledge/hooks/useKnowledgePage.tsx`            |
-|   241 | `src/features/knowledge/hooks/useKnowledgeEditor.ts`           |
 |   232 | `src/types/core.ts`                                            |
 |   209 | `src/features/boards/hooks/useBoardsPage.ts`                   |
+|   208 | `src/features/knowledge/hooks/useKnowledgeSelection.ts`        |
 |   201 | `src/features/requests/components/CreateRequestForm.tsx`       |
 |   199 | `src/features/boards/hooks/useBoardActions.ts`                 |
 |   196 | `src/features/stores/pages/StoresPage.tsx`                     |
@@ -98,9 +97,9 @@
 |   185 | `src/features/knowledge/components/KnowledgeArticleDialog.tsx` |
 |   183 | `src/features/layout/components/AppPageContent.tsx`            |
 |   182 | `src/features/knowledge/components/KnowledgeImportDialog.tsx`  |
+|   180 | `src/features/knowledge/hooks/useKnowledgeEditor.ts`           |
 |   180 | `src/features/requests/components/RequestCreationFields.tsx`   |
 |   179 | `src/features/layout/components/AppContent.tsx`                |
-|   178 | `src/features/knowledge/pages/KnowledgePage.tsx`               |
 |   178 | `src/features/requests/components/RequestStaffControls.tsx`    |
 |   177 | `src/features/boards/components/BoardCanvas.tsx`               |
 |   177 | `src/features/templates/components/TemplateEditDialog.tsx`     |
@@ -108,6 +107,7 @@
 |   172 | `src/features/templates/pages/TemplatesPage.tsx`               |
 |   171 | `src/features/boards/components/BoardArchiveDialog.tsx`        |
 |   169 | `src/features/boards/components/BoardPageDialogs.tsx`          |
+|   169 | `src/features/knowledge/pages/KnowledgePage.tsx`               |
 |   169 | `src/features/staff/pages/StaffPage.tsx`                       |
 |   165 | `src/features/boards/components/BoardWorkspace.tsx`            |
 |   163 | `src/features/requests/components/RequestModal.tsx`            |
@@ -135,7 +135,7 @@
 
 1. Request backend: read/create/update операции, update policy/уведомления и подготовка целей создания заявки вынесены в отдельные модули.
 2. Boards backend/frontend: core, structure, cards и archive сервисы разделены; `BoardsPage` состоит из страницы, рабочего поля и диалогов, а состояние и действия вынесены в hooks с отдельным drag handler.
-3. Knowledge backend/frontend: импорт документов отделён от основного сервиса; URL/query state остаётся в `useKnowledgePage`, редактирование и импорт реализованы отдельными hooks, данные/ошибки — в `knowledge-page-data.ts`.
+3. Knowledge backend/frontend: импорт документов отделён от основного сервиса; URL/query selection вынесен в `useKnowledgeSelection`, page hook собирает selection и editor hooks, section tree и сохранение статьи вынесены в отдельные компоненты/hooks.
 4. Telegram bot: базовые операции, staff linking, выбор связанных организаций/точек и диспетчер событий разнесены по модулям.
 5. Store UI/API: данные точки, форма доступа, toolbar, архивные карточки и DTO mapper разделены по обязанностям.
 

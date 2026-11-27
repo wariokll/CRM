@@ -15,6 +15,7 @@
 - следующий подэтап — проверки входа, статуса пользователя и доступных разделов вынесены в `RequireAuth` / `RequireRole`; доступ по-прежнему строится через `buildNavigation`.
 - `01f4809` — структура frontend features приведена к `components/`, `pages/`, `hooks/` и `types/`; 64 TSX UI/type файла и 6 существующих TS hooks перенесены, импорты скорректированы. Knowledge editor разделён на editing и attachment hooks.
 - текущий backend подэтап — create/update body schemas вынесены из request services в Zod middleware; update middleware выполняет access/visibility preparation перед парсингом body, сохраняя исходный порядок API проверок.
+- knowledge page coordinator сокращён: URL/query selection, section tree, save action и attachments разделены на отдельные hooks/component.
 
 Каждый подэтап проверялся перед коммитом и был отправлен в `origin/master`.
 

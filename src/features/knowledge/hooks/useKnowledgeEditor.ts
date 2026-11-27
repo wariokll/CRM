@@ -1,15 +1,12 @@
 import { useRef, useState, type Dispatch, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { knowledgeRequest, useKnowledgeMutation } from "../queries";
+import { knowledgeRequest } from "../queries";
 import { queryKeys } from "../../../shared/queryKeys";
 import { useKnowledgeImport } from "./useKnowledgeImport";
 import { errorText } from "../knowledge-page-data";
-import type {
-  KnowledgeArticle,
-  KnowledgeAttachment,
-  KnowledgeSection,
-} from "../../../types";
+import type { KnowledgeArticle, KnowledgeSection } from "../../../types";
 import { useKnowledgeAttachments } from "./useKnowledgeAttachments";
+import { useKnowledgeArticleSave } from "./useKnowledgeArticleSave";
 
 type KnowledgeEditorOptions = {
   sections: KnowledgeSection[];
@@ -46,7 +43,6 @@ export function useKnowledgeEditor({
   const [busy, setBusy] = useState(false);
   const bodyEditorRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
-  const knowledgeMutation = useKnowledgeMutation();
   const knowledgeImport = useKnowledgeImport({
     sections,
     activeSectionId,
@@ -60,6 +56,16 @@ export function useKnowledgeEditor({
     article,
     openArticle,
     setError,
+  });
+  const saveArticle = useKnowledgeArticleSave({
+    articleDialog,
+    pendingFiles,
+    setArticleDialog,
+    setActiveSectionId,
+    setBusy,
+    setError,
+    reloadSections,
+    openArticle,
   });
 
   const editArticle = (value: KnowledgeArticle | "new") => {
@@ -128,73 +134,6 @@ export function useKnowledgeEditor({
       );
     } catch (reason) {
       setError(errorText(reason));
-    }
-  };
-
-  const saveArticle = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
-    const form = new FormData(event.currentTarget);
-    const isNew = articleDialog === "new";
-    const body = {
-      sectionId: Number(form.get("sectionId")),
-      title: String(form.get("title") ?? ""),
-      body: String(form.get("body") ?? ""),
-    };
-    const files = pendingFiles;
-    try {
-      const saved = await knowledgeRequest<{ id: number; sectionId: number }>(
-        isNew
-          ? "/knowledge/articles"
-          : `/knowledge/articles/${articleDialog!.id}`,
-        {
-          method: isNew ? "POST" : "PATCH",
-          body: JSON.stringify({
-            ...body,
-            body: body.body.replace(/\[\[image:pending:\d+\]\]/g, ""),
-          }),
-        },
-      );
-      let finalBody = body.body;
-      if (files.length) {
-        const upload = new FormData();
-        files.forEach((file) => upload.append("files", file));
-        const uploaded = await knowledgeRequest<KnowledgeAttachment[]>(
-          `/knowledge/articles/${saved.id}/attachments`,
-          {
-            method: "POST",
-            body: upload,
-          },
-        );
-        files.forEach((file, index) => {
-          const attachment = uploaded[index];
-          if (file.type.startsWith("image/") && attachment)
-            finalBody = finalBody.replaceAll(
-              `[[image:pending:${index}]]`,
-              `[[image:${attachment.id}]]`,
-            );
-        });
-        if (finalBody !== body.body.replace(/\[\[image:pending:\d+\]\]/g, ""))
-          await knowledgeMutation.mutateAsync({
-            path: `/knowledge/articles/${saved.id}`,
-            init: {
-              method: "PATCH",
-              body: JSON.stringify({ body: finalBody }),
-            },
-          });
-      }
-      setArticleDialog(null);
-      setActiveSectionId(saved.sectionId);
-      await reloadSections(saved.sectionId);
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.knowledge.articles,
-      });
-      await openArticle(saved.id);
-    } catch (reason) {
-      setError(errorText(reason));
-    } finally {
-      setBusy(false);
     }
   };
 

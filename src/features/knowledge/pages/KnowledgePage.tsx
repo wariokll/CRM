@@ -1,10 +1,11 @@
-import { BookOpen, FolderPlus } from "lucide-react";
+import { FolderPlus } from "lucide-react";
 import { useKnowledgePage } from "../hooks/useKnowledgePage";
 import { ErrorState } from "../../../components/ui";
 import { KnowledgeImportDialog } from "../components/KnowledgeImportDialog";
 import { KnowledgeEditDialogs } from "../components/KnowledgeEditDialogs";
 import { KnowledgeArticleView } from "../components/KnowledgeArticleView";
 import { KnowledgeArticleList } from "../components/KnowledgeArticleList";
+import { KnowledgeSectionTree } from "../components/KnowledgeSectionTree";
 
 function errorText(reason: unknown) {
   return reason instanceof Error
@@ -64,7 +65,6 @@ export function KnowledgePage() {
     deleteAttachment,
     selectImportFiles,
     importKnowledgeFiles,
-    renderSection,
     currentSection,
   } = useKnowledgePage();
 
@@ -82,25 +82,16 @@ export function KnowledgePage() {
             <FolderPlus size={17} />
           </button>
         </div>
-        <div className="knowledge-tree">
-          <button
-            className={activeSectionId === null && !search ? "active" : ""}
-            onClick={() => {
-              setSearch("");
-              setArticle(null);
-              setActiveSectionId(null);
-            }}
-          >
-            <BookOpen size={14} />
-            <span>Все статьи</span>
-            <small>
-              {sections.reduce((sum, item) => sum + item.articles.length, 0)}
-            </small>
-          </button>
-          {sections
-            .filter((item) => item.parentId === null)
-            .map((item) => renderSection(item))}
-        </div>
+        <KnowledgeSectionTree
+          sections={sections}
+          activeSectionId={activeSectionId}
+          article={article}
+          search={search}
+          setActiveSectionId={setActiveSectionId}
+          setArticle={setArticle}
+          setSearch={setSearch}
+          openArticle={openArticle}
+        />
       </aside>
 
       <section className="knowledge-content">
