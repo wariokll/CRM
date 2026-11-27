@@ -1,1 +1,1 @@
-export { AppContent } from "./features/layout/AppContent";
+export { AppContent } from "./features/layout/components/AppContent";

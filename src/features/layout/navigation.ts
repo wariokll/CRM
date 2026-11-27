@@ -1,7 +1,20 @@
-import { BookOpen, Building2, CalendarDays, ClipboardList, Columns3, FileText, LayoutDashboard, ListTodo, MessageCircle, Settings2, Store as StoreIcon, Users } from "lucide-react";
+import {
+  BookOpen,
+  Building2,
+  CalendarDays,
+  ClipboardList,
+  Columns3,
+  FileText,
+  LayoutDashboard,
+  ListTodo,
+  MessageCircle,
+  Settings2,
+  Store as StoreIcon,
+  Users,
+} from "lucide-react";
 import { can } from "../../auth/permissions";
 import type { User } from "../../types";
-import type { NavItem } from "./AppSidebar";
+import type { NavItem } from "./components/AppSidebar";
 
 export function buildNavigation(user: User): NavItem[] {
   return [
@@ -31,5 +44,5 @@ export function buildNavigation(user: User): NavItem[] {
     ...(can(user, "MANAGE_KNOWLEDGE")
       ? [{ id: "knowledge", label: "База знаний", Icon: BookOpen }]
       : []),
-  ];;
+  ];
 }

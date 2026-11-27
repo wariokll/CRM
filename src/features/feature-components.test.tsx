@@ -1,7 +1,7 @@
 import { fireEvent, render, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { AccessDialog } from "./boards/BoardAccessDialog";
-import { StoreDetails } from "./stores/StoreDetails";
+import { AccessDialog } from "./boards/components/BoardAccessDialog";
+import { StoreDetails } from "./stores/components/StoreDetails";
 import type { BoardAccessUser, Store, User } from "../types";
 
 const user: User = {

@@ -1,7 +1,7 @@
 import type { DragEndEvent } from "@dnd-kit/core";
 import type { Dispatch, SetStateAction } from "react";
 import { boardRequest } from "./queries";
-import { errorText } from "./BoardDialog";
+import { errorText } from "./components/BoardDialog";
 import type { BoardCard, BoardDetails } from "../../types";
 
 type BoardMutation = {

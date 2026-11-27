@@ -1,6 +1,6 @@
 import { createBrowserRouter } from "react-router-dom";
-import { AppContent } from "../features/layout/AppContent";
-import { NotFoundPage } from "../features/layout/NotFoundPage";
+import { AppContent } from "../features/layout/components/AppContent";
+import { NotFoundPage } from "../features/layout/pages/NotFoundPage";
 
 const sections = [
   "requests",

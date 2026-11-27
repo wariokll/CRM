@@ -1,0 +1,170 @@
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Archive, Search } from "lucide-react";
+import { ApiError } from "../../../api";
+import type { ArchivedBoardCard, BoardDetails } from "../../../types";
+import { Dialog, errorText } from "./BoardDialog";
+import { LoadingState } from "../../../components/ui";
+import { ArchivedCardItem } from "./ArchivedCardItem";
+
+export function BoardArchiveDialog({
+  board,
+  refreshKey,
+  close,
+  updated,
+  refresh,
+  loadArchive,
+  restoreCard,
+}: {
+  board: BoardDetails;
+  refreshKey: number;
+  close: () => void;
+  updated: (board: BoardDetails) => void;
+  refresh: () => Promise<void>;
+  loadArchive: (
+    boardId: number,
+    signal: AbortSignal,
+  ) => Promise<ArchivedBoardCard[]>;
+  restoreCard: (
+    cardId: number,
+    version: number,
+    targetColumnId: number,
+  ) => Promise<BoardDetails>;
+}) {
+  const [cards, setCards] = useState<ArchivedBoardCard[]>([]);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [targets, setTargets] = useState<Record<number, number>>({});
+  const [reload, setReload] = useState(0);
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    loadArchive(board.id, controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) setCards(result);
+      })
+      .catch((reason) => {
+        if (!controller.signal.aborted) setError(errorText(reason));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [board.id, refreshKey, reload, loadArchive]);
+
+  const visible = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase("ru-RU");
+    return cards.filter((card) =>
+      `${card.title} ${card.description ?? ""} ${card.column.name}`
+        .toLocaleLowerCase("ru-RU")
+        .includes(query),
+    );
+  }, [cards, search]);
+  const targetFor = (card: ArchivedBoardCard) => {
+    const requested = targets[card.id] ?? card.columnId;
+    return board.columns.some((column) => column.id === requested)
+      ? requested
+      : board.columns[0]?.id;
+  };
+  const restore = async (card: ArchivedBoardCard) => {
+    const targetColumnId = targetFor(card);
+    if (!targetColumnId || busyId !== null || loading) return;
+    setBusyId(card.id);
+    setError("");
+    setNotice("");
+    try {
+      const result = await restoreCard(card.id, card.version, targetColumnId);
+      setCards((current) => current.filter((item) => item.id !== card.id));
+      updated(result);
+      setReload((value) => value + 1);
+      setNotice(
+        `«${card.title}» восстановлена в столбец «${result.columns.find((column) => column.id === targetColumnId)?.name ?? ""}»`,
+      );
+    } catch (reason) {
+      setError(errorText(reason));
+      if (reason instanceof ApiError && [404, 409].includes(reason.status)) {
+        setReload((value) => value + 1);
+        await refresh();
+      }
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <Dialog title={`Архив · ${board.name}`} close={close} wide>
+      <p className="board-dialog-hint">
+        Восстановите карточку в исходный или другой столбец этой доски. Она
+        появится в конце списка.
+      </p>
+      <label className="board-access-search">
+        <Search />
+        <input
+          autoFocus
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Поиск по названию, описанию или столбцу"
+          aria-label="Поиск в архиве"
+        />
+      </label>
+      {error && (
+        <div className="form-error" role="alert">
+          <AlertTriangle />
+          {error}
+        </div>
+      )}
+      {notice && (
+        <p className="archive-success" role="status">
+          {notice}
+        </p>
+      )}
+      {loading && <LoadingState>Загрузка архива…</LoadingState>}
+      <div className="board-archive-list" aria-busy={loading}>
+        {visible.map((card) => (
+          <ArchivedCardItem
+            key={card.id}
+            card={card}
+            columns={board.columns}
+            targetColumnId={targetFor(card)}
+            busy={busyId !== null}
+            loading={loading}
+            onTargetChange={(columnId) =>
+              setTargets((current) => ({ ...current, [card.id]: columnId }))
+            }
+            onRestore={() => void restore(card)}
+          />
+        ))}
+        {!loading && !visible.length && !error && (
+          <div className="archive-empty">
+            <Archive />
+            <b>{cards.length ? "Ничего не найдено" : "Архив пуст"}</b>
+            <p>
+              {cards.length
+                ? "Попробуйте изменить поисковый запрос."
+                : "Здесь появятся карточки, отправленные в архив."}
+            </p>
+          </div>
+        )}
+      </div>
+      {error && (
+        <button
+          className="button secondary compact"
+          onClick={() => {
+            setError("");
+            setReload((value) => value + 1);
+          }}
+        >
+          Обновить архив
+        </button>
+      )}
+      <div className="modal-actions">
+        <button className="button secondary" onClick={close}>
+          Закрыть
+        </button>
+      </div>
+    </Dialog>
+  );
+}

@@ -1,6 +1,6 @@
 # Инвентаризация CRM после этапа 8
 
-Дата: 2026-11-26
+Дата: 2026-11-27
 Ветка: `master`
 Основание: ТЗ «рефакторинг CRM» и завершённые этапы 0–8.7.
 
@@ -8,7 +8,7 @@
 
 ## 1. Карта проекта
 
-- Frontend: React, TypeScript и Vite; приложение и страницы находятся в `src/`, общие типы — в `src/types/`, feature-код — в `src/features/`.
+- Frontend: React, TypeScript и Vite; composition root находится в `src/app/`, feature UI разложен по `components/`, `pages/` и `hooks/`, feature-specific типы находятся в `types/`, общие типы — в `src/types/`.
 - Backend: Express 5 и TypeScript в `backend/src/`; маршруты организованы в `backend/src/modules/` с разделением routes, controllers и services там, где это применимо. Запуск приложения и сервер находятся в `backend/src/app.ts` и `backend/src/server.ts`.
 - Хранилище: Prisma 6 и MariaDB; схема — `backend/prisma/schema.prisma`, миграции — `backend/prisma/migrations/` (14 миграций).
 - В `backend/src/modules/` находятся 14 модулей: `auth`, `boards`, `components`, `departments`, `knowledge`, `moderation`, `organizations`, `recurring-requests`, `request-types`, `requests`, `staff`, `stores`, `telegram`, `users`.
@@ -17,104 +17,104 @@
 
 ## 2. Крупнейшие текущие файлы
 
-Размеры рассчитаны автоматически по исходникам TypeScript/TSX; тестовые файлы исключены. Размер сам по себе не доказывает смешение ответственностей.
-
-| Строк | Файл                                                         | Содержание      |
-| ----: | ------------------------------------------------------------ | --------------- |
-|   294 | `src/features/knowledge/useKnowledgeEditor.ts`               | Frontend source |
-|   284 | `backend/src/modules/stores/stores.service.ts`               | Backend source  |
-|   275 | `src/features/knowledge/useKnowledgePage.tsx`                | Frontend source |
-|   264 | `backend/src/modules/organizations/organizations.service.ts` | Backend source  |
-|   263 | `backend/src/modules/requests/reports.service.ts`            | Backend source  |
-|   259 | `backend/src/modules/boards/board-cards.service.ts`          | Backend source  |
-|   249 | `backend/src/modules/boards/board-structure.service.ts`      | Backend source  |
-|   228 | `backend/src/telegram/bot-handler-support.ts`                | Backend source  |
-|   227 | `backend/src/telegram/bot-handlers.ts`                       | Backend source  |
-|   226 | `backend/src/modules/boards/board.controller.ts`             | Backend source  |
-|   225 | `backend/src/modules/requests/request-update.service.ts`     | Backend source  |
-|   224 | `backend/src/modules/requests/request-create.service.ts`     | Backend source  |
-|   222 | `backend/src/modules/requests/request-read.service.ts`       | Backend source  |
-|   221 | `src/types/core.ts`                                          | Frontend source |
-|   219 | `backend/src/modules/requests/request-create-targets.ts`     | Backend source  |
-|   219 | `backend/src/telegram/bot-request-selections.ts`             | Backend source  |
-|   204 | `src/features/boards/useBoardsPage.ts`                       | Frontend source |
-|   201 | `backend/src/modules/knowledge/knowledge.service.ts`         | Backend source  |
-|   199 | `src/App.tsx`                                                | Frontend source |
-|   198 | `src/features/requests/CreateRequestForm.tsx`                | Frontend source |
-
-## 2.1. Топ-30 backend-файлов
-
-Топ-30 backend-исходников; тестовые файлы исключены.
+Размеры рассчитаны по исходникам TypeScript/TSX; тесты исключены. Размер сам по себе не доказывает смешение ответственностей.
 
 | Строк | Файл                                                         |
 | ----: | ------------------------------------------------------------ |
-|   284 | `backend/src/modules/stores/stores.service.ts`               |
-|   264 | `backend/src/modules/organizations/organizations.service.ts` |
-|   263 | `backend/src/modules/requests/reports.service.ts`            |
-|   259 | `backend/src/modules/boards/board-cards.service.ts`          |
-|   249 | `backend/src/modules/boards/board-structure.service.ts`      |
-|   228 | `backend/src/telegram/bot-handler-support.ts`                |
-|   227 | `backend/src/telegram/bot-handlers.ts`                       |
-|   226 | `backend/src/modules/boards/board.controller.ts`             |
-|   225 | `backend/src/modules/requests/request-update.service.ts`     |
-|   224 | `backend/src/modules/requests/request-create.service.ts`     |
-|   222 | `backend/src/modules/requests/request-read.service.ts`       |
-|   219 | `backend/src/modules/requests/request-create-targets.ts`     |
-|   219 | `backend/src/telegram/bot-request-selections.ts`             |
-|   201 | `backend/src/modules/knowledge/knowledge.service.ts`         |
-|   166 | `backend/src/telegram/bot-targets.ts`                        |
-|   160 | `backend/src/utils/telegram-notifications.ts`                |
-|   152 | `backend/src/modules/requests/request.controller.ts`         |
-|   143 | `backend/src/modules/moderation/moderation.service.ts`       |
-|   140 | `backend/src/modules/knowledge/knowledge.controller.ts`      |
-|   138 | `backend/src/modules/boards/board-core.service.ts`           |
-|   138 | `backend/src/modules/staff/staff.service.ts`                 |
-|   138 | `backend/src/modules/telegram/telegram.service.ts`           |
-|   132 | `backend/src/modules/users/users.service.ts`                 |
-|   128 | `backend/src/shared/response-schemas.ts`                     |
-|   122 | `backend/src/modules/knowledge/knowledge-import.service.ts`  |
-|   119 | `backend/src/modules/auth/auth.service.ts`                   |
-|   111 | `backend/src/telegram/bot-employee-handlers.ts`              |
-|   102 | `backend/src/utils/recurring-requests.ts`                    |
-|   100 | `backend/src/modules/knowledge/knowledge.routes.ts`          |
-|    94 | `backend/src/shared/middleware/authorization.ts`             |
+|   298 | `backend/src/modules/stores/stores.service.ts`               |
+|   286 | `src/features/knowledge/hooks/useKnowledgePage.tsx`          |
+|   276 | `backend/src/modules/organizations/organizations.service.ts` |
+|   270 | `backend/src/modules/requests/reports.service.ts`            |
+|   269 | `backend/src/modules/boards/board-cards.service.ts`          |
+|   260 | `backend/src/modules/boards/board-structure.service.ts`      |
+|   249 | `backend/src/modules/boards/board.controller.ts`             |
+|   247 | `src/features/knowledge/hooks/useKnowledgeEditor.ts`         |
+|   241 | `backend/src/telegram/bot-handler-support.ts`                |
+|   238 | `backend/src/telegram/bot-handlers.ts`                       |
+|   234 | `backend/src/modules/requests/request-update.service.ts`     |
+|   232 | `src/types/core.ts`                                          |
+|   232 | `backend/src/modules/requests/request-create.service.ts`     |
+|   232 | `backend/src/modules/requests/request-read.service.ts`       |
+|   232 | `backend/src/telegram/bot-request-selections.ts`             |
+|   225 | `backend/src/modules/requests/request-create-targets.ts`     |
+|   216 | `backend/src/modules/knowledge/knowledge.service.ts`         |
+|   209 | `src/features/boards/hooks/useBoardsPage.ts`                 |
+|   201 | `src/features/requests/components/CreateRequestForm.tsx`     |
+|   199 | `src/features/boards/hooks/useBoardActions.ts`               |
+
+## 2.1. Топ-30 backend-файлов
+
+Top 30 backend source files; tests are excluded.
+
+| Строк | Файл                                                         |
+| ----: | ------------------------------------------------------------ |
+|   298 | `backend/src/modules/stores/stores.service.ts`               |
+|   276 | `backend/src/modules/organizations/organizations.service.ts` |
+|   270 | `backend/src/modules/requests/reports.service.ts`            |
+|   269 | `backend/src/modules/boards/board-cards.service.ts`          |
+|   260 | `backend/src/modules/boards/board-structure.service.ts`      |
+|   249 | `backend/src/modules/boards/board.controller.ts`             |
+|   241 | `backend/src/telegram/bot-handler-support.ts`                |
+|   238 | `backend/src/telegram/bot-handlers.ts`                       |
+|   234 | `backend/src/modules/requests/request-update.service.ts`     |
+|   232 | `backend/src/modules/requests/request-create.service.ts`     |
+|   232 | `backend/src/modules/requests/request-read.service.ts`       |
+|   232 | `backend/src/telegram/bot-request-selections.ts`             |
+|   225 | `backend/src/modules/requests/request-create-targets.ts`     |
+|   216 | `backend/src/modules/knowledge/knowledge.service.ts`         |
+|   196 | `backend/src/test/api-characterization.helpers.ts`           |
+|   173 | `backend/src/telegram/bot-targets.ts`                        |
+|   166 | `backend/src/utils/telegram-notifications.ts`                |
+|   165 | `backend/src/modules/requests/request.controller.ts`         |
+|   157 | `backend/src/modules/knowledge/knowledge.controller.ts`      |
+|   151 | `backend/src/modules/moderation/moderation.service.ts`       |
+|   149 | `backend/src/modules/telegram/telegram.service.ts`           |
+|   147 | `backend/src/modules/staff/staff.service.ts`                 |
+|   146 | `backend/src/modules/boards/board-core.service.ts`           |
+|   138 | `backend/src/modules/users/users.service.ts`                 |
+|   138 | `backend/src/shared/response-schemas.ts`                     |
+|   127 | `backend/src/modules/auth/auth.service.ts`                   |
+|   126 | `backend/src/modules/knowledge/knowledge-import.service.ts`  |
+|   118 | `backend/src/telegram/bot-employee-handlers.ts`              |
+|   109 | `backend/src/utils/recurring-requests.ts`                    |
+|   108 | `backend/src/modules/knowledge/knowledge.routes.ts`          |
 
 ## 2.2. Топ-30 frontend-файлов
 
-Топ-30 frontend-исходников; тестовые файлы исключены.
+Top 30 frontend source files; tests are excluded.
 
-| Строк | Файл                                                |
-| ----: | --------------------------------------------------- |
-|   294 | `src/features/knowledge/useKnowledgeEditor.ts`      |
-|   275 | `src/features/knowledge/useKnowledgePage.tsx`       |
-|   221 | `src/types/core.ts`                                 |
-|   204 | `src/features/boards/useBoardsPage.ts`              |
-|   199 | `src/App.tsx`                                       |
-|   198 | `src/features/requests/CreateRequestForm.tsx`       |
-|   195 | `src/features/boards/useBoardActions.ts`            |
-|   194 | `src/features/stores/StoresPage.tsx`                |
-|   191 | `src/features/telegram/TelegramPage.tsx`            |
-|   187 | `src/features/requests/RequestsList.tsx`            |
-|   186 | `src/features/organizations/OrganizationsPage.tsx`  |
-|   183 | `src/features/knowledge/KnowledgeArticleDialog.tsx` |
-|   179 | `src/features/knowledge/KnowledgeImportDialog.tsx`  |
-|   179 | `src/features/layout/AppPageContent.tsx`            |
-|   178 | `src/features/requests/RequestCreationFields.tsx`   |
-|   176 | `src/features/requests/RequestStaffControls.tsx`    |
-|   175 | `src/features/templates/TemplateEditDialog.tsx`     |
-|   173 | `src/features/boards/BoardDialogs.tsx`              |
-|   172 | `src/features/boards/BoardCanvas.tsx`               |
-|   170 | `src/features/knowledge/KnowledgePage.tsx`          |
-|   169 | `src/features/templates/TemplatesPage.tsx`          |
-|   166 | `src/features/boards/BoardArchiveDialog.tsx`        |
-|   166 | `src/features/boards/BoardPageDialogs.tsx`          |
-|   166 | `src/features/staff/StaffPage.tsx`                  |
-|   163 | `src/features/boards/BoardWorkspace.tsx`            |
-|   160 | `src/features/requests/RequestModal.tsx`            |
-|   157 | `src/features/boards/BoardLayoutDialog.tsx`         |
-|   157 | `src/features/reports/ReportsPage.tsx`              |
-|   157 | `src/features/staff/StaffAccessDialog.tsx`          |
-|   155 | `src/features/boards/BoardsPage.tsx`                |
+| Строк | Файл                                                           |
+| ----: | -------------------------------------------------------------- |
+|   286 | `src/features/knowledge/hooks/useKnowledgePage.tsx`            |
+|   247 | `src/features/knowledge/hooks/useKnowledgeEditor.ts`           |
+|   232 | `src/types/core.ts`                                            |
+|   209 | `src/features/boards/hooks/useBoardsPage.ts`                   |
+|   201 | `src/features/requests/components/CreateRequestForm.tsx`       |
+|   199 | `src/features/boards/hooks/useBoardActions.ts`                 |
+|   196 | `src/features/stores/pages/StoresPage.tsx`                     |
+|   194 | `src/features/organizations/pages/OrganizationsPage.tsx`       |
+|   194 | `src/features/telegram/pages/TelegramPage.tsx`                 |
+|   189 | `src/features/requests/components/RequestsList.tsx`            |
+|   185 | `src/features/knowledge/components/KnowledgeArticleDialog.tsx` |
+|   183 | `src/features/layout/components/AppPageContent.tsx`            |
+|   182 | `src/features/knowledge/components/KnowledgeImportDialog.tsx`  |
+|   180 | `src/features/requests/components/RequestCreationFields.tsx`   |
+|   179 | `src/features/layout/components/AppContent.tsx`                |
+|   178 | `src/features/knowledge/pages/KnowledgePage.tsx`               |
+|   178 | `src/features/requests/components/RequestStaffControls.tsx`    |
+|   177 | `src/features/boards/components/BoardCanvas.tsx`               |
+|   177 | `src/features/templates/components/TemplateEditDialog.tsx`     |
+|   176 | `src/features/boards/components/BoardDialogs.tsx`              |
+|   172 | `src/features/templates/pages/TemplatesPage.tsx`               |
+|   171 | `src/features/boards/components/BoardArchiveDialog.tsx`        |
+|   169 | `src/features/boards/components/BoardPageDialogs.tsx`          |
+|   169 | `src/features/staff/pages/StaffPage.tsx`                       |
+|   165 | `src/features/boards/components/BoardWorkspace.tsx`            |
+|   163 | `src/features/requests/components/RequestModal.tsx`            |
+|   160 | `src/features/boards/components/BoardLayoutDialog.tsx`         |
+|   159 | `src/features/reports/pages/ReportsPage.tsx`                   |
+|   159 | `src/features/staff/components/StaffAccessDialog.tsx`          |
+|   158 | `src/features/boards/pages/BoardsPage.tsx`                     |
 
 ## 2.3. Карта UI по ролям и правам
 
@@ -150,7 +150,7 @@
 ## 4. Проверки и контракты
 
 - `npm.cmd run verify` выполняет проверку UTF-8, frontend/backend TypeScript, ESLint, Prettier, frontend и backend tests с coverage, обе production-сборки, SPA fallback и Playwright smoke.
-- Полный прогон 2026-11-26: frontend — 10 тестов; backend — 116 тестов; Playwright — 12 тестов. Все прошли.
+- Полный прогон 2026-11-27: frontend — 10 тестов; backend — 116 тестов; Playwright — 12 тестов. Все прошли.
 - Актуальное покрытие выводится непосредственно в `verify`; это число не является критерием нонтестовой сверки.
 - В frontend и backend включён TypeScript `noUncheckedIndexedAccess`.
 - Общий каталог `shared-types/` содержит response DTO для board access, request assignees, organization contacts/members, store summaries и client summaries. Runtime Zod validation пяти групп DTO выполняется в `backend/src/shared/response-schemas.ts`; `shared-types/` остаётся только декларациями типов, подключёнными через tsconfig alias.
@@ -162,4 +162,4 @@
 
 ## 6. Следующая работа
 
-Состояние инвентаризации обновлено 2026-11-26. После структурных подэтапов остались функциональные/API/DB пункты только там, где это отдельно отмечено в `stage-8-nontest-audit.md`. Необходимость эксплуатации без Docker и служб также учтена по прямому указанию пользователя.
+Состояние инвентаризации обновлено 2026-11-27. После структурных подэтапов остались API/DB пункты только там, где это отдельно отмечено в `stage-8-nontest-audit.md`. Необходимость эксплуатации без Docker и служб также учтена по прямому указанию пользователя.

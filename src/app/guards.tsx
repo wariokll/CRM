@@ -3,9 +3,9 @@ import { RefreshCw } from "lucide-react";
 import { Navigate, useLocation } from "react-router-dom";
 import { logout } from "../api";
 import { useAuth } from "../auth/AuthContext";
-import { AuthPage } from "../features/auth/AuthPage";
-import { AccessDeniedPage } from "../features/layout/AccessDeniedPage";
-import { AccountStatusPage } from "../features/layout/AccountStatusPage";
+import { AuthPage } from "../features/auth/pages/AuthPage";
+import { AccessDeniedPage } from "../features/layout/pages/AccessDeniedPage";
+import { AccountStatusPage } from "../features/layout/pages/AccountStatusPage";
 import { buildNavigation } from "../features/layout/navigation";
 
 const knownPages = new Set([
