@@ -12,6 +12,7 @@
 - `e063c8f` — request update policy вынесена из update service.
 - `26724ee` — загрузка knowledge page data и форматирование ошибок вынесены в общий helper.
 - текущий подэтап — composition root перенесён в `src/app/`; `main.tsx` стал точкой запуска, `AppContent` размещён в layout feature, прежние корневые импорты сохранены через barrel. Исправлена mojibake-строка загрузки.
+- следующий подэтап — проверки входа, статуса пользователя и доступных разделов вынесены в `RequireAuth` / `RequireRole`; доступ по-прежнему строится через `buildNavigation`.
 
 Каждый подэтап проверялся перед коммитом и был отправлен в `origin/master`.
 
@@ -25,6 +26,8 @@
 - Prisma: 14 миграций, нет ожидающих миграций и schema diff;
 - обе production-сборки и SPA fallback smoke — успешно;
 - Playwright: 12/12.
+
+Этот прогон включал guards: frontend 10/10, backend 116/116, 14 Prisma migrations без schema diff, сборки, SPA fallback smoke и Playwright 12/12.
 
 Проверка включала текущий composition-root подэтап. Повторный `npm.cmd run verify` прошёл после исправления относительных импортов; затем были удалены только случайные форматтером изменённые файлы из diff и BOM у `main.tsx` (содержимое приложения не менялось).
 

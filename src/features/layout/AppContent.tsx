@@ -1,42 +1,20 @@
 ﻿import { useEffect, useState } from "react";
-import {
-  Navigate,
-  useLocation,
-  useNavigate,
-  useSearchParams,
-} from "react-router-dom";
-import { RefreshCw } from "lucide-react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { logout } from "../../api";
 import { useAuth } from "../../auth/AuthContext";
-import { AuthPage } from "../auth/AuthPage";
+import { RequireAuth, RequireRole } from "../../app/guards";
 import { AppSidebar } from "./AppSidebar";
 import { AppPageContent } from "./AppPageContent";
 import { AppPageHeader } from "./AppPageHeader";
 import { buildNavigation } from "./navigation";
-import { AccountStatusPage } from "./AccountStatusPage";
-import { AccessDeniedPage } from "./AccessDeniedPage";
 import { AppDialogs } from "./AppDialogs";
 import { useAppData } from "./useAppData";
 import { ErrorState } from "../../components/ui";
 import "../../recurrence.css";
 import type { ServiceRequest } from "../../types";
 
-const knownPages = new Set([
-  "requests",
-  "calendar",
-  "organizations",
-  "stores",
-  "my-boards",
-  "team-boards",
-  "reports",
-  "templates",
-  "staff",
-  "telegram",
-  "knowledge",
-]);
-
-export function AppContent() {
-  const { user, setUser, booting } = useAuth();
+function AppContentView() {
+  const { user, setUser } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const routeParts = location.pathname.split("/").filter(Boolean);
@@ -102,21 +80,8 @@ export function AppContent() {
     await logout();
     setUser(null);
   };
-  if (booting)
-    return (
-      <main className="boot">
-        <RefreshCw className="spin" /> Загрузка БАЗИС CRM…
-      </main>
-    );
-  if (!user) return <AuthPage onAuth={setUser} />;
-  if (user.status !== "ACTIVE")
-    return <AccountStatusPage user={user} exit={exit} />;
+  if (!user || user.status !== "ACTIVE") return null;
   const nav = buildNavigation(user);
-
-  if (page !== "dashboard" && !knownPages.has(page))
-    return <Navigate to="/" replace />;
-  if (page !== "dashboard" && !nav.some((item) => item.id === page))
-    return <AccessDeniedPage />;
   const urgent = requests.filter(
     (r) =>
       r.priority === "CRITICAL" && !["DONE", "CANCELLED"].includes(r.status),
@@ -199,5 +164,15 @@ export function AppContent() {
         }}
       />
     </main>
+  );
+}
+
+export function AppContent() {
+  return (
+    <RequireAuth>
+      <RequireRole>
+        <AppContentView />
+      </RequireRole>
+    </RequireAuth>
   );
 }
