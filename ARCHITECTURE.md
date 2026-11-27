@@ -4,8 +4,8 @@ This document describes the current source layout and runtime boundaries.
 
 ## Frontend
 
-- `src/main.tsx` installs the Query client, authentication provider, and `RouterProvider`.
-- `src/router.tsx` declares browser routes; `src/App.tsx` composes the authenticated CRM shell and applies the existing role checks.
+- `src/main.tsx` is the bootstrap entry point; `src/app/App.tsx` composes the providers and `RouterProvider`.
+- `src/app/router.tsx` declares browser routes. The app shell and role checks live in the layout feature and app guards; root `src/App.tsx` and `src/router.tsx` are compatibility re-exports.
 - `src/features/layout/` contains the sidebar, header, page composition, shared dashboard data queries, and account status screen.
 - `src/features/<feature>/` contains feature pages, presentation components, and `queries.ts` modules for feature API operations. Feature pages are loaded lazily. Search filters and selected entities that should survive reloads are stored in route paths or query parameters.
 - `src/shared/http.ts` owns cookies, access-token refresh, API errors, and JSON/file requests. `src/api.ts` is a compatibility re-export.
@@ -27,4 +27,4 @@ The Express production server serves `dist/` and returns `index.html` for non-AP
 
 ## Verification
 
-Run `npm run verify` at the repository root. It checks frontend and backend TypeScript, ESLint, Prettier, frontend unit tests, backend integration tests against the isolated MariaDB test database, production builds, and Playwright smoke tests. Deployment scripts and Docker Compose are documented in `DEPLOYMENT.md` and `docker-compose.production.yml`.
+Run `npm run verify` at the repository root. It checks frontend and backend TypeScript, ESLint, Prettier, frontend unit tests, backend integration tests against the isolated MariaDB test database, production builds, and Playwright smoke tests. Optional Windows Server deployment scripts are documented in `DEPLOYMENT.md`.

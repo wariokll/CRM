@@ -22,3 +22,6 @@ backend/.env.test
 backend/.mysql-test-data/
 .env
 deploy/.env.production
+*.tsbuildinfo
+/vite.config.js
+/vite.config.d.ts

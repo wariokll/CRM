@@ -1,6 +1,6 @@
 # Production deployment on Windows Server
 
-This deployment path uses native Windows services for the CRM API and Telegram bot, plus MariaDB as a Windows service. Docker Compose remains available in [docker-compose.production.yml](./docker-compose.production.yml) as an alternative, but is not required.
+This optional production deployment path uses native Windows services for the CRM API and Telegram bot, plus MariaDB as a Windows service. It is separate from the local manual start scripts.
 
 ## 1. Server preparation
 

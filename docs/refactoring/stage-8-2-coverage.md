@@ -1,5 +1,7 @@
 # Stage 8.2 — Coverage baseline and thresholds
 
+> Исторический baseline на момент этапа 8.2. Приведённые проценты и план роста не являются текущими показателями; после завершающих изменений этапа coverage не пересчитывался в рамках аудита вне тестов.
+
 ## Configuration
 
 - Frontend and backend use the already installed `@vitest/coverage-v8`; no dependency was added.
