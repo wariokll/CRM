@@ -13,7 +13,8 @@
 - `26724ee` — загрузка knowledge page data и форматирование ошибок вынесены в общий helper.
 - текущий подэтап — composition root перенесён в `src/app/`; `main.tsx` стал точкой запуска, `AppContent` размещён в layout feature, прежние корневые импорты сохранены через barrel. Исправлена mojibake-строка загрузки.
 - следующий подэтап — проверки входа, статуса пользователя и доступных разделов вынесены в `RequireAuth` / `RequireRole`; доступ по-прежнему строится через `buildNavigation`.
-- структура frontend features приведена к `components/`, `pages/`, `hooks/` и `types/`; 64 TSX UI/type файла и 6 существующих TS hooks перенесены, импорты скорректированы. Knowledge editor разделён на editing и attachment hooks.
+- `01f4809` — структура frontend features приведена к `components/`, `pages/`, `hooks/` и `types/`; 64 TSX UI/type файла и 6 существующих TS hooks перенесены, импорты скорректированы. Knowledge editor разделён на editing и attachment hooks.
+- текущий backend подэтап — create/update body schemas вынесены из request services в Zod middleware; update middleware выполняет access/visibility preparation перед парсингом body, сохраняя исходный порядок API проверок.
 
 Каждый подэтап проверялся перед коммитом и был отправлен в `origin/master`.
 
@@ -27,6 +28,8 @@
 - Prisma: 14 миграций, нет ожидающих миграций и schema diff;
 - обе production-сборки и SPA fallback smoke — успешно;
 - Playwright: 12/12.
+
+Последний полный прогон выполнен после request-validation подэтапа: request API characterization включён в backend suite (все 116 тестов прошли), а production smoke и browser E2E также прошли.
 
 Полный прогон после реорганизации папок и разделения knowledge attachment hook также завершился успешно: frontend 10/10, backend 116/116, Prisma без schema diff, обе сборки, SPA fallback smoke и Playwright 12/12.
 

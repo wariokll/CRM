@@ -6,7 +6,6 @@ import {
   type UserAccess,
 } from "../../shared/middleware/authorization.js";
 import { requestInclude } from "./request.include.js";
-import { createRequestSchema } from "./request.contracts.js";
 import { createTelegramNotifications } from "../../utils/telegram-notifications.js";
 import { RequestServiceError } from "./request.errors.js";
 import { createRequestTargetService } from "./request-create-targets.js";
@@ -188,8 +187,7 @@ export function createRequestCreationService(prisma: PrismaClient) {
     });
   }
 
-  async function createRequest(userId: number, input: unknown) {
-    const body = createRequestSchema.parse(input);
+  async function createRequest(userId: number, body: RequestCreationBody) {
     const access = await getUserAccess(userId, prisma);
     if (!access || access.status !== "ACTIVE")
       throw new RequestServiceError(403, "Аккаунт ещё не одобрен");

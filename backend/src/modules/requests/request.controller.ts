@@ -136,9 +136,8 @@ export function createRequestControllers(
 
   const updateRequestController: RequestHandler = async (req, res) => {
     try {
-      const request = await requests.updateRequest(
-        req.auth!.userId,
-        Number(req.params.id),
+      const request = await requests.updatePreparedRequest(
+        res.locals.requestUpdateContext,
         req.body,
       );
       return res.json(request);

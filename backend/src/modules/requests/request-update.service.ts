@@ -12,7 +12,6 @@ import {
 } from "../../shared/middleware/authorization.js";
 import { requestVisibilityWhere } from "./request-policy.js";
 import { requestInclude } from "./request.include.js";
-import { updateRequestSchema } from "./request.contracts.js";
 import { createTelegramNotifications } from "../../utils/telegram-notifications.js";
 import { RequestServiceError } from "./request.errors.js";
 import { notifyRequestUpdate } from "./request-update-notifications.js";
@@ -182,7 +181,7 @@ export function createRequestUpdateService(prisma: PrismaClient) {
     });
   }
 
-  async function updateRequest(userId: number, id: number, input: unknown) {
+  async function prepareRequestUpdate(userId: number, id: number) {
     const access = await getUserAccess(userId, prisma);
     if (!access || access.role === Role.CLIENT)
       throw new RequestServiceError(403, "Недостаточно прав");
@@ -191,7 +190,14 @@ export function createRequestUpdateService(prisma: PrismaClient) {
       include: { assignees: true, type: { select: { name: true } } },
     });
     if (!row) throw new RequestServiceError(404, "Заявка не найдена");
-    const update = updateRequestSchema.parse(input);
+    return { access, row };
+  }
+
+  async function updatePreparedRequest(
+    context: Awaited<ReturnType<typeof prepareRequestUpdate>>,
+    update: RequestUpdateInput,
+  ) {
+    const { access, row } = context;
     const managesCurrent = assertCanEditRequest(access, row);
     validateRequestUpdate(access, managesCurrent, row, update);
     await prisma.$transaction(async (transaction) => {
@@ -229,5 +235,5 @@ export function createRequestUpdateService(prisma: PrismaClient) {
     });
   }
 
-  return { updateRequest };
+  return { prepareRequestUpdate, updatePreparedRequest };
 }

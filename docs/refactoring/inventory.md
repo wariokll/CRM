@@ -28,14 +28,14 @@
 |   269 | `backend/src/modules/boards/board-cards.service.ts`          |
 |   260 | `backend/src/modules/boards/board-structure.service.ts`      |
 |   249 | `backend/src/modules/boards/board.controller.ts`             |
-|   247 | `src/features/knowledge/hooks/useKnowledgeEditor.ts`         |
+|   241 | `src/features/knowledge/hooks/useKnowledgeEditor.ts`         |
 |   241 | `backend/src/telegram/bot-handler-support.ts`                |
+|   240 | `backend/src/modules/requests/request-update.service.ts`     |
 |   238 | `backend/src/telegram/bot-handlers.ts`                       |
-|   234 | `backend/src/modules/requests/request-update.service.ts`     |
 |   232 | `src/types/core.ts`                                          |
-|   232 | `backend/src/modules/requests/request-create.service.ts`     |
 |   232 | `backend/src/modules/requests/request-read.service.ts`       |
 |   232 | `backend/src/telegram/bot-request-selections.ts`             |
+|   230 | `backend/src/modules/requests/request-create.service.ts`     |
 |   225 | `backend/src/modules/requests/request-create-targets.ts`     |
 |   216 | `backend/src/modules/knowledge/knowledge.service.ts`         |
 |   209 | `src/features/boards/hooks/useBoardsPage.ts`                 |
@@ -44,7 +44,7 @@
 
 ## 2.1. Топ-30 backend-файлов
 
-Top 30 backend source files; tests are excluded.
+Топ-30 backend исходников; тестовые файлы исключены.
 
 | Строк | Файл                                                         |
 | ----: | ------------------------------------------------------------ |
@@ -55,17 +55,17 @@ Top 30 backend source files; tests are excluded.
 |   260 | `backend/src/modules/boards/board-structure.service.ts`      |
 |   249 | `backend/src/modules/boards/board.controller.ts`             |
 |   241 | `backend/src/telegram/bot-handler-support.ts`                |
+|   240 | `backend/src/modules/requests/request-update.service.ts`     |
 |   238 | `backend/src/telegram/bot-handlers.ts`                       |
-|   234 | `backend/src/modules/requests/request-update.service.ts`     |
-|   232 | `backend/src/modules/requests/request-create.service.ts`     |
 |   232 | `backend/src/modules/requests/request-read.service.ts`       |
 |   232 | `backend/src/telegram/bot-request-selections.ts`             |
+|   230 | `backend/src/modules/requests/request-create.service.ts`     |
 |   225 | `backend/src/modules/requests/request-create-targets.ts`     |
 |   216 | `backend/src/modules/knowledge/knowledge.service.ts`         |
 |   196 | `backend/src/test/api-characterization.helpers.ts`           |
 |   173 | `backend/src/telegram/bot-targets.ts`                        |
 |   166 | `backend/src/utils/telegram-notifications.ts`                |
-|   165 | `backend/src/modules/requests/request.controller.ts`         |
+|   164 | `backend/src/modules/requests/request.controller.ts`         |
 |   157 | `backend/src/modules/knowledge/knowledge.controller.ts`      |
 |   151 | `backend/src/modules/moderation/moderation.service.ts`       |
 |   149 | `backend/src/modules/telegram/telegram.service.ts`           |
@@ -81,12 +81,12 @@ Top 30 backend source files; tests are excluded.
 
 ## 2.2. Топ-30 frontend-файлов
 
-Top 30 frontend source files; tests are excluded.
+Топ-30 frontend исходников; тестовые файлы исключены.
 
 | Строк | Файл                                                           |
 | ----: | -------------------------------------------------------------- |
 |   286 | `src/features/knowledge/hooks/useKnowledgePage.tsx`            |
-|   247 | `src/features/knowledge/hooks/useKnowledgeEditor.ts`           |
+|   241 | `src/features/knowledge/hooks/useKnowledgeEditor.ts`           |
 |   232 | `src/types/core.ts`                                            |
 |   209 | `src/features/boards/hooks/useBoardsPage.ts`                   |
 |   201 | `src/features/requests/components/CreateRequestForm.tsx`       |
